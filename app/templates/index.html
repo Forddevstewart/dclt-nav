@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DCLT Nav</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: .5rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid #ddd; }
+    th { background: #f4f4f4; }
+    #status { color: #888; font-style: italic; }
+  </style>
+</head>
+<body>
+  <h1>DCLT Nav</h1>
+  <p id="status">Loading…</p>
+  <table id="items-table" hidden>
+    <thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Created</th></tr></thead>
+    <tbody id="items-body"></tbody>
+  </table>
+
+  <script>
+    fetch('/api/items')
+      .then(r => r.json())
+      .then(items => {
+        const tbody = document.getElementById('items-body');
+        items.forEach(item => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${item.id}</td><td>${item.name}</td><td>${item.description}</td><td>${item.created_at}</td>`;
+          tbody.appendChild(tr);
+        });
+        document.getElementById('status').hidden = true;
+        document.getElementById('items-table').hidden = false;
+      })
+      .catch(() => {
+        document.getElementById('status').textContent = 'Failed to load items.';
+      });
+  </script>
+</body>
+</html>
