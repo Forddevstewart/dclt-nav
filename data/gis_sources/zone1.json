@@ -1,0 +1,15 @@
+{
+  "layer_key": "zone1",
+  "shapefile_name": "ZONE1_POLY",
+  "title": "Zone I Wellhead Protection Areas",
+  "abstract": "As stated in 310 CMR 22.02, Zone I means the protective radius required around a public water supply well or wellfield. For public water system wells with approved yields of 100,000 gpd or greater, the protective radius is 400 feet. Tubular wellfields require a 250-foot protective radius. Protective radii for all other public water system wells are determined by the following equation: Zone I radius in feet = (150 x log of pumping rate in gpd) - 350. A default Zone I radius or a Zone I radius otherwise computed and determined by the Department shall be applied to transient non-community (TNC) and non-transient non-community (NTNC) wells when there is no metered rate of withdrawal or no approved pumping rate. In no case shall the Zone I radius be less than 100 feet.",
+  "geometry_type": "Polygon (MultiPolygon)",
+  "feature_count": 3734,
+  "crs": "EPSG:26986",
+  "last_modified": "2025-09-15",
+  "organization": "MassDEP",
+  "contact_email": null,
+  "contact_phone": "617-292-5500",
+  "rights": "MassDEP",
+  "constraints": null
+}

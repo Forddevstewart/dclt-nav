@@ -1,0 +1,15 @@
+{
+  "layer_key": "bm3_core",
+  "shapefile_name": "BM3_CORE_HABITAT",
+  "title": "BioMap: Core Habitat",
+  "abstract": "Areas critical for the long-term persistence of rare species, exemplary natural communities, and resilient ecosystems.",
+  "geometry_type": "Polygon (MultiPolygon)",
+  "feature_count": 4081,
+  "crs": "EPSG:26986",
+  "last_modified": "2023-02-13",
+  "organization": "Natural Heritage and Endangered Species Program",
+  "contact_email": "natural.heritage@mass.gov",
+  "contact_phone": "508-389-6360",
+  "rights": "MassWildlife and the Massachusetts Chapter of The Nature Conservancy (TNC)",
+  "constraints": "Limitations of use: The legend \"NHESP/TNC BioMap\" MUST accompany these datalayers on ALL maps. These data layers are intended for conservation planning purposes only and should not be used for regulatory purposes. The NHESP layers designed for regulatory use are produced in the Natural Heritage Atlas and include Priority Habitat and Estimated Habitat."
+}

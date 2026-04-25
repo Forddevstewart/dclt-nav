@@ -1,0 +1,15 @@
+{
+  "layer_key": "bm3_cnl",
+  "shapefile_name": "BM3_CRITICAL_NATURAL_LANDSCAPE",
+  "title": "BioMap: Critical Natural Landscape",
+  "abstract": "Large landscapes minimally impacted by development and buffers to core habitats and coastal areas, both of which enhance connectivity and resilience.",
+  "geometry_type": "Polygon (MultiPolygon)",
+  "feature_count": 2722,
+  "crs": "EPSG:26986",
+  "last_modified": "2023-02-13",
+  "organization": "Natural Heritage and Endangered Species Program",
+  "contact_email": "natural.heritage@mass.gov",
+  "contact_phone": "508-389-6360",
+  "rights": "MassWildlife and the Massachusetts Chapter of The Nature Conservancy (TNC)",
+  "constraints": "Limitations of use: The legend \"NHESP/TNC BioMap\" MUST accompany these datalayers on ALL maps. These data layers are intended for conservation planning purposes only and should not be used for regulatory purposes. The NHESP layers designed for regulatory use are produced in the Natural Heritage Atlas and include Priority Habitat and Estimated Habitat."
+}

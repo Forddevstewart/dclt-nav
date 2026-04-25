@@ -1,0 +1,15 @@
+{
+  "layer_key": "prihab",
+  "shapefile_name": "PRIHAB_POLY",
+  "title": "NHESP Priority Habitats of Rare Species",
+  "abstract": "The Priority Habitats of Rare Species datalayer contains polygons representing the geographic extent of Habitat of state-listed rare species in Massachusetts based on observations documented within the last 25 years in the database of the Natural Heritage & Endangered Species Program (NHESP). Priority Habitat polygons are the filing trigger for project proponents, municipalities, and all others for determining whether or not a proposed project or activity must be reviewed by the NHESP for compliance with the Massachusetts Endangered Species Act (MESA) and its implementing regulations. Areas delineated as Priority Habitats can include wetlands, uplands, and marine habitats. The Priority Habitats presented here are part of the 15th Edition of the Massachusetts Natural Heritage Atlas, effective beginning August 1, 2021. Priority Habitats were digitized by NHESP scientists from documented observations of state-listed rare species, heads-up digitized in ArcGIS 10x referenced to the MassGIS 2019 Aerial Imagery. Occurrence records are incorporated into revisions to this datalayer every four years.",
+  "geometry_type": "Polygon (MultiPolygon)",
+  "feature_count": 2158,
+  "crs": "EPSG:26986",
+  "last_modified": "2021-08-01",
+  "organization": "Natural Heritage & Endangered Species Program",
+  "contact_email": "natural.heritage@state.ma.us",
+  "contact_phone": "508-389-6360",
+  "rights": "Natural Heritage & Endangered Species Program, MassGIS",
+  "constraints": "Limitations of use: Priority Habitats should be displayed at 1:25,000 scale or smaller, against MassGIS's 2019 Color Aerial Imagery, using the \"NHESP Priority Habitats of Rare Species\" legend which MUST accompany this datalayer on ALL maps."
+}

@@ -1,0 +1,15 @@
+{
+  "layer_key": "esthab",
+  "shapefile_name": "ESTHAB_POLY",
+  "title": "NHESP Estimated Habitats of Rare Wildlife",
+  "abstract": "Estimated Habitats are for use with the Wetlands Protection Act regulations (310 CMR 10.00). The Estimated Habitats of Rare Wildlife datalayer contains polygons that are a subset of the Priority Habitats of Rare Species. They are based on occurrences of rare wetland wildlife observed within the last 25 years and documented in the NHESP database. They do not include areas delineated as Priority Habitat for rare plants or for rare wildlife with strictly upland habitat requirements. The Estimated Habitats presented here are part of the 15th Edition of the Massachusetts Natural Heritage Atlas, effective beginning August 1, 2021. For projects or activities that fall within Estimated Habitats of Rare Wildlife and that require a Notice of Intent (NOI) under the Wetlands Protection Act, proponents are required to send a copy of the NOI to the NHESP. Estimated Habitats were extracted from the Priority Habitats of Rare Species datalayer and are incorporated into revisions every four years.",
+  "geometry_type": "Polygon (MultiPolygon)",
+  "feature_count": 1366,
+  "crs": "EPSG:26986",
+  "last_modified": "2021-08-01",
+  "organization": "Natural Heritage & Endangered Species Program",
+  "contact_email": "natural.heritage@state.ma.us",
+  "contact_phone": "508-389-6360",
+  "rights": "NHESP, MassGIS",
+  "constraints": "Limitations of use: Estimated Habitats should be displayed at 1:25,000 scale or smaller, with Estimated Habitats shown on top of Priority Habitats when both are displayed, against MassGIS's 2019 Color Orthophotos, using the \"NHESP Estimated Habitats of Rare Wildlife\" legend which MUST accompany this datalayer on ALL maps."
+}

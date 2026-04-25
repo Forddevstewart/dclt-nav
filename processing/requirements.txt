@@ -1,0 +1,6 @@
+# Processing pipeline dependencies — local use only, not installed on the server.
+# Install with: pip install -r processing/requirements.txt
+pyyaml>=6.0
+pandas>=2.0
+openpyxl>=3.1
+sqlalchemy>=2.0

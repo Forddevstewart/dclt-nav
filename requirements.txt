@@ -1,2 +1,4 @@
+# Server dependencies only — deployed to VPS.
+# Discovery/scraping deps live in discovery/requirements.txt (local use only).
 flask>=3.0
 gunicorn>=22.0

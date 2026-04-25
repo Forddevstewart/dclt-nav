@@ -10,6 +10,9 @@ def create_app():
         os.path.dirname(os.path.dirname(__file__)), "data", "dclt.db"
     )
 
+    from discovery.config import get_config
+    app.config["RAW_DATABASE"] = str(get_config().db_path("raw"))
+
     from .routes import bp as routes_bp
     from .api import bp as api_bp
 

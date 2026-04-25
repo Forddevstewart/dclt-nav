@@ -1,0 +1,15 @@
+{
+  "layer_key": "structures",
+  "shapefile_name": "STRUCTURES_POLY",
+  "title": "Building Structures (2-D, from Ortho Imagery)",
+  "abstract": "This dataset consists of 2-dimensional roof outlines (roofprints) for all buildings larger than 150 square feet, as initially interpreted by a contractor (Rolta) for the whole area of the Commonwealth using DigitalGlobe ortho images obtained in 2011 and 2012, supplemented with LiDAR data collected from 2002 to 2011 for the eastern half of the state. The roofprints were enhanced by MassGIS using Normalized Digital Surface Models (NDSMs) derived from the same LiDAR data. In 2019, MassGIS refreshed the data to a baseline of 2016 and continues to update features using newer aerial imagery. Structures from the original compilation that are removed are stored in an archive feature class for historical purposes. Updates based on 2023 imagery were completed in August 2024; additional edits made in December 2025. Last updated 1/26/2026.",
+  "geometry_type": "Polygon (MultiPolygon)",
+  "feature_count": 2669043,
+  "crs": "EPSG:26986",
+  "last_modified": "2026-01-24",
+  "organization": "MassGIS",
+  "contact_email": "michael.trust@state.ma.us",
+  "contact_phone": "617-626-4400",
+  "rights": "Rolta, MassGIS, City of Boston",
+  "constraints": null
+}

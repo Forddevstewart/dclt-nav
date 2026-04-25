@@ -1,0 +1,15 @@
+{
+  "layer_key": "openspace",
+  "shapefile_name": "OPENSPACE_POLY",
+  "title": "Protected and Recreational OpenSpace (Polygons)",
+  "abstract": "The protected and recreational open space datalayer contains the boundaries of conservation lands and outdoor recreational facilities in Massachusetts. The associated database contains relevant information about each parcel, including ownership, level of protection, public accessibility, assessor's map and lot numbers, and related legal interests held on the land, including conservation restrictions. Conservation and outdoor recreational facilities owned by federal, state, county, municipal, and nonprofit enterprises are included. Not all lands in this layer are protected in perpetuity, though nearly all have at least some level of protection. Types of land included: conservation land, recreation land, town forests, parkways, agricultural land under APR, aquifer protection land, watershed protection land, cemeteries recognized as conservation resources, and Forest Legacy Areas.",
+  "geometry_type": "Polygon (MultiPolygon)",
+  "feature_count": 60150,
+  "crs": "EPSG:26986",
+  "last_modified": "2026-02-07",
+  "organization": "Executive Office of Energy and Environmental Affairs",
+  "contact_email": "benjamin.smith@state.ma.us",
+  "contact_phone": "(617) 626-1076",
+  "rights": "MassGIS, Executive Office of Energy and Environmental Affairs",
+  "constraints": "Limitations of use: These data are very useful for most statewide and regional planning purposes. However, they are not a legal record of ownership, and parcel representations are generally not based on property surveys."
+}

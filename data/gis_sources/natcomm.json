@@ -1,0 +1,15 @@
+{
+  "layer_key": "natcomm",
+  "shapefile_name": "NATCOMM_POLY",
+  "title": "NHESP Natural Communities",
+  "abstract": "The NHESP Natural Communities datalayer consists of polygons that represent the extent of various natural communities of biodiversity conservation interest in Massachusetts. These polygons are based on records of natural communities maintained in the Natural Heritage & Endangered Species Program (NHESP) database. Program scientists classify and delineate natural community polygons by analyzing field data and available information about the landscape. All sites have been visited by NHESP biologists or by other biologists who have submitted reviewed reports. Aquatic community types are not included. The natural community types are from Swain, P.C. 2020. Classification of the Natural Communities of Massachusetts, which describes 106 types. The datalayer contains 966 records covering 99 community types, of which 73 are Priority for conservation (ranked S1 through S3S4), 25 types are Low-priority (S4 and S5), and 1 type with conservation status not yet assigned. These polygons are not related to 'Priority Habitat' or 'Significant Habitat' as defined by MESA regulations.",
+  "geometry_type": "Polygon (MultiPolygon)",
+  "feature_count": 966,
+  "crs": "EPSG:26986",
+  "last_modified": "2024-06-20",
+  "organization": "Natural Heritage & Endangered Species Program",
+  "contact_email": "natural.heritage@mass.gov",
+  "contact_phone": "508-389-6360",
+  "rights": "Natural Heritage & Endangered Species Program",
+  "constraints": "Limitations of use: The legend \"NHESP Natural Communities, 2020 edition\" MUST accompany this datalayer on all maps. Data should be displayed at scales of 1:25,000 or smaller. This datalayer is intended for conservation planning purposes only and is NOT intended for regulatory purposes."
+}

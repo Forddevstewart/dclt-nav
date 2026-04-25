@@ -1,0 +1,15 @@
+{
+  "layer_key": "soil",
+  "shapefile_name": "SOILS_MUPOLYGON_TOP20",
+  "title": "Soils Polygons for Massachusetts with Top 20 Fields",
+  "abstract": "This dataset is a digital soil survey representing the most detailed level of soil geographic data developed by the National Cooperative Soil Survey. The information was prepared by digitizing maps or compiling information onto a planimetric correct base. The dataset includes a detailed, field-verified inventory of soils and miscellaneous areas that normally occur in a repeatable pattern on the landscape. Soil map units are linked to attributes in the National Soil Information System relational database, giving the proportionate extent of component soils and their properties. The Soil Survey Geographic (SSURGO) Database depicts information about the kinds and distribution of soils on the landscape, prepared by soil scientists as part of the National Cooperative Soil Survey. MassGIS projected the original data into the Massachusetts NAD 1983 State Plane Meters coordinate system.",
+  "geometry_type": "Polygon (MultiPolygon)",
+  "feature_count": 249771,
+  "crs": "EPSG:26986",
+  "last_modified": "2021-11-19",
+  "organization": "U.S. Department of Agriculture, Natural Resources Conservation Service, National Soil Survey Center",
+  "contact_email": "SoilsHotline@lin.usda.gov",
+  "contact_phone": "402-437-5499",
+  "rights": "Soil Survey Staff. Gridded Soil Survey Geographic (gSSURGO) Database for Massachusetts. United States Department of Agriculture, Natural Resources Conservation Service.",
+  "constraints": "Limitations of use: USDA NRCS should be acknowledged as the data source in products derived from these data. This dataset is not designed for use as a primary regulatory tool in permitting or siting decisions, but may be used as a reference source. Federal, State, or local regulatory bodies are not to reassign to NRCS any authority for decisions they make."
+}

@@ -1,0 +1,139 @@
+# discovery/sources.yaml
+#
+# Source configuration for the dclt-nav Discovery pipeline.
+# Discovery runs locally, writes to CIVICTWIN_ROOT (/CivicTwin on the external volume).
+# Override the root path by setting the CIVICTWIN_ROOT environment variable.
+#
+# Source types:
+#   scrape      - code fetches documents from the web
+#   collection  - files are manually placed or downloaded outside this pipeline;
+#                 each file is explicitly listed here so the pipeline knows what to process
+
+civictwin_root: /Volumes/DigitalTwin/CivicTwin
+
+sources:
+
+  # ── Scraped sources ──────────────────────────────────────────────────────────
+
+  document_center:
+    description: >
+      CivicPlus DocumentCenter hosted at town.dennis.ma.us. Hosts Town of Dennis
+      PDFs organized into named libraries — annual warrants, town meeting results,
+      bylaws and regulations, election results, comprehensive plan, budget, open
+      space and recreation plan, and town administrator reports. The scraper walks
+      each library page for DocumentCenter/View links and downloads any PDF not
+      already on disk. All categories are fetched when this source is enabled;
+      disable the whole source to skip DocumentCenter entirely.
+    enabled: true
+    type: scrape
+    base_url: https://www.town.dennis.ma.us
+    rate_limit_seconds: 2.0
+    output_dir: ma-dennis/documentcenter
+    categories:
+      warrants:
+        path: /676/Annual-Town-Reports-Public-Documents
+        subdir: warrants
+      results:
+        path: /391/Town-Meeting-Results
+        subdir: results
+      election_results:
+        path: /381/Election-Results
+        subdir: election_results
+      bylaws_regulations:
+        path: /372/By-Laws-Rules-Regulations
+        subdir: bylaws_regulations
+      comprehensive_plan:
+        path: /296/Comprehensive-Plan
+        subdir: comprehensive_plan
+      budget:
+        path: /1158/Budget-Central
+        subdir: budget
+      open_space_plan:
+        path: /992/Open-Space-Recreation-Plan-Update-2024-2
+        subdir: open_space_plan
+      town_administrator_reports:
+        path: /769/Town-Administrator-Reports
+        subdir: town_administrator_reports
+
+  agenda_center:
+    description: >
+      CivicPlus AgendaCenter at ma-dennis.civicplus.com. Scrapes meeting agendas,
+      minutes, agenda packets, and supplemental documents for all Town of Dennis
+      committees and boards. Metadata discovery uses the civic-scraper library
+      (CivicPlusSite); PDFs are then downloaded separately. Two run modes: a
+      full-history run from full_history_start_year to present, and a daily mode
+      that covers only the last daily_lookback_days days. Documents are organized
+      under output_dir by committee name.
+    enabled: true
+    type: scrape
+    base_url: https://ma-dennis.civicplus.com/agendacenter
+    rate_limit_seconds: 2.0
+    output_dir: ma-dennis/agendacenter
+    full_history_start_year: 2010
+    daily_lookback_days: 14
+
+  registry:
+    description: >
+      Barnstable Registry of Deeds (ALIS system) at search.barnstabledeeds.org.
+      Looks up deed documents by Book/Page number (sourced from the assessor
+      collection) for parcels that have a deed reference, or by owner name for
+      parcels that do not. Downloads deed scans and Land Court documents as PDFs.
+      Documents are organized under output_dir by book/page or certificate number.
+      IMPORTANT: robots.txt disallows all automated access. The override_robots
+      flag must be set to true before running — treat each session as a deliberate
+      research decision. Never set override_robots: true in a commit on main.
+    enabled: true
+    type: scrape
+    base_url: https://search.barnstabledeeds.org
+    override_robots: false
+    output_dir: registry
+    rate_limit:
+      min_delay_seconds: 2.0
+      adaptive_delay_seconds: 10.0
+      batch_size: 100
+      batch_pause_seconds: 15.0
+      slow_threshold_seconds: 10.0
+      max_retries: 2
+
+  # ── Collections (explicitly listed files, not scraped) ───────────────────────
+  #
+  # Add new files by adding an entry to the files list.
+  # 'path' is relative to civictwin_root.
+  # The pipeline uses this list as the authoritative inventory of what to process.
+  # dennis_parcels.geojson
+  # dennis_prihab.csv
+  # dennis_structures.csv
+  # dennis_wetlandsdep.csv
+  
+
+  # Planimetrics
+
+  gis:
+    description: >
+      GIS data files (GeoJSON, Shapefile, CSV) from MassGIS and other sources.
+      The parcel layer is fetched from the MassGIS ArcGIS Feature Service and
+      written to disk outside this config; add new layers here as they are
+      collected. Each file is processed by the pipeline only if listed here.
+    enabled: true
+    type: collection
+    files:
+      - id: dennis_parcels
+        path: gis/dennis_parcels.geojson
+        description: Dennis parcel polygons from MassGIS ArcGIS Feature Service (ESRI REST, filtered CITY='DENNIS')
+        format: geojson
+
+  assessor:
+    description: >
+      Manually maintained data files from the Dennis Board of Assessors. The
+      annual extract (BT_Extract sheet) is the primary source for parcel
+      ownership, deed book/page references, and assessed values. Update the
+      path entry each year when a new extract is received; keep old entries
+      commented out for reference rather than deleting them.
+    enabled: true
+    type: collection
+    files:
+      - id: annual_extract_2026
+        path: assessor/2026 Assessor Database - 2026.01.13.x.xlsx
+        description: 2026 annual assessor extract, received 2026-01-13
+        format: xlsx
+        sheet: BT_Extract

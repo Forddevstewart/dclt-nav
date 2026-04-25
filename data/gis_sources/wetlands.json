@@ -1,0 +1,15 @@
+{
+  "layer_key": "wetlands",
+  "shapefile_name": "WETLANDSDEP_POLY",
+  "title": "MassDEP Wetland Polygons",
+  "abstract": "The MassDEP Wetlands dataset contains polygon features delineating mapped wetland resource areas with attribute codes indicating wetland type. These statewide layers enhance and replace the original MassDEP wetlands layers (formerly DEP Wetlands 1:12,000) and provide a medium-scale representation for planning purposes only. The original mapping was based on photo-interpretation of 1:12,000 stereo color-infrared photography captured between 1990 and 2000, with field verification by the MassDEP Wetlands Conservancy Program. In 2007, MassDEP began a statewide update effort using 0.5m digital stereo CIR imagery captured in April 2005. Wetland boundary determination for regulatory purposes such as the Wetlands Protection Act (M.G.L. c. 131) or local bylaws must use the relevant procedures and criteria.",
+  "geometry_type": "Polygon (MultiPolygon)",
+  "feature_count": 199633,
+  "crs": "EPSG:26986",
+  "last_modified": "2017-12-13",
+  "organization": "Massachusetts Bureau of Geographic Information (MassGIS)",
+  "contact_email": "paul.nutting@state.ma.us",
+  "contact_phone": "(617) 619-5611",
+  "rights": "Massachusetts Department of Environmental Protection (MassDEP) Wetlands Conservancy Program",
+  "constraints": "Limitations of use: These layers provide a medium-scale representation of the wetland areas of the state and are for planning purposes only. Wetlands boundary determination for other purposes, such as the Wetlands Protection Act MA Act M.G.L. c. 131 or local bylaws, must use the relevant procedures and criteria."
+}

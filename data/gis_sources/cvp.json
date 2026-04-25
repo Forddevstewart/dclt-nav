@@ -1,0 +1,15 @@
+{
+  "layer_key": "cvp",
+  "shapefile_name": "GISDATA_CVP_PTPoint",
+  "title": "Certified Vernal Pools",
+  "abstract": null,
+  "geometry_type": "Point (PointZM)",
+  "feature_count": 8293,
+  "crs": "EPSG:26986",
+  "last_modified": "2026-04-23",
+  "organization": null,
+  "contact_email": null,
+  "contact_phone": null,
+  "rights": null,
+  "constraints": null
+}

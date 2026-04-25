@@ -1,0 +1,15 @@
+{
+  "layer_key": "zone2",
+  "shapefile_name": "ZONE2_POLY",
+  "title": "Zone II Approved Wellhead Protection Areas (Dissolved)",
+  "abstract": "As stated in 310 CMR 22.02, a Zone II is: that area of an aquifer which contributes water to a well under the most severe pumping and recharge conditions that can be realistically anticipated (180 days of pumping at safe yield, with no recharge from precipitation). It is bounded by the groundwater divides which result from pumping the well and by the contact of the aquifer with less permeable materials such as till or bedrock. In some cases, streams or lakes may act as recharge boundaries. In all cases, Zone IIs shall extend up gradient to its point of intersection with prevailing hydrogeologic boundaries (a groundwater flow divide, a contact with till or bedrock, or a recharge boundary).",
+  "geometry_type": "Polygon (MultiPolygon)",
+  "feature_count": 565,
+  "crs": "EPSG:26986",
+  "last_modified": "2025-09-15",
+  "organization": "MassDEP",
+  "contact_email": null,
+  "contact_phone": "617-292-5500",
+  "rights": "MassDEP",
+  "constraints": null
+}

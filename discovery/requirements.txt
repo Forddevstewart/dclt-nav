@@ -1,0 +1,9 @@
+# Discovery pipeline dependencies — local use only, not installed on the server.
+# Install with: pip install -r discovery/requirements.txt
+pyyaml>=6.0
+requests>=2.32
+beautifulsoup4>=4.12
+lxml>=5.0
+civic-scraper>=1.0
+sqlalchemy>=2.0
+pytest>=8.0
