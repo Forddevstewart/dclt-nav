@@ -2,3 +2,6 @@
 # Discovery/scraping deps live in discovery/requirements.txt (local use only).
 flask>=3.0
 gunicorn>=22.0
+pyyaml>=6.0
+pandas>=2.0
+sqlalchemy>=2.0

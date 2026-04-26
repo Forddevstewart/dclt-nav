@@ -183,9 +183,76 @@ the copy still completes. `reference.db` is the file deployed to the server.
 Sync `transactional.db` down before publishing if you want corrections included:
 
 ```bash
-# Example — adjust to your actual sync mechanism
-rsync user@server:/path/to/transactional.db /Volumes/DigitalTwin/CivicTwin/db/
+rsync ionos-vps:/var/www/dclt-nav/civictwin/db/transactional.db \
+  /Volumes/DigitalTwin/CivicTwin/db/
 python3 -m processing.publish
+```
+
+---
+
+## Deploy to VPS
+
+### Code — push to trigger GitHub Actions
+
+```bash
+git push origin main
+```
+
+The Actions workflow SSHs into the VPS, runs `git reset --hard origin/main`,
+`pip install -r requirements.txt`, and `systemctl restart dclt-nav`. Monitor
+the result at github.com/Forddevstewart/dclt-nav/actions.
+
+### Data — rsync reference.db and PDFs
+
+Run `processing.publish` first to build a fresh `reference.db`, then sync:
+
+```bash
+# Database (run after every processing.publish)
+rsync -avz --progress \
+  /Volumes/DigitalTwin/CivicTwin/db/reference.db \
+  ionos-vps:/var/www/dclt-nav/civictwin/db/reference.db
+
+# Registry PDFs (incremental — only new files transfer)
+rsync -avz --progress \
+  /Volumes/DigitalTwin/CivicTwin/registry/documents/ \
+  ionos-vps:/var/www/dclt-nav/civictwin/registry/documents/
+```
+
+Uses the `ionos-vps` alias from `~/.ssh/config`. No restart needed after data sync.
+
+### Server layout
+
+```
+/var/www/dclt-nav/
+  civictwin/
+    db/
+      reference.db       ← rsynced from local volume
+      transactional.db   ← born on server, never overwritten
+    registry/
+      documents/         ← rsynced from local volume
+```
+
+`CIVICTWIN_ROOT=/var/www/dclt-nav/civictwin` must be set in the systemd service.
+
+### Editing the systemd service (requires root)
+
+The `deployer` user can only `sudo systemctl restart dclt-nav`. To edit the
+service file, SSH as root:
+
+```bash
+ssh root@198.71.50.88
+nano /etc/systemd/system/dclt-nav.service
+systemctl daemon-reload
+systemctl restart dclt-nav
+```
+
+### Checking logs on the server
+
+```bash
+ssh ionos-vps
+tail -30 /var/log/dclt-nav-error.log
+tail -10 /var/log/dclt-nav-access.log
+systemctl status dclt-nav
 ```
 
 ---
