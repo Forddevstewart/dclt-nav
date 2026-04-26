@@ -8,8 +8,8 @@ def get_db():
     return conn
 
 
-def get_raw_db():
-    conn = sqlite3.connect(current_app.config["RAW_DATABASE"])
+def get_reference_db():
+    conn = sqlite3.connect(current_app.config["REFERENCE_DATABASE"])
     conn.row_factory = sqlite3.Row
     return conn
 

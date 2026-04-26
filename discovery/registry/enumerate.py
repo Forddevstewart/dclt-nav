@@ -23,6 +23,7 @@ from discovery.registry.cache import (
     ensure_cache_dirs,
     get_cached_index,
     save_index,
+    setup_logging,
 )
 from discovery.registry.ratelimit import RateLimiter, RegistryThrottleError, check_robots
 
@@ -146,12 +147,14 @@ _IMG_RE = re.compile(
 
 def _name_search_params(search_name: str, search_first: str,
                         is_lc: bool, date_start: str, date_end: str,
-                        direction: str = "A") -> dict:
-    try:
-        fdta = f"0101{int(date_start):04d}"
-        tdta = f"1231{int(date_end):04d}"
-    except ValueError:
-        fdta, tdta = "", ""
+                        direction: str = "A",
+                        fdta: str | None = None, tdta: str | None = None) -> dict:
+    if fdta is None or tdta is None:
+        try:
+            fdta = fdta or f"0101{int(date_start):04d}"
+            tdta = tdta or f"1231{int(date_end):04d}"
+        except ValueError:
+            fdta, tdta = fdta or "", tdta or ""
 
     if is_lc:
         return {"WSHTNM": "WW401L00", "WSIQTP": "LC01LP", "WSWVER": "2",
@@ -222,15 +225,18 @@ def _has_next(html: str) -> bool:
 def name_search(rl: RateLimiter, search_name: str, search_first: str,
                 is_lc: bool, date_start: str, date_end: str,
                 parcel_id: str, project: str,
-                direction: str = "A") -> list[dict]:
+                direction: str = "A",
+                fdta: str | None = None, tdta: str | None = None,
+                max_pages: int = MAX_PAGES) -> tuple[list[dict], bool]:
     if not search_name.strip():
-        return []
+        return [], False
     params = _name_search_params(search_name, search_first, is_lc, date_start, date_end,
-                                 direction)
+                                 direction, fdta=fdta, tdta=tdta)
     all_docs = []
     next_iqtp = "LR01N" if not is_lc else "LC01N"
+    truncated = False
 
-    for page_num in range(1, MAX_PAGES + 1):
+    for page_num in range(1, max_pages + 1):
         if page_num > 1:
             params["WSIQTP"] = next_iqtp
         try:
@@ -248,10 +254,11 @@ def name_search(rl: RateLimiter, search_name: str, search_first: str,
         all_docs.extend(page_docs)
         if not _has_next(resp.text) or not page_docs:
             break
-        if page_num == MAX_PAGES:
+        if page_num == max_pages:
             log.warning("Page cap hit for %s '%s' — results truncated", parcel_id, search_name)
+            truncated = True
 
-    return all_docs
+    return all_docs, truncated
 
 
 def _dedup(docs: list[dict]) -> list[dict]:
@@ -353,9 +360,10 @@ def process_tier2(rl: RateLimiter, queue: list[dict], limit: int) -> dict:
         log.info("NAME SEARCH %s  W9SNM='%s' W9GNM='%s'", pid, primary, first)
 
         try:
-            docs = name_search(rl, primary, first, is_lc, date_start, date_end, pid, project)
+            docs, _ = name_search(rl, primary, first, is_lc, date_start, date_end, pid, project)
             if secondary and secondary != primary:
-                docs += name_search(rl, secondary, "", is_lc, date_start, date_end, pid, project)
+                more, _ = name_search(rl, secondary, "", is_lc, date_start, date_end, pid, project)
+                docs += more
         except RegistryThrottleError:
             raise
         except Exception as e:
@@ -387,6 +395,8 @@ def main() -> None:
         sys.exit(1)
 
     ensure_cache_dirs()
+    log_path = setup_logging("enumerate")
+    log.info("Logging to %s", log_path)
 
     queue_csv = _queue_csv()
     if not queue_csv.exists():

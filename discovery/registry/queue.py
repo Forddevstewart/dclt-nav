@@ -91,7 +91,7 @@ def _queue_path() -> Path:
 
 
 def _db_path() -> Path:
-    return get_config().db_path("dennis")
+    return get_config().db_path("raw")
 
 
 def build_queue(con: sqlite3.Connection) -> tuple[list[dict], list[str]]:

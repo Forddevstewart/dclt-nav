@@ -3,40 +3,1173 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DCLT Nav123</title>
+  <title>DCLT Navigator</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
-    h1 { border-bottom: 2px solid #333; padding-bottom: .5rem; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid #ddd; }
-    th { background: #f4f4f4; }
-    #status { color: #888; font-style: italic; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      display: flex; flex-direction: column;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px; background: #f1f5f9; color: #1e293b;
+    }
+
+    /* ── Nav ─────────────────────────────────────────────────────────────── */
+    nav {
+      height: 48px; background: #1e2d3d; display: flex; align-items: center;
+      padding: 0 1.25rem; gap: 2rem; flex-shrink: 0;
+      border-bottom: 1px solid #0f172a;
+    }
+    .nav-brand { font-size: 15px; font-weight: 700; color: #93c5fd; letter-spacing: .01em; white-space: nowrap; }
+    .nav-tabs  { display: flex; }
+    .nav-tab {
+      height: 48px; padding: 0 1rem; display: flex; align-items: center;
+      color: #94a3b8; cursor: pointer; border-bottom: 3px solid transparent;
+      font-size: 13px; font-weight: 500; user-select: none; transition: color .1s;
+    }
+    .nav-tab:hover { color: #e2e8f0; }
+    .nav-tab.active { color: #f8fafc; border-bottom-color: #3b82f6; }
+
+    /* ── Layout ──────────────────────────────────────────────────────────── */
+    .main   { flex: 1; overflow: hidden; display: flex; }
+    .tab-panel { width: 100%; height: 100%; display: flex; }
+    .three-col { display: flex; width: 100%; height: 100%; overflow: hidden; }
+    .stub-panel { align-items: center; justify-content: center; color: #94a3b8; }
+
+    /* ── Left column (shared) ────────────────────────────────────────────── */
+    .col-left {
+      width: 288px; flex-shrink: 0; display: flex; flex-direction: column;
+      background: #fff; border-right: 1px solid #e2e8f0;
+    }
+    .col-left-controls {
+      padding: .6rem .75rem; border-bottom: 1px solid #e2e8f0;
+      display: flex; flex-direction: column; gap: .45rem; flex-shrink: 0;
+    }
+    .col-left-list   { flex: 1; overflow-y: auto; }
+    .col-left-footer {
+      padding: .4rem .75rem; border-top: 1px solid #e2e8f0; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 11px; color: #64748b; gap: .5rem;
+    }
+
+    /* ── Middle column ───────────────────────────────────────────────────── */
+    .col-mid { flex: 1; overflow-y: auto; min-width: 0; background: #fafafa; border-right: 1px solid #e2e8f0; }
+    .col-mid-inner { padding: 1rem 1.1rem; }
+
+    /* ── Right column ────────────────────────────────────────────────────── */
+    .col-right { width: 42%; flex-shrink: 0; display: flex; flex-direction: column; background: #fff; }
+    .col-right-header {
+      padding: .5rem .9rem; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
+      font-size: 11px; font-weight: 700; color: #94a3b8;
+      text-transform: uppercase; letter-spacing: .07em;
+    }
+    .col-right-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+    /* ── Controls ────────────────────────────────────────────────────────── */
+    .search-input {
+      width: 100%; padding: .38rem .6rem; border: 1px solid #cbd5e1; border-radius: 4px;
+      font-size: 13px; outline: none; color: #1e293b;
+    }
+    .search-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px #bfdbfe; }
+    .ctrl-select {
+      width: 100%; padding: .28rem .4rem; border: 1px solid #cbd5e1; border-radius: 4px;
+      font-size: 12px; outline: none; background: #fff; color: #1e293b;
+    }
+    .ctrl-select:focus { border-color: #3b82f6; }
+    .sort-row { display: flex; gap: .35rem; align-items: center; }
+    .sort-label { font-size: 11px; color: #94a3b8; white-space: nowrap; }
+    .sort-dir-btn {
+      padding: .28rem .55rem; border: 1px solid #cbd5e1; border-radius: 4px;
+      background: #fff; cursor: pointer; font-size: 14px; line-height: 1; color: #475569; flex-shrink: 0;
+    }
+    .sort-dir-btn:hover { background: #f8fafc; }
+
+    /* ── List rows ───────────────────────────────────────────────────────── */
+    .list-row {
+      padding: .45rem .75rem; border-bottom: 1px solid #f1f5f9; cursor: pointer;
+      border-left: 3px solid transparent; transition: background .1s;
+    }
+    .list-row:hover  { background: #f8fafc; }
+    .list-row.selected { background: #eff6ff; border-left-color: #3b82f6; }
+    .row-id    { font-size: 10px; color: #94a3b8; letter-spacing: .03em; }
+    .row-main  { font-size: 13px; font-weight: 500; line-height: 1.35; color: #0f172a; }
+    .row-sub   { font-size: 11px; color: #64748b; margin-top: 1px; }
+    .row-kws   { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 3px; }
+
+    /* ── Pagination ──────────────────────────────────────────────────────── */
+    .paging-btns { display: flex; gap: .25rem; }
+    .paging-btn {
+      padding: .18rem .45rem; border: 1px solid #cbd5e1; border-radius: 3px;
+      background: #fff; cursor: pointer; font-size: 11px; color: #374151;
+    }
+    .paging-btn:hover:not(:disabled) { background: #f1f5f9; }
+    .paging-btn:disabled { opacity: .4; cursor: default; }
+    .paging-page { font-size: 11px; align-self: center; white-space: nowrap; }
+
+    /* ── Sections ────────────────────────────────────────────────────────── */
+    .section { margin-bottom: 1.4rem; }
+    .section-title {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .1em; color: #94a3b8;
+      padding-bottom: .35rem; margin-bottom: .6rem; border-bottom: 2px solid #e2e8f0;
+    }
+
+    /* ── Attr table ──────────────────────────────────────────────────────── */
+    .attr-table { width: 100%; border-collapse: collapse; }
+    .attr-table tr { border-bottom: 1px solid #f1f5f9; }
+    .attr-table td { padding: .28rem .3rem; font-size: 13px; vertical-align: top; }
+    .attr-label { color: #64748b; width: 44%; }
+    .attr-value { color: #0f172a; font-weight: 500; }
+
+    /* ── Document table ──────────────────────────────────────────────────── */
+    .doc-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .doc-table th {
+      text-align: left; padding: .3rem .45rem; background: #f8fafc;
+      color: #64748b; font-weight: 600; font-size: 11px;
+      border-bottom: 2px solid #e2e8f0; white-space: nowrap;
+    }
+    .doc-table td { padding: .32rem .45rem; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+    .doc-row { cursor: pointer; transition: background .1s; }
+    .doc-row:hover  { background: #f0f9ff; }
+    .doc-row.active { background: #eff6ff; }
+    .doc-party { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── Badges ──────────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-block; font-size: 11px; padding: .15rem .45rem;
+      border-radius: 3px; font-weight: 500; line-height: 1.4;
+    }
+    .badge-blue   { background: #dbeafe; color: #1d4ed8; }
+    .badge-green  { background: #dcfce7; color: #166534; }
+    .badge-gray   { background: #f1f5f9; color: #64748b; }
+    .badge-orange { background: #ffedd5; color: #c2410c; }
+    .badge-teal   { background: #ccfbf1; color: #0f766e; }
+    .badge-purple { background: #ede9fe; color: #6d28d9; }
+    .badge-amber  { background: #fef9c3; color: #92400e; }
+
+    /* ── Keyword badges (mini) ───────────────────────────────────────────── */
+    .kw-badge {
+      font-size: 10px; padding: .1rem .35rem; border-radius: 2px;
+      font-weight: 600; line-height: 1.3;
+    }
+    .kw-cr   { background: #ccfbf1; color: #0f766e; }
+    .kw-a97  { background: #ede9fe; color: #6d28d9; }
+    .kw-dr   { background: #ffedd5; color: #c2410c; }
+    .kw-c61  { background: #dcfce7; color: #166534; }
+    .kw-apr  { background: #fef9c3; color: #92400e; }
+    .kw-pr   { background: #dbeafe; color: #1d4ed8; }
+    .kw-ccr  { background: #f1f5f9; color: #64748b; }
+
+    /* ── Keyword score bars ──────────────────────────────────────────────── */
+    .kw-score-row {
+      display: grid; grid-template-columns: 200px 1fr 48px;
+      align-items: center; gap: .5rem; padding: .25rem 0;
+      font-size: 12px; border-bottom: 1px solid #f8fafc;
+    }
+    .kw-score-row:last-child { border-bottom: none; }
+    .kw-bar-track { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+    .kw-bar-fill  { height: 100%; border-radius: 4px; transition: width .3s; }
+    .kw-val { text-align: right; font-weight: 600; color: #1e293b; font-size: 11px; }
+
+    /* ── GIS flags ───────────────────────────────────────────────────────── */
+    .gis-flag-grid  { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .8rem; }
+    .gis-flag { font-size: 11px; padding: .18rem .5rem; border-radius: 3px; font-weight: 500; line-height: 1.4; }
+    .gis-flag.on  { background: #dcfce7; color: #166534; cursor: pointer; }
+    .gis-flag.on:hover { background: #bbf7d0; }
+    .gis-flag.off { background: #f1f5f9; color: #94a3b8; }
+    .gis-groups { display: flex; flex-direction: column; gap: .4rem; }
+    .gis-group  { border: 1px solid #e2e8f0; border-radius: 4px; overflow: hidden; }
+    .gis-group-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .35rem .6rem; background: #f8fafc; cursor: pointer;
+      user-select: none; font-size: 12px; font-weight: 600; color: #374151;
+    }
+    .gis-group-header:hover { background: #f1f5f9; }
+    .gis-group-body { padding: .4rem .6rem; background: #fff; }
+    .gis-detail-row { display: grid; grid-template-columns: 150px 1fr; gap: .25rem; padding: .15rem 0; font-size: 12px; border-bottom: 1px solid #f8fafc; }
+    .gis-detail-row:last-child { border-bottom: none; }
+    .gis-detail-label { color: #64748b; }
+    .gis-detail-value { color: #1e293b; font-weight: 500; word-break: break-word; }
+
+    /* ── Empty / loading ─────────────────────────────────────────────────── */
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; color: #94a3b8; gap: .4rem; padding: 2rem; text-align: center;
+    }
+    .empty-icon  { font-size: 28px; }
+    .loading-msg { display: flex; align-items: center; justify-content: center; padding: 3rem; color: #94a3b8; }
+
+    /* ── PDF / no-scan panel ─────────────────────────────────────────────── */
+    .no-scan-panel {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; gap: 1rem; padding: 2rem; text-align: center; color: #64748b;
+    }
+    .rod-link {
+      display: inline-block; padding: .5rem 1.1rem; background: #3b82f6; color: #fff;
+      border-radius: 5px; text-decoration: none; font-size: 13px; font-weight: 600;
+      border: none; cursor: pointer;
+    }
+    .rod-link:hover { background: #2563eb; }
+    .rod-doc-meta { font-size: 12px; color: #94a3b8; }
+
+    /* ── OCR text ────────────────────────────────────────────────────────── */
+    .ocr-text {
+      white-space: pre-wrap; word-break: break-word;
+      font-family: 'Courier New', monospace; font-size: 11px;
+      line-height: 1.6; color: #374151; background: #f8fafc;
+      padding: .75rem; border-radius: 4px; max-height: 320px;
+      overflow-y: auto; border: 1px solid #e2e8f0;
+    }
+
+    /* ── Overview tab ────────────────────────────────────────────────────── */
+    .overview-page { width: 100%; height: 100%; overflow-y: auto; padding: 1.5rem; }
+    .overview-hdr  { margin-bottom: 1.25rem; }
+    .overview-hdr h2  { font-size: 18px; font-weight: 700; color: #0f172a; }
+    .overview-hdr p   { font-size: 12px; color: #94a3b8; margin-top: .2rem; }
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1rem;
+    }
+    .stat-card {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;
+      padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: .75rem;
+    }
+    .stat-card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; }
+    .stat-primary { display: flex; align-items: baseline; gap: .4rem; }
+    .stat-big     { font-size: 28px; font-weight: 700; color: #0f172a; line-height: 1; }
+    .stat-unit    { font-size: 13px; color: #64748b; }
+    .stat-subs    { display: flex; flex-direction: column; gap: .2rem; }
+    .stat-sub     { display: flex; justify-content: space-between; font-size: 12px; color: #64748b; padding: .15rem 0; border-bottom: 1px solid #f8fafc; }
+    .stat-sub:last-child { border-bottom: none; }
+    .stat-sub-val { font-weight: 600; color: #374151; }
+
+    /* breakdown bars */
+    .brk-list  { display: flex; flex-direction: column; gap: .3rem; }
+    .brk-row   { display: flex; justify-content: space-between; align-items: baseline; gap: .4rem; font-size: 12px; margin-bottom: 2px; }
+    .brk-label { color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .brk-count { font-weight: 600; color: #1e293b; white-space: nowrap; font-size: 11px; flex-shrink: 0; }
+    .brk-bar-wrap { height: 4px; background: #f1f5f9; border-radius: 2px; overflow: hidden; margin-bottom: .45rem; }
+    .brk-bar      { height: 100%; background: #3b82f6; border-radius: 2px; }
+
+    /* layer table */
+    .layer-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .layer-table td { padding: .25rem .3rem; border-bottom: 1px solid #f8fafc; }
+    .layer-table td:last-child { text-align: right; font-weight: 600; }
+    .layer-table tr:last-child td { border-bottom: none; }
+    .layer-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; margin-right: .4rem; }
+
+    /* kw hits table */
+    .kw-hits-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .kw-hits-table td { padding: .2rem .3rem; border-bottom: 1px solid #f8fafc; }
+    .kw-hits-table td:last-child { text-align: right; }
+    .kw-hits-table tr:last-child td { border-bottom: none; }
   </style>
 </head>
-<body>
-  <h1>DCLT Nav123</h1>
-  <p id="status">Loading…</p>
-  <table id="items-table" hidden>
-    <thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Created</th></tr></thead>
-    <tbody id="items-body"></tbody>
-  </table>
+<body x-data="app()">
+
+  <!-- Nav -->
+  <nav>
+    <span class="nav-brand">DCLT Navigator</span>
+    <div class="nav-tabs">
+      <div class="nav-tab" :class="{active:activeTab==='overview'}"  @click="switchTab('overview')">Overview</div>
+      <div class="nav-tab" :class="{active:activeTab==='parcels'}"   @click="switchTab('parcels')">Parcels</div>
+      <div class="nav-tab" :class="{active:activeTab==='documents'}" @click="switchTab('documents')">Documents</div>
+      <div class="nav-tab" :class="{active:activeTab==='admin'}"     @click="activeTab='admin'">Admin</div>
+    </div>
+  </nav>
+
+  <div class="main">
+
+    <!-- ═══════════════════════════ OVERVIEW TAB ════════════════════════════ -->
+    <div class="tab-panel" x-show="activeTab==='overview'" style="overflow:hidden;">
+      <div class="overview-page">
+
+        <template x-if="overviewLoading">
+          <div class="loading-msg">Loading…</div>
+        </template>
+
+        <template x-if="!overviewLoading && overviewData">
+          <div>
+            <div class="overview-hdr">
+              <h2>Reference Database</h2>
+              <p x-text="overviewData.pipeline.last_run
+                ? 'Last built ' + overviewData.pipeline.last_run.run_at.slice(0,10)
+                : 'Build date unknown'"></p>
+            </div>
+
+            <div class="stat-grid">
+
+              <!-- Registry of Deeds -->
+              <div class="stat-card">
+                <div class="stat-card-title">Registry of Deeds</div>
+                <div class="stat-primary">
+                  <span class="stat-big" x-text="overviewData.registry.documents.toLocaleString()"></span>
+                  <span class="stat-unit">documents</span>
+                </div>
+                <div class="stat-subs">
+                  <div class="stat-sub">
+                    <span>Local scans</span>
+                    <span class="stat-sub-val"
+                      x-text="overviewData.registry.scan_cached.toLocaleString()
+                        + ' (' + Math.round(overviewData.registry.scan_cached/overviewData.registry.documents*100) + '%)'">
+                    </span>
+                  </div>
+                  <div class="stat-sub">
+                    <span>OCR processed</span>
+                    <span class="stat-sub-val" x-text="overviewData.registry.ocr.toLocaleString()"></span>
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">By instrument type</div>
+                  <div class="brk-list">
+                    <template x-for="row in overviewData.registry.by_type.slice(0,10)" :key="row.instrument_type">
+                      <div>
+                        <div class="brk-row">
+                          <span class="brk-label" x-text="row.instrument_type || '(blank)'"></span>
+                          <span class="brk-count" x-text="row.n.toLocaleString()"></span>
+                        </div>
+                        <div class="brk-bar-wrap">
+                          <div class="brk-bar" :style="'width:'+Math.min(100,row.n/overviewData.registry.documents*100)+'%'"></div>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+                <template x-if="overviewData.registry.kw_hits && Object.keys(overviewData.registry.kw_hits).length">
+                  <div>
+                    <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">Keyword hits in OCR corpus (score&gt;0.4)</div>
+                    <table class="kw-hits-table">
+                      <template x-for="(info, kw) in overviewData.registry.kw_hits" :key="kw">
+                        <tr>
+                          <td x-text="info.label"></td>
+                          <td x-text="info.n_04.toLocaleString()"></td>
+                        </tr>
+                      </template>
+                    </table>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Parcels -->
+              <div class="stat-card">
+                <div class="stat-card-title">Parcels</div>
+                <div class="stat-primary">
+                  <span class="stat-big" x-text="overviewData.parcels.total.toLocaleString()"></span>
+                  <span class="stat-unit">parcels</span>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">By property class</div>
+                  <div class="brk-list">
+                    <template x-for="row in overviewData.parcels.by_class" :key="row.property_class">
+                      <div>
+                        <div class="brk-row">
+                          <span class="brk-label" x-text="row.property_class || 'Other'"></span>
+                          <span class="brk-count" x-text="row.n.toLocaleString()"></span>
+                        </div>
+                        <div class="brk-bar-wrap">
+                          <div class="brk-bar" :style="'width:'+Math.min(100,row.n/overviewData.parcels.total*100)+'%'"></div>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+              <!-- GIS Layers -->
+              <div class="stat-card">
+                <div class="stat-card-title">GIS Layers</div>
+                <div class="stat-primary">
+                  <span class="stat-big" x-text="overviewData.gis.total_parcels.toLocaleString()"></span>
+                  <span class="stat-unit">parcels with overlay</span>
+                </div>
+                <div class="stat-subs">
+                  <div class="stat-sub">
+                    <span>Data sources</span>
+                    <span class="stat-sub-val" x-text="overviewData.gis.sources + ' layers'"></span>
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">Layer coverage</div>
+                  <table class="layer-table">
+                    <template x-for="row in overviewData.gis.layer_coverage" :key="row.layer">
+                      <tr>
+                        <td>
+                          <span class="layer-dot" x-show="row.n > 0"></span>
+                          <span x-text="row.layer"></span>
+                        </td>
+                        <td x-text="row.n.toLocaleString()"></td>
+                      </tr>
+                    </template>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Assessor + MassGIS -->
+              <div class="stat-card">
+                <div class="stat-card-title">Assessor &amp; MassGIS</div>
+                <div class="stat-subs">
+                  <div class="stat-sub">
+                    <span>Assessor records (incl. condo units)</span>
+                    <span class="stat-sub-val" x-text="overviewData.assessor.records.toLocaleString()"></span>
+                  </div>
+                  <div class="stat-sub">
+                    <span>MassGIS parcel features (raw)</span>
+                    <span class="stat-sub-val" x-text="overviewData.massgis.raw.toLocaleString()"></span>
+                  </div>
+                  <div class="stat-sub">
+                    <span>MassGIS normalized (1 per parcel)</span>
+                    <span class="stat-sub-val" x-text="overviewData.massgis.normalized.toLocaleString()"></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Town Meeting -->
+              <div class="stat-card">
+                <div class="stat-card-title">Town Meeting Warrants</div>
+                <div class="stat-primary">
+                  <span class="stat-big" x-text="overviewData.warrants.total.toLocaleString()"></span>
+                  <span class="stat-unit">articles</span>
+                </div>
+                <div class="stat-subs">
+                  <div class="stat-sub">
+                    <span>Year range</span>
+                    <span class="stat-sub-val"
+                      x-text="overviewData.warrants.year_range.min_year + ' – ' + overviewData.warrants.year_range.max_year">
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">By result</div>
+                  <div class="brk-list">
+                    <template x-for="row in overviewData.warrants.by_result" :key="row.result">
+                      <div>
+                        <div class="brk-row">
+                          <span class="brk-label" x-text="row.result"></span>
+                          <span class="brk-count" x-text="row.n.toLocaleString()"></span>
+                        </div>
+                        <div class="brk-bar-wrap">
+                          <div class="brk-bar" :style="'width:'+Math.min(100,row.n/overviewData.warrants.total*100)+'%'"></div>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Reference -->
+              <div class="stat-card">
+                <div class="stat-card-title">Reference Tables</div>
+                <div class="stat-subs">
+                  <div class="stat-sub">
+                    <span>Land use codes</span>
+                    <span class="stat-sub-val" x-text="overviewData.reference.use_codes"></span>
+                  </div>
+                  <div class="stat-sub">
+                    <span>Schema columns documented</span>
+                    <span class="stat-sub-val" x-text="overviewData.reference.schema_columns"></span>
+                  </div>
+                  <div class="stat-sub">
+                    <span>GIS data sources</span>
+                    <span class="stat-sub-val" x-text="overviewData.gis.sources"></span>
+                  </div>
+                </div>
+              </div>
+
+            </div><!-- /stat-grid -->
+          </div>
+        </template>
+
+      </div>
+    </div><!-- /overview tab -->
+
+    <!-- ═══════════════════════════ PARCELS TAB ══════════════════════════════ -->
+    <div class="tab-panel three-col" x-show="activeTab==='parcels'">
+
+      <!-- Left: parcel list -->
+      <div class="col-left">
+        <div class="col-left-controls">
+          <input class="search-input" x-model.debounce.300ms="parcelSearch"
+            placeholder="Search address, owner, parcel ID…" type="search" autocomplete="off">
+          <div class="sort-row">
+            <span class="sort-label">Sort</span>
+            <select class="ctrl-select" x-model="parcelSort">
+              <option value="site_addr">Address</option>
+              <option value="owner_name">Owner</option>
+              <option value="parcel_id">Parcel ID</option>
+              <option value="totalapprvalue">Value</option>
+              <option value="property_class">Class</option>
+              <option value="billingacres">Acres</option>
+            </select>
+            <button class="sort-dir-btn" @click="parcelSortDir = parcelSortDir==='asc'?'desc':'asc'"
+              :title="parcelSortDir==='asc'?'Ascending':'Descending'">
+              <span x-text="parcelSortDir==='asc'?'↑':'↓'"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="col-left-list">
+          <template x-if="parcelsLoading"><div class="loading-msg">Loading…</div></template>
+          <template x-if="!parcelsLoading">
+            <div>
+              <template x-for="p in pagedParcels" :key="p.parcel_id">
+                <div class="list-row" :class="{selected:selectedParcelId===p.parcel_id}" @click="selectParcel(p)">
+                  <div class="row-id"   x-text="p.parcel_id"></div>
+                  <div class="row-main" x-text="p.site_addr||'(no address)'"></div>
+                  <div class="row-sub"  x-text="p.owner_name||'—'"></div>
+                </div>
+              </template>
+              <template x-if="pagedParcels.length===0">
+                <div class="empty-state" style="height:100px;">No results</div>
+              </template>
+            </div>
+          </template>
+        </div>
+
+        <div class="col-left-footer">
+          <span x-text="parcelFilteredCount.toLocaleString()+' parcel'+(parcelFilteredCount!==1?'s':'')+(parcelSearch.trim()?' found':'')"></span>
+          <div class="paging-btns">
+            <button class="paging-btn" @click="parcelPage=1"            :disabled="parcelPage===1">«</button>
+            <button class="paging-btn" @click="parcelPage--"            :disabled="parcelPage===1">‹</button>
+            <span   class="paging-page" x-text="parcelPage+' / '+parcelTotalPages"></span>
+            <button class="paging-btn" @click="parcelPage++"            :disabled="parcelPage>=parcelTotalPages">›</button>
+            <button class="paging-btn" @click="parcelPage=parcelTotalPages" :disabled="parcelPage>=parcelTotalPages">»</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Middle: parcel detail -->
+      <div class="col-mid">
+        <div class="col-mid-inner">
+
+          <template x-if="!selectedParcelId">
+            <div class="empty-state" style="height:60vh;">
+              <span class="empty-icon">🗂</span><span>Select a parcel</span>
+            </div>
+          </template>
+          <template x-if="selectedParcelId && parcelDetailLoading">
+            <div class="loading-msg">Loading…</div>
+          </template>
+          <template x-if="selectedParcelId && !parcelDetailLoading && parcelDetailError">
+            <div class="empty-state" style="color:#dc2626;">
+              <span class="empty-icon">⚠</span>
+              <span x-text="parcelDetailError"></span>
+            </div>
+          </template>
+          <template x-if="selectedParcelId && !parcelDetailLoading && parcelDetail">
+            <div>
+              <div style="margin-bottom:1rem;">
+                <div style="font-size:18px;font-weight:700;color:#0f172a;" x-text="parcelDetail.parcel.site_addr||parcelDetail.parcel.parcel_id"></div>
+                <div style="font-size:13px;color:#64748b;margin-top:2px;" x-text="parcelDetail.parcel.parcel_id"></div>
+                <div style="margin-top:.4rem;display:flex;flex-wrap:wrap;gap:.35rem;">
+                  <span class="badge" :class="propClassBadge(parcelDetail.parcel.property_class)" x-text="parcelDetail.parcel.property_class||'Unknown'"></span>
+                  <span x-show="parcelDetail.parcel.is_public" class="badge badge-teal">Public</span>
+                  <span x-show="(parcelDetail.parcel.condo_units||0)>0" class="badge badge-purple" x-text="parcelDetail.parcel.condo_units+' condo units'"></span>
+                </div>
+              </div>
+
+              <div class="section">
+                <div class="section-title">Parcel Attributes</div>
+                <table class="attr-table">
+                  <tbody>
+                    <template x-for="[lbl,val] in parcelAttrs(parcelDetail.parcel)" :key="lbl">
+                      <tr><td class="attr-label" x-text="lbl"></td><td class="attr-value" x-text="val||'—'"></td></tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="section">
+                <div class="section-title">Registry of Deeds
+                  <template x-if="parcelDetail.documents.length">
+                    <span style="font-weight:400;text-transform:none;letter-spacing:0;"
+                      x-text="' — '+parcelDetail.documents.length+' record'+(parcelDetail.documents.length!==1?'s':'')"></span>
+                  </template>
+                </div>
+                <template x-if="parcelDetail.documents.length===0">
+                  <div style="color:#94a3b8;font-size:13px;">No records found</div>
+                </template>
+                <template x-if="parcelDetail.documents.length>0">
+                  <div style="overflow-x:auto;">
+                    <table class="doc-table">
+                      <thead><tr><th>#</th><th>Type</th><th>Recorded</th><th>Grantor</th><th>Grantee</th><th>Book/Page</th><th>PDF</th></tr></thead>
+                      <tbody>
+                        <template x-for="doc in parcelDetail.documents" :key="doc.doc_rank">
+                          <tr class="doc-row" :class="{active:parcelSelectedDoc&&parcelSelectedDoc.doc_rank===doc.doc_rank}" @click="selectParcelDoc(doc)">
+                            <td x-text="doc.doc_rank"></td>
+                            <td x-text="doc.instrument_type||'—'"></td>
+                            <td x-text="doc.recorded_date?doc.recorded_date.slice(0,10):'—'"></td>
+                            <td class="doc-party" :title="doc.grantor" x-text="doc.grantor||'—'"></td>
+                            <td class="doc-party" :title="doc.grantee" x-text="doc.grantee||'—'"></td>
+                            <td x-text="doc.book+' / '+doc.page"></td>
+                            <td>
+                              <template x-if="doc.scan_cached"><span class="badge badge-green" style="font-size:10px;padding:.1rem .35rem;">Local</span></template>
+                              <template x-if="!doc.scan_cached"><span class="badge badge-gray" style="font-size:10px;padding:.1rem .35rem;">RoD</span></template>
+                            </td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                </template>
+              </div>
+
+              <div class="section">
+                <div class="section-title">GIS Layers</div>
+                <template x-if="!parcelDetail.gis">
+                  <div style="color:#94a3b8;font-size:13px;">No GIS overlay data</div>
+                </template>
+                <template x-if="parcelDetail.gis">
+                  <div>
+                    <div class="gis-flag-grid">
+                      <template x-for="g in gisGroups(parcelDetail.gis,parcelDetail.soil)" :key="g.key">
+                        <span class="gis-flag" :class="g.present?'on':'off'" x-text="g.label" @click="g.present&&toggleGis(g.key)"></span>
+                      </template>
+                    </div>
+                    <div class="gis-groups">
+                      <template x-for="g in gisGroups(parcelDetail.gis,parcelDetail.soil)" :key="g.key">
+                        <template x-if="g.present">
+                          <div class="gis-group">
+                            <div class="gis-group-header" @click="toggleGis(g.key)">
+                              <span x-text="g.label"></span>
+                              <span style="font-size:10px;color:#94a3b8;" x-text="parcelGisOpen[g.key]?'▲':'▼'"></span>
+                            </div>
+                            <div class="gis-group-body" x-show="parcelGisOpen[g.key]">
+                              <template x-for="[lbl,val] in g.fields.filter(f=>f[1]!==null&&f[1]!==undefined&&f[1]!=='')" :key="lbl">
+                                <div class="gis-detail-row">
+                                  <span class="gis-detail-label" x-text="lbl"></span>
+                                  <span class="gis-detail-value" x-text="val"></span>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+
+        </div>
+      </div>
+
+      <!-- Right: PDF viewer -->
+      <div class="col-right">
+        <div class="col-right-header">Document View</div>
+        <div class="col-right-body">
+          <template x-if="!parcelSelectedDoc">
+            <div class="empty-state"><span class="empty-icon">📄</span><span>Click a document row</span></div>
+          </template>
+          <template x-if="parcelSelectedDoc && !parcelPdfUrl">
+            <div class="no-scan-panel">
+              <div class="rod-doc-meta" x-text="(parcelSelectedDoc.instrument_type||'Document')+' · Book '+parcelSelectedDoc.book+', Page '+parcelSelectedDoc.page"></div>
+              <div style="font-size:13px;color:#64748b;">No local scan</div>
+              <button class="rod-link"
+                @click="parcelPdfUrl='/api/documents/'+parcelSelectedDoc.book+'/'+parcelSelectedDoc.page+'/rod'">
+                Read from Registry of Deeds
+              </button>
+            </div>
+          </template>
+          <template x-if="parcelSelectedDoc && parcelPdfUrl">
+            <iframe :src="parcelPdfUrl" style="flex:1;width:100%;height:100%;border:none;"></iframe>
+          </template>
+        </div>
+      </div>
+
+    </div><!-- /parcels tab -->
+
+    <!-- ══════════════════════════ DOCUMENTS TAB ════════════════════════════ -->
+    <div class="tab-panel three-col" x-show="activeTab==='documents'">
+
+      <!-- Left: document list -->
+      <div class="col-left">
+        <div class="col-left-controls">
+          <input class="search-input" x-model.debounce.300ms="docSearch"
+            placeholder="Grantor, grantee, address, parcel…" type="search" autocomplete="off">
+          <select class="ctrl-select" x-model="docTypeFilter">
+            <option value="">All instrument types</option>
+            <template x-for="t in docTypes" :key="t"><option :value="t" x-text="t"></option></template>
+          </select>
+          <select class="ctrl-select" x-model="docKwFilter">
+            <option value="">All keyword scores</option>
+            <option value="conservation_restriction">Conservation Restriction</option>
+            <option value="article_97">Article 97</option>
+            <option value="deed_restriction">Deed Restriction</option>
+            <option value="chapter_61">Chapter 61</option>
+            <option value="agricultural_preservation_restriction">Ag. Preservation</option>
+            <option value="perpetual_restriction">Perpetual Restriction</option>
+            <option value="ccr">CC&amp;R</option>
+          </select>
+          <div class="sort-row">
+            <span class="sort-label">Sort</span>
+            <select class="ctrl-select" x-model="docSort">
+              <option value="recorded_date">Date</option>
+              <option value="instrument_type">Type</option>
+              <option value="address">Address</option>
+              <option value="grantor">Grantor</option>
+              <option value="kw_conservation_restriction">↑ CR Score</option>
+              <option value="kw_article_97">↑ A97 Score</option>
+              <option value="kw_deed_restriction">↑ DR Score</option>
+              <option value="kw_perpetual_restriction">↑ PR Score</option>
+            </select>
+            <button class="sort-dir-btn" @click="docSortDir=docSortDir==='asc'?'desc':'asc'"
+              :title="docSortDir==='asc'?'Ascending':'Descending'">
+              <span x-text="docSortDir==='asc'?'↑':'↓'"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="col-left-list">
+          <template x-if="docsLoading"><div class="loading-msg">Loading…</div></template>
+          <template x-if="!docsLoading && allDocuments.length===0">
+            <div class="empty-state"><span class="empty-icon">📁</span><span>No documents loaded</span></div>
+          </template>
+          <template x-if="!docsLoading && allDocuments.length>0">
+            <div>
+              <template x-for="d in pagedDocuments" :key="d.book+'_'+d.page">
+                <div class="list-row"
+                  :class="{selected: docSelectedBP && docSelectedBP.book===d.book && docSelectedBP.page===d.page}"
+                  @click="selectDoc(d)">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span class="badge" :class="instrBadge(d.instrument_type)" style="font-size:10px;padding:.1rem .35rem;" x-text="d.instrument_type||'—'"></span>
+                    <span class="row-id" x-text="d.recorded_date?d.recorded_date.slice(0,10):''"></span>
+                  </div>
+                  <div class="row-main" x-text="d.address||(d.grantor?d.grantor.split(';')[0].trim():'')"></div>
+                  <div class="row-sub" x-text="'Book '+d.book+' / '+d.page+(d.parcel_id?' · '+d.parcel_id:'')"></div>
+                  <div class="row-kws">
+                    <template x-for="kw in docBadges(d)" :key="kw.key">
+                      <span class="kw-badge" :class="kw.cls" x-text="kw.abbr+' '+kw.score"></span>
+                    </template>
+                    <template x-if="d.scan_cached">
+                      <span class="kw-badge" style="background:#f0fdf4;color:#166534;">PDF</span>
+                    </template>
+                  </div>
+                </div>
+              </template>
+              <template x-if="pagedDocuments.length===0">
+                <div class="empty-state" style="height:100px;">No results</div>
+              </template>
+            </div>
+          </template>
+        </div>
+
+        <div class="col-left-footer">
+          <span x-text="docFilteredCount.toLocaleString()+' doc'+(docFilteredCount!==1?'s':'')"></span>
+          <div class="paging-btns">
+            <button class="paging-btn" @click="docPage=1"            :disabled="docPage===1">«</button>
+            <button class="paging-btn" @click="docPage--"            :disabled="docPage===1">‹</button>
+            <span   class="paging-page" x-text="docPage+' / '+docTotalPages"></span>
+            <button class="paging-btn" @click="docPage++"            :disabled="docPage>=docTotalPages">›</button>
+            <button class="paging-btn" @click="docPage=docTotalPages" :disabled="docPage>=docTotalPages">»</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Middle: document detail + keywords + OCR -->
+      <div class="col-mid">
+        <div class="col-mid-inner">
+
+          <template x-if="!docSelectedBP">
+            <div class="empty-state" style="height:60vh;">
+              <span class="empty-icon">📋</span><span>Select a document</span>
+            </div>
+          </template>
+          <template x-if="docSelectedBP && docDetailLoading">
+            <div class="loading-msg">Loading…</div>
+          </template>
+          <template x-if="docSelectedBP && !docDetailLoading && docDetailError">
+            <div class="empty-state" style="color:#dc2626;">
+              <span class="empty-icon">⚠</span><span x-text="docDetailError"></span>
+            </div>
+          </template>
+
+          <template x-if="docSelectedBP && !docDetailLoading && docDetail">
+            <div>
+              <!-- Header -->
+              <div style="margin-bottom:1rem;">
+                <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+                  <span class="badge" :class="instrBadge(docDetail.document.instrument_type)" x-text="docDetail.document.instrument_type||'Document'"></span>
+                  <span style="font-size:15px;font-weight:700;color:#0f172a;"
+                    x-text="'Book '+docDetail.document.book+', Page '+docDetail.document.page"></span>
+                </div>
+                <div style="font-size:13px;color:#64748b;margin-top:.3rem;">
+                  <span x-text="docDetail.document.recorded_date?'Recorded '+docDetail.document.recorded_date.slice(0,10):''"></span>
+                  <template x-if="docDetail.document.doc_amount">
+                    <span x-text="' · $'+Number(docDetail.document.doc_amount.replace(/,/g,'')).toLocaleString()"></span>
+                  </template>
+                  <template x-if="docDetail.document.parcel_id">
+                    <span x-text="' · Parcel '+docDetail.document.parcel_id"></span>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Parties -->
+              <div class="section">
+                <div class="section-title">Parties</div>
+                <table class="attr-table">
+                  <tr><td class="attr-label">Grantor</td><td class="attr-value" x-text="docDetail.document.grantor||'—'"></td></tr>
+                  <tr><td class="attr-label">Grantee</td><td class="attr-value" x-text="docDetail.document.grantee||'—'"></td></tr>
+                  <tr x-show="docDetail.document.address"><td class="attr-label">Address</td><td class="attr-value" x-text="docDetail.document.address"></td></tr>
+                  <tr x-show="docDetail.document.description"><td class="attr-label">Description</td><td class="attr-value" x-text="docDetail.document.description"></td></tr>
+                  <tr x-show="docDetail.document.pages_in_doc"><td class="attr-label">Pages</td><td class="attr-value" x-text="docDetail.document.pages_in_doc"></td></tr>
+                </table>
+              </div>
+
+              <!-- Keyword Scores -->
+              <template x-if="docDetail.ocr">
+                <div class="section">
+                  <div class="section-title">Keyword Scores</div>
+                  <div>
+                    <template x-for="kw in KW_ORDER" :key="kw.key">
+                      <div class="kw-score-row">
+                        <span x-text="kw.label" style="color:#475569;"></span>
+                        <div class="kw-bar-track">
+                          <div class="kw-bar-fill"
+                            :class="'kw-'+kw.cls"
+                            :style="'width:'+Math.min(100,(docDetail.ocr['kw_'+kw.key]||0)*100)+'%;background:currentColor;'">
+                          </div>
+                        </div>
+                        <span class="kw-val" x-text="((docDetail.ocr['kw_'+kw.key]||0)).toFixed(3)"></span>
+                      </div>
+                    </template>
+                  </div>
+                  <div style="font-size:11px;color:#94a3b8;margin-top:.4rem;"
+                    x-text="'OCR: '+docDetail.ocr.page_count+' page'+(docDetail.ocr.page_count!==1?'s':'')+' · '+docDetail.ocr.pipeline_version">
+                  </div>
+                </div>
+              </template>
+
+              <!-- OCR Text -->
+              <template x-if="docDetail.ocr && docDetail.ocr.full_text">
+                <div class="section">
+                  <div class="section-title">OCR Text</div>
+                  <div class="ocr-text" x-text="docDetail.ocr.full_text"></div>
+                </div>
+              </template>
+
+              <template x-if="!docDetail.ocr">
+                <div style="font-size:13px;color:#94a3b8;margin-bottom:1rem;">No OCR data for this document</div>
+              </template>
+            </div>
+          </template>
+
+        </div>
+      </div>
+
+      <!-- Right: PDF viewer -->
+      <div class="col-right">
+        <div class="col-right-header">Document View</div>
+        <div class="col-right-body">
+          <template x-if="!docSelectedBP">
+            <div class="empty-state"><span class="empty-icon">📄</span><span>Click a document</span></div>
+          </template>
+          <template x-if="docSelectedBP && !docPdfUrl">
+            <div class="no-scan-panel">
+              <div class="rod-doc-meta" x-text="docDetail ? (docDetail.document.instrument_type||'Document')+' · Book '+docDetail.document.book+', Page '+docDetail.document.page : ''"></div>
+              <div style="font-size:13px;color:#64748b;">No local scan</div>
+              <button class="rod-link"
+                @click="docPdfUrl='/api/documents/'+docSelectedBP.book+'/'+docSelectedBP.page+'/rod'">
+                Read from Registry of Deeds
+              </button>
+            </div>
+          </template>
+          <template x-if="docSelectedBP && docPdfUrl">
+            <iframe :src="docPdfUrl" style="flex:1;width:100%;height:100%;border:none;"></iframe>
+          </template>
+        </div>
+      </div>
+
+    </div><!-- /documents tab -->
+
+    <!-- Admin -->
+    <div class="tab-panel stub-panel" x-show="activeTab==='admin'">Coming soon</div>
+
+  </div><!-- /main -->
 
   <script>
-    fetch('/api/items')
-      .then(r => r.json())
-      .then(items => {
-        const tbody = document.getElementById('items-body');
-        items.forEach(item => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `<td>${item.id}</td><td>${item.name}</td><td>${item.description}</td><td>${item.created_at}</td>`;
-          tbody.appendChild(tr);
-        });
-        document.getElementById('status').hidden = true;
-        document.getElementById('items-table').hidden = false;
-      })
-      .catch(() => {
-        document.getElementById('status').textContent = 'Failed to load items.';
-      });
+    // ── Keyword metadata (priority order) ────────────────────────────────────
+    const KW_ORDER = [
+      { key:'conservation_restriction',             label:'Conservation Restriction', abbr:'CR',  cls:'cr'  },
+      { key:'article_97',                           label:'Article 97',               abbr:'A97', cls:'a97' },
+      { key:'deed_restriction',                     label:'Deed Restriction',         abbr:'DR',  cls:'dr'  },
+      { key:'chapter_61',                           label:'Chapter 61',               abbr:'C61', cls:'c61' },
+      { key:'agricultural_preservation_restriction',label:'Ag. Preservation',         abbr:'APR', cls:'apr' },
+      { key:'perpetual_restriction',                label:'Perpetual Restriction',    abbr:'PR',  cls:'pr'  },
+      { key:'ccr',                                  label:'CC&R',                     abbr:'CCR', cls:'ccr' },
+    ];
+    const KW_THRESHOLD = 0.4;
+
+    // ── Pure helpers (no `this`) ──────────────────────────────────────────────
+    function parcelAttrs(p) {
+      const cur  = v => (v !== null && v !== undefined && v !== '') ? v : null;
+      const usd  = v => v ? '$' + Number(v).toLocaleString() : null;
+      const ac   = v => v ? Number(v).toFixed(3) + ' ac' : null;
+      return [
+        ['Owner',          cur(p.owner_name)],
+        ['Owner Category', cur(p.owner_category)],
+        ['Village',        cur(p.village)],
+        ['Use Code',       p.use_code_norm ? p.use_code_norm + (p.use_code_desc ? ' — ' + p.use_code_desc : '') : null],
+        ['Zone',           cur(p.zonedesc)],
+        ['Appraised Value',usd(p.totalapprvalue)],
+        ['Billing Acres',  ac(p.billingacres)],
+        ['Condo Units',    (p.condo_units > 0) ? p.condo_units : null],
+      ].filter(([,v]) => v !== null);
+    }
+
+    function gisGroups(gis, soil) {
+      if (!gis) return [];
+      const f = v => v !== null && v !== undefined && v !== '';
+      const farmland = [];
+      if (soil) {
+        if (soil.prime)     farmland.push(['Prime Farmland',             'Yes']);
+        if (soil.statewide) farmland.push(['Farmland of Statewide Imp.','Yes']);
+        if (soil.unique)    farmland.push(['Farmland of Unique Imp.',   'Yes']);
+        if (soil.not_prime) farmland.push(['Not Prime Farmland',        'Yes']);
+      }
+      return [
+        { key:'zone1',   label:'Zone 1 WHP',              present:f(gis.zone1_type),    fields:[['Type',gis.zone1_type],['Site',gis.zone1_site],['Supplier',gis.zone1_supplier],['Buffer ft',gis.zone1_ft],['PWS ID',gis.zone1_pws_id]] },
+        { key:'zone2',   label:'Zone 2 WHP',              present:f(gis.zone2_id),       fields:[['ID',gis.zone2_id],['Supplier',gis.zone2_supplier],['Acres',gis.zone2_acres],['PWS ID',gis.zone2_pws_id]] },
+        { key:'prihab',  label:'Priority Habitat',        present:f(gis.prihab_id),     fields:[['ID',gis.prihab_id],['Version',gis.prihab_version]] },
+        { key:'esthab',  label:'Est. Habitat',            present:f(gis.esthab_id),     fields:[['ID',gis.esthab_id],['Version',gis.esthab_version]] },
+        { key:'natcomm', label:'Nat. Community',          present:f(gis.natcomm_id),    fields:[['Name',gis.natcomm_name],['Rank',gis.natcomm_rank],['Community',gis.natcomm_community],['Description',gis.natcomm_description]] },
+        { key:'bm3vp',   label:'BioMap3 VP',              present:f(gis.bm3_vp_id),    fields:[['ID',gis.bm3_vp_id],['Acres',gis.bm3_vp_acres]] },
+        { key:'bm3wc',   label:'BioMap3 Wetland',         present:f(gis.bm3_wc_id),    fields:[['ID',gis.bm3_wc_id],['Acres',gis.bm3_wc_acres],['Integrity',gis.bm3_wc_integrity],['Resilience',gis.bm3_wc_resilience]] },
+        { key:'bm3ch',   label:'BioMap3 Core',            present:f(gis.bm3_ch_id),    fields:[['ID',gis.bm3_ch_id],['Acres',gis.bm3_ch_acres],['Town Acres',gis.bm3_ch_town_acres]] },
+        { key:'bm3cnl',  label:'BioMap3 CNL',             present:f(gis.bm3_cnl_id),   fields:[['ID',gis.bm3_cnl_id],['Acres',gis.bm3_cnl_acres],['Town Acres',gis.bm3_cnl_town_acres]] },
+        { key:'os',      label:'Open Space',              present:f(gis.os_site_name),  fields:[['Site',gis.os_site_name],['Alt Name',gis.os_alt_name],['Owner',gis.os_owner],['Type',gis.os_type],['Purpose',gis.os_purpose],['Access',gis.os_public_access],['Protection',gis.os_protection_level],['Acres',gis.os_acres],['Manager',gis.os_manager],['Comments',gis.os_comments]] },
+        { key:'wetlands',label:'Wetlands',                present:f(gis.wetlands_code), fields:[['Code',gis.wetlands_code],['Description',gis.wetlands_val_desc],['Poly Code',gis.wetlands_poly_code],['Acres',gis.wetlands_acres]] },
+        { key:'struct',  label:'Structures',              present:(gis.struct_count||0)>0, fields:[['Count',gis.struct_count],['Total Sq Ft',gis.struct_total_sqft?Number(gis.struct_total_sqft).toLocaleString():null],['Has Archived',gis.struct_has_archived?'Yes':'No']] },
+        { key:'soil',    label:'Soil',                    present:f(gis.soil_name),     fields:[['Name',gis.soil_name],['Component',gis.soil_component],['Drainage',gis.soil_drainage_class],['Farmland Class',gis.soil_farmland_class],['Hydric Rating',gis.soil_hydric_rating],['Hydro Group',gis.soil_hydro_group],['Slope',gis.soil_slope],['Depth to WTbl',gis.soil_depth_to_water_table],['Flooding',gis.soil_flooding],['Ponding',gis.soil_ponding],['Septic',gis.soil_septic],...farmland] },
+      ];
+    }
+
+    // ── Alpine component ──────────────────────────────────────────────────────
+    function app() {
+      return {
+        // nav
+        activeTab: 'overview',
+        KW_ORDER,
+
+        // overview
+        overviewData:    null,
+        overviewLoading: false,
+
+        // parcels
+        allParcels:         [],
+        parcelsLoading:     true,
+        parcelSearch:       '',
+        parcelSort:         'site_addr',
+        parcelSortDir:      'asc',
+        parcelPage:         1,
+        parcelPageSize:     50,
+        selectedParcelId:   null,
+        parcelDetail:       null,
+        parcelDetailLoading:false,
+        parcelDetailError:  null,
+        parcelSelectedDoc:  null,
+        parcelPdfUrl:       null,
+        parcelGisOpen:      {},
+
+        // documents
+        allDocuments:      [],
+        docsLoading:       false,
+        docSearch:         '',
+        docTypeFilter:     '',
+        docKwFilter:       '',
+        docSort:           'recorded_date',
+        docSortDir:        'desc',
+        docPage:           1,
+        docPageSize:       50,
+        docSelectedBP:     null,
+        docDetail:         null,
+        docDetailLoading:  false,
+        docDetailError:    null,
+        docPdfUrl:         null,
+
+        // ── Computed — parcels ──────────────────────────────────────────────
+        get filteredParcels() {
+          const q = this.parcelSearch.trim().toLowerCase();
+          let list = q
+            ? this.allParcels.filter(p =>
+                (p.site_addr  ||'').toLowerCase().includes(q) ||
+                (p.owner_name ||'').toLowerCase().includes(q) ||
+                (p.parcel_id  ||'').toLowerCase().includes(q))
+            : this.allParcels;
+          const f = this.parcelSort, d = this.parcelSortDir==='asc'?1:-1;
+          return [...list].sort((a,b)=>{
+            const av=a[f], bv=b[f];
+            const na=parseFloat(av), nb=parseFloat(bv);
+            if(!isNaN(na)&&!isNaN(nb)) return d*(na-nb);
+            return d*String(av??'').localeCompare(String(bv??''),undefined,{numeric:true});
+          });
+        },
+        get parcelFilteredCount() { return this.filteredParcels.length; },
+        get parcelTotalPages()    { return Math.max(1,Math.ceil(this.filteredParcels.length/this.parcelPageSize)); },
+        get pagedParcels()        { const s=(this.parcelPage-1)*this.parcelPageSize; return this.filteredParcels.slice(s,s+this.parcelPageSize); },
+
+        // ── Computed — documents ────────────────────────────────────────────
+        get docTypes() {
+          return [...new Set(this.allDocuments.map(d=>d.instrument_type||'').filter(Boolean))].sort();
+        },
+        get filteredDocuments() {
+          const q = this.docSearch.trim().toLowerCase();
+          let list = this.allDocuments;
+          if (q) list = list.filter(d =>
+            (d.grantor||'').toLowerCase().includes(q) ||
+            (d.grantee||'').toLowerCase().includes(q) ||
+            (d.address||'').toLowerCase().includes(q) ||
+            (d.parcel_id||'').toLowerCase().includes(q) ||
+            (d.book+'').includes(q) ||
+            (d.page+'').includes(q));
+          if (this.docTypeFilter) list = list.filter(d=>d.instrument_type===this.docTypeFilter);
+          if (this.docKwFilter)   list = list.filter(d=>(d['kw_'+this.docKwFilter]||0)>KW_THRESHOLD);
+          const f=this.docSort, dir=this.docSortDir==='asc'?1:-1;
+          return [...list].sort((a,b)=>{
+            const av=a[f], bv=b[f];
+            const na=parseFloat(av), nb=parseFloat(bv);
+            if(!isNaN(na)&&!isNaN(nb)) return dir*(na-nb);
+            return dir*String(av??'').localeCompare(String(bv??''),undefined,{numeric:true});
+          });
+        },
+        get docFilteredCount() { return this.filteredDocuments.length; },
+        get docTotalPages()    { return Math.max(1,Math.ceil(this.filteredDocuments.length/this.docPageSize)); },
+        get pagedDocuments()   { const s=(this.docPage-1)*this.docPageSize; return this.filteredDocuments.slice(s,s+this.docPageSize); },
+
+        // ── Init ────────────────────────────────────────────────────────────
+        async init() {
+          this.$watch('parcelSearch',  ()=>{ this.parcelPage=1; });
+          this.$watch('parcelSort',    ()=>{ this.parcelPage=1; });
+          this.$watch('parcelSortDir', ()=>{ this.parcelPage=1; });
+          this.$watch('docSearch',     ()=>{ this.docPage=1; });
+          this.$watch('docTypeFilter', ()=>{ this.docPage=1; });
+          this.$watch('docKwFilter',   ()=>{ this.docPage=1; });
+          this.$watch('docSort',       ()=>{ this.docPage=1; });
+          this.$watch('docSortDir',    ()=>{ this.docPage=1; });
+          this.loadOverview();
+          this.loadParcels();
+        },
+
+        // ── Tab switch ───────────────────────────────────────────────────────
+        switchTab(tab) {
+          this.activeTab = tab;
+          if (tab==='documents' && this.allDocuments.length===0) this.loadDocuments();
+        },
+
+        // ── Loaders ──────────────────────────────────────────────────────────
+        async loadOverview() {
+          this.overviewLoading = true;
+          try {
+            const r = await fetch('/api/overview');
+            if (!r.ok) throw new Error(r.status);
+            this.overviewData = await r.json();
+          } catch(e) { console.error('overview:', e); }
+          finally { this.overviewLoading = false; }
+        },
+
+        async loadParcels() {
+          try {
+            const r = await fetch('/api/parcels');
+            if (!r.ok) throw new Error(r.status);
+            this.allParcels = await r.json();
+          } finally { this.parcelsLoading = false; }
+        },
+
+        async loadDocuments() {
+          this.docsLoading = true;
+          try {
+            const r = await fetch('/api/documents');
+            if (!r.ok) throw new Error(r.status);
+            this.allDocuments = await r.json();
+          } catch(e) { console.error('documents:', e); }
+          finally { this.docsLoading = false; }
+        },
+
+        // ── Actions — parcels ────────────────────────────────────────────────
+        async selectParcel(p) {
+          if (this.selectedParcelId===p.parcel_id) return;
+          this.selectedParcelId   = p.parcel_id;
+          this.parcelDetail       = null;
+          this.parcelSelectedDoc  = null;
+          this.parcelPdfUrl       = null;
+          this.parcelGisOpen      = {};
+          this.parcelDetailError  = null;
+          this.parcelDetailLoading= true;
+          try {
+            const r = await fetch('/api/parcels/'+encodeURIComponent(p.parcel_id));
+            if (!r.ok) throw new Error('Server returned '+r.status);
+            this.parcelDetail = await r.json();
+          } catch(e) { this.parcelDetailError = e.message; }
+          finally    { this.parcelDetailLoading = false; }
+        },
+
+        selectParcelDoc(doc) {
+          this.parcelSelectedDoc = doc;
+          this.parcelPdfUrl = doc.scan_cached
+            ? '/api/documents/'+doc.book+'/'+doc.page+'/pdf'
+            : null;
+        },
+
+        toggleGis(key) {
+          this.parcelGisOpen = {...this.parcelGisOpen, [key]: !this.parcelGisOpen[key]};
+        },
+
+        // ── Actions — documents ──────────────────────────────────────────────
+        async selectDoc(d) {
+          if (this.docSelectedBP && this.docSelectedBP.book===d.book && this.docSelectedBP.page===d.page) return;
+          this.docSelectedBP    = {book:d.book, page:d.page};
+          this.docDetail        = null;
+          this.docPdfUrl        = null;
+          this.docDetailError   = null;
+          this.docDetailLoading = true;
+          try {
+            const r = await fetch('/api/documents/'+d.book+'/'+d.page);
+            if (!r.ok) throw new Error('Server returned '+r.status);
+            this.docDetail = await r.json();
+            this.docPdfUrl = this.docDetail.document.scan_cached
+              ? '/api/documents/'+d.book+'/'+d.page+'/pdf'
+              : null;
+          } catch(e) { this.docDetailError = e.message; }
+          finally    { this.docDetailLoading = false; }
+        },
+
+        // ── Display helpers ──────────────────────────────────────────────────
+        parcelAttrs,
+        gisGroups,
+
+        propClassBadge(cls) {
+          return {
+            'Residential':              'badge-blue',
+            'Agricultural / Open Space':'badge-green',
+            'Municipal':                'badge-teal',
+            'Exempt / Non-profit':      'badge-purple',
+          }[cls] || 'badge-gray';
+        },
+
+        instrBadge(type) {
+          if (!type) return 'badge-gray';
+          if (type==='Deed')                return 'badge-blue';
+          if (type==='Mortgage')            return 'badge-orange';
+          if (type==='Notice')              return 'badge-gray';
+          if (type==='Certificate')         return 'badge-teal';
+          if (type==='Declaration Of Trust')return 'badge-purple';
+          if (type==='Court Order')         return 'badge-amber';
+          return 'badge-gray';
+        },
+
+        docBadges(d) {
+          return KW_ORDER
+            .filter(kw => (d['kw_'+kw.key]||0) > KW_THRESHOLD)
+            .map(kw => ({
+              key:   kw.key,
+              abbr:  kw.abbr,
+              score: (d['kw_'+kw.key]||0).toFixed(2),
+              cls:   'kw-'+kw.cls,
+            }));
+        },
+      };
+    }
   </script>
 </body>
 </html>

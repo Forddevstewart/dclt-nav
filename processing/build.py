@@ -42,6 +42,16 @@ from sqlalchemy import create_engine, text
 
 from discovery.config import get_config
 
+KW_KEYS: list[str] = [
+    "article_97",
+    "ccr",
+    "chapter_61",
+    "deed_restriction",
+    "conservation_restriction",
+    "agricultural_preservation_restriction",
+    "perpetual_restriction",
+]
+
 # ── Use code reference ────────────────────────────────────────────────────────
 
 USE_CODES: dict[str, tuple[str, str]] = {
@@ -413,6 +423,71 @@ def load_gis_layers(engine, gis_dir: Path) -> int:
     return len(result)
 
 
+def load_ocr(engine, docs_dir: Path) -> int:
+    if not docs_dir.exists():
+        print("  SKIP — registry documents directory not found")
+        return 0
+
+    records = []
+    for p in sorted(docs_dir.rglob("scan.json")):
+        # Path is .../documents/{book}/{page}/scan.json
+        try:
+            page_str = p.parent.name
+            book_str = p.parent.parent.name
+        except Exception:
+            continue
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"  WARN {p}: {e}")
+            continue
+        if "error" in data:
+            continue
+
+        pages = data.get("pages", [])
+        full_text = "\n\n".join(pg.get("text", "") for pg in pages).strip()
+
+        # Max composite score per keyword across all pages
+        kw: dict[str, float] = {}
+        for pg in pages:
+            for name, score in pg.get("keyword_scores", {}).items():
+                kw[name] = max(kw.get(name, 0.0), score.get("composite", 0.0))
+
+        records.append({
+            "book":                                    book_str,
+            "page":                                    page_str,
+            "full_text":                               full_text,
+            "page_count":                              data.get("page_count", len(pages)),
+            "kw_article_97":                           kw.get("article_97"),
+            "kw_ccr":                                  kw.get("ccr"),
+            "kw_chapter_61":                           kw.get("chapter_61"),
+            "kw_deed_restriction":                     kw.get("deed_restriction"),
+            "kw_conservation_restriction":             kw.get("conservation_restriction"),
+            "kw_agricultural_preservation_restriction": kw.get("agricultural_preservation_restriction"),
+            "kw_perpetual_restriction":                kw.get("perpetual_restriction"),
+            "pipeline_version":                        data.get("pipeline_version"),
+            "processed_at":                            data.get("processed_at"),
+            "source_hash":                             data.get("source_hash"),
+        })
+
+    if not records:
+        return 0
+
+    df = pd.DataFrame(records)
+    df["_loaded_at"] = now_utc()
+    df.to_sql("registry_ocr", engine, if_exists="replace", index=False)
+
+    with engine.begin() as con:
+        con.execute(text("DROP TABLE IF EXISTS registry_ocr_fts"))
+        con.execute(text("""
+            CREATE VIRTUAL TABLE registry_ocr_fts
+            USING fts5(book, page, full_text, content=registry_ocr, content_rowid=rowid)
+        """))
+        con.execute(text("INSERT INTO registry_ocr_fts(registry_ocr_fts) VALUES('rebuild')"))
+
+    return len(records)
+
+
 def load_registry(engine, index_dir: Path) -> int:
     if not index_dir.exists():
         print("  SKIP — registry index not found")
@@ -548,11 +623,16 @@ def build_parcels(engine) -> int:
 
     # ── Derived columns ───────────────────────────────────────────────────────
     def _use_code_norm(row) -> str:
-        sc = str(row.get("stateclass") or "").strip()
-        if sc and sc not in ("", "nan"):
-            return sc.zfill(4)
-        uc = str(row.get("use_code") or "").strip()
-        return uc.zfill(4) if uc and uc not in ("", "nan") else ""
+        def _parse(v) -> str:
+            s = str(v or "").strip()
+            if not s or s == "nan":
+                return ""
+            try:
+                return str(int(float(s))).zfill(4)
+            except (ValueError, TypeError):
+                return s.zfill(4) if len(s) <= 4 else s
+        sc = _parse(row.get("stateclass") or row.get("state_class") or "")
+        return sc if sc else _parse(row.get("use_code") or "")
 
     parcels["use_code_norm"] = parcels.apply(_use_code_norm, axis=1)
 
@@ -614,10 +694,11 @@ def main() -> None:
     gis_files = cfg.collection_files("gis")
     massgis_path = gis_files[0]["abs_path"] if gis_files else root / "gis" / "dennis_parcels.geojson"
 
-    warrants_path   = root / "ma-dennis" / "town_meeting_all_years.csv"
-    soil_path       = root / "gis" / "dennis_soil.csv"
-    gis_dir         = root / "gis"
-    registry_index  = cfg.output_dir("registry") / "index"
+    warrants_path       = root / "ma-dennis" / "town_meeting_all_years.csv"
+    soil_path           = root / "gis" / "dennis_soil.csv"
+    gis_dir             = root / "gis"
+    registry_index      = cfg.output_dir("registry") / "index"
+    registry_docs   = cfg.output_dir("registry") / "documents"
 
     db_path = cfg.db_path("raw")
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -632,6 +713,7 @@ def main() -> None:
         ("Soil CSV",       soil_path),
         ("GIS layers dir", gis_dir),
         ("Registry index", registry_index),
+        ("Registry OCR",   registry_docs),
     ]:
         print(f"  {label}: {'OK' if path.exists() else 'not found — stage will be skipped'}")
 
@@ -661,6 +743,7 @@ def main() -> None:
         ("layer_soils",    soil_path,      lambda e: load_gis_top20(e, soil_path)),
         ("parcels_gis",    gis_dir,        lambda e: load_gis_layers(e, gis_dir)),
         ("load_registry",  registry_index, lambda e: load_registry(e, registry_index)),
+        ("load_ocr",       registry_docs,  lambda e: load_ocr(e, registry_docs)),
         ("schema_columns",  None,           lambda e: load_schema_columns(e)),
         ("gis_sources",     None,           lambda e: load_gis_sources(e)),
         ("ref_use_codes",   None,           lambda e: load_ref_use_codes(e)),

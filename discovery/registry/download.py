@@ -27,6 +27,7 @@ from discovery.registry.cache import (
     ensure_cache_dirs,
     all_cached_indexes,
     scan_path, metadata_path, scan_exists,
+    setup_logging,
 )
 from discovery.config import get_config as _get_config
 from discovery.registry.ratelimit import RateLimiter, RegistryThrottleError, check_robots
@@ -286,6 +287,8 @@ def main() -> None:
         sys.exit(1)
 
     ensure_cache_dirs()
+    log_path = setup_logging("download")
+    log.info("Logging to %s", log_path)
 
     log.info("Building download manifest from all cached indexes...")
     queue, manifest_stats = build_download_manifest()

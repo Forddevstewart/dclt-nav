@@ -19,6 +19,7 @@ Usage:
 """
 
 import argparse
+import calendar
 import logging
 import sys
 from datetime import datetime
@@ -30,6 +31,7 @@ from discovery.registry.cache import (
     get_cached_index,
     save_index,
     scan_exists,
+    setup_logging,
 )
 from discovery.registry.enumerate import lookup_book_page, name_search, _dedup
 from discovery.registry.ratelimit import RateLimiter, RegistryThrottleError, check_robots
@@ -43,13 +45,17 @@ log = logging.getLogger(__name__)
 
 REPORT_TXT = LOCAL_OUTPUT_DIR / "registry_sweep_report.txt"
 
-TOWN_SEARCH_NAME = "DENNIS"
+TOWN_SEARCH_NAME = "DENNIS TOWN"   # prefix-matches "DENNIS TOWN OF", "DENNIS TOWN OF (CONSERVATION)", etc.
+TOWN_SEARCH_FIRST = ""
 DIRECTIONS = [("G", "grantor"), ("E", "grantee")]
+SWEEP_MAX_PAGES = 20  # deeper paging for broad name searches
 
 
 def _date_windows() -> list[tuple[str, str]]:
     current_year = datetime.now().year
-    windows = [("1742", "1949")]
+    windows = []
+    for y in range(1793, 1950, 10):   # Dennis incorporated 1793; no town records predate this
+        windows.append((str(y), str(min(y + 9, 1949))))
     for y in range(1950, current_year + 1, 5):
         windows.append((str(y), str(min(y + 4, current_year))))
     return windows
@@ -120,6 +126,155 @@ def process_xrefs(rl: RateLimiter, targets: list[tuple[str, str]], limit: int) -
 
 # ── Option 1: Town of Dennis date-windowed sweep ──────────────────────────────
 
+def _sweep_window(rl: RateLimiter, direction: str, dir_label: str,
+                  year_start: str, year_end: str,
+                  pid: str, stats: dict, limit: int) -> tuple[list[dict], bool]:
+    """Fetch one window; subdivide year-by-year if the page cap is hit."""
+    # If a prior run subdivided this window but was killed before saving the parent,
+    # sub-year caches already exist — skip the network call and reconstruct directly.
+    first_sub_pid = f"sweep-denn-{direction}-{year_start}-{year_start}"
+    if year_start != year_end and get_cached_index(first_sub_pid) is not None:
+        log.info("TOWN SWEEP  %s %s–%s (reconstructing from sub-windows)", dir_label, year_start, year_end)
+        return _collect_sub_years(rl, direction, dir_label, year_start, year_end, stats, limit)
+
+    if limit and stats["attempted"] >= limit:
+        log.info("Reached --limit %d, stopping.", limit)
+        raise StopIteration
+
+    stats["attempted"] += 1
+    log.info("TOWN SWEEP  %s %s–%s", dir_label, year_start, year_end)
+
+    try:
+        docs, truncated = name_search(
+            rl, TOWN_SEARCH_NAME, TOWN_SEARCH_FIRST, False,
+            year_start, year_end,
+            pid, "TOWN-SWEEP",
+            direction=direction,
+            max_pages=SWEEP_MAX_PAGES,
+        )
+    except RegistryThrottleError:
+        raise
+
+    if not truncated or year_start == year_end:
+        return docs, truncated
+
+    log.info("  Subdividing %s–%s into 1-year windows to recover truncated results",
+             year_start, year_end)
+    return _collect_sub_years(rl, direction, dir_label, year_start, year_end, stats, limit)
+
+
+def _collect_sub_months(rl: RateLimiter, direction: str, dir_label: str,
+                        year: int, stats: dict, limit: int) -> tuple[list[dict], bool]:
+    all_docs: list[dict] = []
+    any_truncated = False
+    for mm in range(1, 13):
+        sub_pid = f"sweep-denn-{direction}-{year}-{mm:02d}"
+        cached = get_cached_index(sub_pid)
+        if cached is not None:
+            all_docs.extend(cached)
+            stats["cache_hits"] += 1
+            continue
+
+        if limit and stats["attempted"] >= limit:
+            log.info("Reached --limit %d, stopping.", limit)
+            break
+
+        stats["attempted"] += 1
+        _, last_day = calendar.monthrange(year, mm)
+        fdta = f"{mm:02d}01{year:04d}"
+        tdta = f"{mm:02d}{last_day:02d}{year:04d}"
+        log.info("TOWN SWEEP  %s %d-%02d (monthly sub-window)", dir_label, year, mm)
+        try:
+            sub_docs, sub_trunc = name_search(
+                rl, TOWN_SEARCH_NAME, TOWN_SEARCH_FIRST, False,
+                str(year), str(year),
+                sub_pid, "TOWN-SWEEP",
+                direction=direction,
+                fdta=fdta, tdta=tdta,
+                max_pages=SWEEP_MAX_PAGES,
+            )
+        except RegistryThrottleError:
+            raise
+        except Exception as e:
+            log.error("Town sweep monthly sub-window error %s %d-%02d: %s", direction, year, mm, e)
+            stats["errors"] += 1
+            continue
+
+        if sub_trunc:
+            log.warning("Page cap hit even for month %d-%02d %s — results still truncated",
+                        year, mm, direction)
+            any_truncated = True
+        sub_unique = _dedup(sub_docs)
+        save_index(sub_pid, sub_unique, truncated=sub_trunc)
+        all_docs.extend(sub_unique)
+        log.info("  → %d documents", len(sub_unique))
+
+    return all_docs, any_truncated
+
+
+def _collect_sub_years(rl: RateLimiter, direction: str, dir_label: str,
+                       year_start: str, year_end: str,
+                       stats: dict, limit: int) -> tuple[list[dict], bool]:
+    all_docs: list[dict] = []
+    any_truncated = False
+    for y in range(int(year_start), int(year_end) + 1):
+        sub_pid = f"sweep-denn-{direction}-{y}-{y}"
+        cached = get_cached_index(sub_pid)
+        if cached is not None:
+            all_docs.extend(cached)
+            stats["cache_hits"] += 1
+            continue
+
+        # If the first monthly pid exists, a previous run already subdivided this year.
+        first_month_pid = f"sweep-denn-{direction}-{y}-01"
+        if get_cached_index(first_month_pid) is not None:
+            log.info("TOWN SWEEP  %s %d (reconstructing from monthly sub-windows)", dir_label, y)
+            monthly, month_trunc = _collect_sub_months(rl, direction, dir_label, y, stats, limit)
+            sub_unique = _dedup(monthly)
+            save_index(sub_pid, sub_unique, truncated=month_trunc)
+            any_truncated |= month_trunc
+            all_docs.extend(sub_unique)
+            log.info("  → %d documents", len(sub_unique))
+            continue
+
+        if limit and stats["attempted"] >= limit:
+            log.info("Reached --limit %d, stopping.", limit)
+            break
+
+        stats["attempted"] += 1
+        log.info("TOWN SWEEP  %s %d–%d (sub-window)", dir_label, y, y)
+        try:
+            sub_docs, sub_trunc = name_search(
+                rl, TOWN_SEARCH_NAME, TOWN_SEARCH_FIRST, False,
+                str(y), str(y),
+                sub_pid, "TOWN-SWEEP",
+                direction=direction,
+                max_pages=SWEEP_MAX_PAGES,
+            )
+        except RegistryThrottleError:
+            raise
+        except Exception as e:
+            log.error("Town sweep sub-window error %s %d: %s", direction, y, e)
+            stats["errors"] += 1
+            continue
+
+        if sub_trunc:
+            log.info("  Subdividing year %d into monthly windows", y)
+            monthly, month_trunc = _collect_sub_months(rl, direction, dir_label, y, stats, limit)
+            sub_unique = _dedup(monthly)
+            year_trunc = month_trunc
+        else:
+            sub_unique = _dedup(sub_docs)
+            year_trunc = False
+
+        save_index(sub_pid, sub_unique, truncated=year_trunc)
+        any_truncated |= year_trunc
+        all_docs.extend(sub_unique)
+        log.info("  → %d documents", len(sub_unique))
+
+    return all_docs, any_truncated
+
+
 def process_town_sweep(rl: RateLimiter, limit: int) -> dict:
     windows = _date_windows()
     stats = {"windows_total": len(windows) * len(DIRECTIONS), "attempted": 0,
@@ -133,20 +288,11 @@ def process_town_sweep(rl: RateLimiter, limit: int) -> dict:
                 stats["cache_hits"] += 1
                 continue
 
-            if limit and stats["attempted"] >= limit:
-                log.info("Reached --limit %d, stopping.", limit)
-                return stats
-
-            stats["attempted"] += 1
-            log.info("TOWN SWEEP  %s %s–%s", dir_label, year_start, year_end)
-
             try:
-                docs = name_search(
-                    rl, TOWN_SEARCH_NAME, "", False,
-                    year_start, year_end,
-                    pid, "TOWN-SWEEP",
-                    direction=direction,
-                )
+                docs, window_truncated = _sweep_window(rl, direction, dir_label, year_start, year_end,
+                                                       pid, stats, limit)
+            except StopIteration:
+                return stats
             except RegistryThrottleError:
                 raise
             except Exception as e:
@@ -155,7 +301,7 @@ def process_town_sweep(rl: RateLimiter, limit: int) -> dict:
                 continue
 
             unique = _dedup(docs)
-            save_index(pid, unique)
+            save_index(pid, unique, truncated=window_truncated)
             stats["total_docs"] += len(unique)
             log.info("  → %d documents", len(unique))
 
@@ -183,6 +329,8 @@ def main() -> None:
         sys.exit(1)
 
     ensure_cache_dirs()
+    log_path = setup_logging("sweep")
+    log.info("Logging to %s", log_path)
 
     rl = RateLimiter()
     xref_stats: dict = {}

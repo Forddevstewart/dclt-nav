@@ -11,7 +11,7 @@ def create_app():
     )
 
     from discovery.config import get_config
-    app.config["RAW_DATABASE"] = str(get_config().db_path("raw"))
+    app.config["REFERENCE_DATABASE"] = str(get_config().db_path("reference"))
 
     from .routes import bp as routes_bp
     from .api import bp as api_bp
