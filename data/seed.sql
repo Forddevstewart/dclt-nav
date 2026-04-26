@@ -1,3 +1,8 @@
+CREATE TABLE IF NOT EXISTS schema_version (
+    version    INTEGER PRIMARY KEY,
+    applied_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT    NOT NULL UNIQUE,

@@ -6,3 +6,4 @@ gunicorn>=22.0
 pyyaml>=6.0
 pandas>=2.0
 sqlalchemy>=2.0
+openpyxl>=3.1

@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DCLT Navigator</title>
+  <script>
+    const CURRENT_USER = {{ ({"id": current_user.id, "username": current_user.username, "role": current_user.role} | tojson) if current_user.is_authenticated else "null" }};
+  </script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -32,6 +35,91 @@
     .nav-user { margin-left: auto; display: flex; align-items: center; gap: .75rem; font-size: 12px; color: #94a3b8; }
     .nav-user a { color: #94a3b8; text-decoration: none; }
     .nav-user a:hover { color: #e2e8f0; }
+
+    /* ── Adjudication controls ───────────────────────────────────────────── */
+    .verdict-yes     { background:#dcfce7; color:#166534; border-radius:3px; padding:.1rem .35rem; font-size:10px; font-weight:700; }
+    .verdict-no      { background:#fee2e2; color:#991b1b; border-radius:3px; padding:.1rem .35rem; font-size:10px; font-weight:700; }
+    .verdict-unclear { background:#fef9c3; color:#854d0e; border-radius:3px; padding:.1rem .35rem; font-size:10px; font-weight:700; }
+    .verdict-none    { background:#f1f5f9; color:#94a3b8; border-radius:3px; padding:.1rem .35rem; font-size:10px; }
+    .adj-btn {
+      padding:.2rem .55rem; border-radius:4px; border:1px solid #cbd5e1;
+      font-size:11px; font-weight:600; cursor:pointer; background:#fff; color:#475569;
+      transition:background .1s, border-color .1s;
+    }
+    .adj-btn:hover { background:#f8fafc; }
+    .adj-btn.active.yes     { background:#dcfce7; border-color:#86efac; color:#166534; }
+    .adj-btn.active.no      { background:#fee2e2; border-color:#fca5a5; color:#991b1b; }
+    .adj-btn.active.unclear { background:#fef9c3; border-color:#fde047; color:#854d0e; }
+    .adj-btn.pending        { opacity:.5; pointer-events:none; }
+    .adj-hist-btn { font-size:11px; color:#94a3b8; background:none; border:none; cursor:pointer; padding:.2rem .3rem; }
+    .adj-hist-btn:hover { color:#475569; }
+    .adj-history { background:#f8fafc; border-radius:4px; padding:.4rem .6rem; margin-top:.25rem; }
+    .adj-hist-row { display:flex; gap:.5rem; align-items:center; font-size:11px; color:#64748b; padding:.15rem 0; }
+
+    /* ── Tag picker ──────────────────────────────────────────────────────────── */
+    .tag-chips { display:flex; flex-wrap:wrap; gap:.35rem; }
+    .tag-chip {
+      position:relative; display:inline-flex; align-items:center;
+      padding:.18rem .55rem; border-radius:12px; font-size:11px; font-weight:500;
+      cursor:pointer; user-select:none; white-space:nowrap;
+      border:1px solid #cbd5e1; background:#fff; color:#475569;
+      transition:border-color .1s, background .1s;
+    }
+    .tag-chip:hover { border-color:#94a3b8; background:#f8fafc; }
+    .tag-chip.applied { background:#dbeafe; border-color:#93c5fd; color:#1d4ed8; }
+    .tag-chip.applied:hover { background:#bfdbfe; }
+    .tag-chip.pending { opacity:.5; pointer-events:none; }
+    .tag-chip.retired-state { font-style:italic; border-color:#fbbf24; color:#92400e; background:#fef3c7; }
+    .tag-dropdown {
+      position:absolute; top:calc(100% + 4px); left:0; z-index:20;
+      background:#fff; border:1px solid #e2e8f0; border-radius:6px;
+      box-shadow:0 4px 12px rgba(0,0,0,.12); min-width:140px; overflow:hidden;
+    }
+    .tag-dd-item {
+      padding:.35rem .7rem; font-size:12px; cursor:pointer; color:#334155;
+      display:flex; align-items:center; gap:.4rem;
+    }
+    .tag-dd-item:hover { background:#f1f5f9; }
+    .tag-dd-item.current { font-weight:600; color:#1d4ed8; }
+    .tag-dd-item.default-state::after { content:'default'; font-size:9px; color:#94a3b8; margin-left:auto; }
+    .tag-dd-divider { border:none; border-top:1px solid #e2e8f0; margin:.2rem 0; }
+    .tag-dd-remove { color:#dc2626; }
+    .tag-dd-remove:hover { background:#fee2e2; }
+
+    /* ── Admin secondary tabs ───────────────────────────────────────────────── */
+    .admin-sec-tab {
+      height:36px; padding:0 1.1rem; border:none; background:transparent;
+      cursor:pointer; font-size:13px; font-weight:500; color:#64748b;
+      border-bottom:2px solid transparent; white-space:nowrap;
+    }
+    .admin-sec-tab:hover { color:#1e293b; }
+    .admin-sec-tab.active { color:#1e293b; border-bottom-color:#3b82f6; }
+
+    /* ── Admin tag list & edit ───────────────────────────────────────────────── */
+    .tag-list-row {
+      padding:.5rem .75rem; border-bottom:1px solid #f1f5f9; cursor:pointer;
+      display:flex; flex-direction:column; gap:.25rem;
+    }
+    .tag-list-row:hover { background:#f8fafc; }
+    .tag-list-row.selected { background:#eff6ff; }
+    .tag-list-row.deprecated { opacity:.55; }
+    .tag-states-preview { font-size:11px; color:#64748b; }
+    .tag-usage-preview { font-size:10px; color:#94a3b8; }
+    .tag-state-row {
+      display:flex; align-items:center; gap:.35rem; padding:.2rem 0;
+      font-size:12px;
+    }
+    .tag-state-handle { color:#94a3b8; font-size:10px; }
+    .tag-state-name { flex:1; }
+    .tag-state-default { font-size:9px; color:#3b82f6; font-weight:600; text-transform:uppercase; }
+    .tag-confirm-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:200;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .tag-confirm-box {
+      background:#fff; border-radius:8px; padding:1.5rem; max-width:400px; width:90%;
+      box-shadow:0 8px 30px rgba(0,0,0,.15);
+    }
 
     /* ── Layout ──────────────────────────────────────────────────────────── */
     .main   { flex: 1; overflow: hidden; display: flex; }
@@ -278,7 +366,7 @@
       <div class="nav-tab" :class="{active:activeTab==='overview'}"  @click="switchTab('overview')">Overview</div>
       <div class="nav-tab" :class="{active:activeTab==='parcels'}"   @click="switchTab('parcels')">Parcels</div>
       <div class="nav-tab" :class="{active:activeTab==='documents'}" @click="switchTab('documents')">Documents</div>
-      <div class="nav-tab" :class="{active:activeTab==='admin'}"     @click="activeTab='admin'">Admin</div>
+      <div class="nav-tab" :class="{active:activeTab==='admin'}"     @click="switchTab('admin')">Admin</div>
     </div>
     <div class="nav-user">
       {% if current_user.is_authenticated %}
@@ -539,6 +627,7 @@
 
         <div class="col-left-footer">
           <span x-text="parcelFilteredCount.toLocaleString()+' parcel'+(parcelFilteredCount!==1?'s':'')+(parcelSearch.trim()?' found':'')"></span>
+          <a :href="parcelExportUrl" class="paging-btn" style="text-decoration:none;" download>↓ CSV</a>
           <div class="paging-btns">
             <button class="paging-btn" @click="parcelPage=1"            :disabled="parcelPage===1">«</button>
             <button class="paging-btn" @click="parcelPage--"            :disabled="parcelPage===1">‹</button>
@@ -660,6 +749,51 @@
                   </div>
                 </template>
               </div>
+
+              <!-- Tags -->
+              <template x-if="CURRENT_USER">
+                <div class="section">
+                  <div class="section-title">Tags</div>
+                  <template x-if="tagsLoading">
+                    <div style="font-size:12px;color:#94a3b8;">Loading…</div>
+                  </template>
+                  <div class="tag-chips">
+                    <template x-for="tag in allTags" :key="tag.tag_id">
+                      <div class="tag-chip"
+                        :class="{
+                          applied:  parcelTagState[tag.tag_id] != null,
+                          pending:  tagPending[tag.tag_id],
+                          'retired-state': parcelTagState[tag.tag_id] != null && !tag.states_csv.split(',').includes(parcelTagState[tag.tag_id])
+                        }"
+                        @click.stop="toggleTagPicker('parcel', tag.tag_id)">
+                        <span x-text="parcelTagState[tag.tag_id] != null ? tag.name + ' : ' + parcelTagState[tag.tag_id] : tag.name"></span>
+                        <div class="tag-dropdown" x-show="tagPickerOpen === 'parcel:'+tag.tag_id" @click.stop>
+                          <template x-for="(s, i) in tag.states_csv.split(',')" :key="s">
+                            <div class="tag-dd-item"
+                              :class="{current: parcelTagState[tag.tag_id]===s, 'default-state': i===0 && parcelTagState[tag.tag_id]==null}"
+                              @click="applyTag('parcel', selectedParcelId, tag.tag_id, s)">
+                              <span x-text="s"></span>
+                            </div>
+                          </template>
+                          <template x-if="parcelTagState[tag.tag_id] != null">
+                            <div>
+                              <hr class="tag-dd-divider">
+                              <div class="tag-dd-item tag-dd-remove"
+                                @click="applyTag('parcel', selectedParcelId, tag.tag_id, null)">
+                                Remove tag
+                              </div>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                    <template x-if="allTags.length === 0 && !tagsLoading">
+                      <span style="font-size:12px;color:#94a3b8;">No tags defined</span>
+                    </template>
+                  </div>
+                </div>
+              </template>
+
             </div>
           </template>
 
@@ -713,6 +847,13 @@
             <option value="perpetual_restriction">Perpetual Restriction</option>
             <option value="ccr">CC&amp;R</option>
           </select>
+          <template x-if="docKwFilter">
+            <div style="display:flex;align-items:center;gap:.4rem;">
+              <span style="font-size:11px;color:#94a3b8;white-space:nowrap;">Min confidence</span>
+              <input type="range" min="0" max="1" step="0.05" x-model.number="docKwThreshold" style="flex:1;accent-color:#3b82f6;">
+              <span style="font-size:11px;color:#64748b;white-space:nowrap;min-width:2.5rem;" x-text="docKwThreshold.toFixed(2)"></span>
+            </div>
+          </template>
           <div class="sort-row">
             <span class="sort-label">Sort</span>
             <select class="ctrl-select" x-model="docSort">
@@ -756,6 +897,10 @@
                     <template x-if="d.scan_cached">
                       <span class="kw-badge" style="background:#f0fdf4;color:#166534;">PDF</span>
                     </template>
+                    <template x-if="docKwFilter">
+                      <span :class="verdictCls(docKwAdjudications[d.book+'/'+d.page])"
+                        x-text="docKwAdjudications[d.book+'/'+d.page]||'—'"></span>
+                    </template>
                   </div>
                 </div>
               </template>
@@ -768,6 +913,7 @@
 
         <div class="col-left-footer">
           <span x-text="docFilteredCount.toLocaleString()+' doc'+(docFilteredCount!==1?'s':'')"></span>
+          <a :href="docExportUrl" class="paging-btn" style="text-decoration:none;" download>↓ CSV</a>
           <div class="paging-btns">
             <button class="paging-btn" @click="docPage=1"            :disabled="docPage===1">«</button>
             <button class="paging-btn" @click="docPage--"            :disabled="docPage===1">‹</button>
@@ -828,21 +974,58 @@
                 </table>
               </div>
 
-              <!-- Keyword Scores -->
+              <!-- Keyword Scores + Adjudication -->
               <template x-if="docDetail.ocr">
                 <div class="section">
                   <div class="section-title">Keyword Scores</div>
                   <div>
                     <template x-for="kw in KW_ORDER" :key="kw.key">
-                      <div class="kw-score-row">
-                        <span x-text="kw.label" style="color:#475569;"></span>
-                        <div class="kw-bar-track">
-                          <div class="kw-bar-fill"
-                            :class="'kw-'+kw.cls"
-                            :style="'width:'+Math.min(100,(docDetail.ocr['kw_'+kw.key]||0)*100)+'%;background:currentColor;'">
+                      <div style="margin-bottom:.55rem;">
+                        <div class="kw-score-row">
+                          <span x-text="kw.label" style="color:#475569;"></span>
+                          <div class="kw-bar-track">
+                            <div class="kw-bar-fill"
+                              :class="'kw-'+kw.cls"
+                              :style="'width:'+Math.min(100,(docDetail.ocr['kw_'+kw.key]||0)*100)+'%;background:currentColor;'">
+                            </div>
                           </div>
+                          <span class="kw-val" x-text="((docDetail.ocr['kw_'+kw.key]||0)).toFixed(3)"></span>
+                          <span :class="verdictCls(docAdjudications[kw.key]?.verdict)"
+                            x-text="docAdjudications[kw.key]?.verdict||'—'"></span>
                         </div>
-                        <span class="kw-val" x-text="((docDetail.ocr['kw_'+kw.key]||0)).toFixed(3)"></span>
+                        <template x-if="CURRENT_USER">
+                          <div style="display:flex;align-items:center;gap:.3rem;margin-top:.25rem;padding-left:1px;">
+                            <button class="adj-btn yes"
+                              :class="{active: docAdjudications[kw.key]?.verdict==='yes', yes:true, pending: docAdjPending[kw.key]}"
+                              @click="adjudicate(kw.key,'yes')">Yes</button>
+                            <button class="adj-btn no"
+                              :class="{active: docAdjudications[kw.key]?.verdict==='no', no:true, pending: docAdjPending[kw.key]}"
+                              @click="adjudicate(kw.key,'no')">No</button>
+                            <button class="adj-btn unclear"
+                              :class="{active: docAdjudications[kw.key]?.verdict==='unclear', unclear:true, pending: docAdjPending[kw.key]}"
+                              @click="adjudicate(kw.key,'unclear')">?</button>
+                            <button class="adj-hist-btn"
+                              @click="toggleAdjHistory(kw.key)"
+                              x-text="adjHistOpen[kw.key]?'Hide history':'History'"></button>
+                          </div>
+                        </template>
+                        <template x-if="adjHistOpen[kw.key]">
+                          <div class="adj-history">
+                            <template x-if="adjHistory[kw.key]?.loading">
+                              <div style="font-size:11px;color:#94a3b8;">Loading…</div>
+                            </template>
+                            <template x-if="!adjHistory[kw.key]?.loading && adjHistory[kw.key]?.rows?.length===0">
+                              <div style="font-size:11px;color:#94a3b8;">No history</div>
+                            </template>
+                            <template x-for="h in (adjHistory[kw.key]?.rows||[])" :key="h.seq">
+                              <div class="adj-hist-row">
+                                <span :class="verdictCls(h.verdict)" x-text="h.verdict"></span>
+                                <span x-text="h.username"></span>
+                                <span x-text="h.created_at.slice(0,16).replace('T',' ')"></span>
+                              </div>
+                            </template>
+                          </div>
+                        </template>
                       </div>
                     </template>
                   </div>
@@ -863,6 +1046,51 @@
               <template x-if="!docDetail.ocr">
                 <div style="font-size:13px;color:#94a3b8;margin-bottom:1rem;">No OCR data for this document</div>
               </template>
+
+              <!-- Tags -->
+              <template x-if="CURRENT_USER">
+                <div class="section">
+                  <div class="section-title">Tags</div>
+                  <template x-if="tagsLoading">
+                    <div style="font-size:12px;color:#94a3b8;">Loading…</div>
+                  </template>
+                  <div class="tag-chips">
+                    <template x-for="tag in allTags" :key="tag.tag_id">
+                      <div class="tag-chip"
+                        :class="{
+                          applied:  docTagState[tag.tag_id] != null,
+                          pending:  tagPending[tag.tag_id],
+                          'retired-state': docTagState[tag.tag_id] != null && !tag.states_csv.split(',').includes(docTagState[tag.tag_id])
+                        }"
+                        @click.stop="toggleTagPicker('doc', tag.tag_id)">
+                        <span x-text="docTagState[tag.tag_id] != null ? tag.name + ' : ' + docTagState[tag.tag_id] : tag.name"></span>
+                        <div class="tag-dropdown" x-show="tagPickerOpen === 'doc:'+tag.tag_id" @click.stop>
+                          <template x-for="(s, i) in tag.states_csv.split(',')" :key="s">
+                            <div class="tag-dd-item"
+                              :class="{current: docTagState[tag.tag_id]===s, 'default-state': i===0 && docTagState[tag.tag_id]==null}"
+                              @click="applyTag('document', docSelectedBP.book+'/'+docSelectedBP.page, tag.tag_id, s)">
+                              <span x-text="s"></span>
+                            </div>
+                          </template>
+                          <template x-if="docTagState[tag.tag_id] != null">
+                            <div>
+                              <hr class="tag-dd-divider">
+                              <div class="tag-dd-item tag-dd-remove"
+                                @click="applyTag('document', docSelectedBP.book+'/'+docSelectedBP.page, tag.tag_id, null)">
+                                Remove tag
+                              </div>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                    <template x-if="allTags.length === 0 && !tagsLoading">
+                      <span style="font-size:12px;color:#94a3b8;">No tags defined</span>
+                    </template>
+                  </div>
+                </div>
+              </template>
+
             </div>
           </template>
 
@@ -894,10 +1122,345 @@
 
     </div><!-- /documents tab -->
 
-    <!-- Admin -->
-    <div class="tab-panel stub-panel" x-show="activeTab==='admin'">Coming soon</div>
+    <!-- ════════════════════════════ ADMIN TAB ═════════════════════════════ -->
+    <div class="tab-panel" x-show="activeTab==='admin'" style="overflow:hidden;display:flex;flex-direction:column;">
+
+      <!-- Secondary tab bar -->
+      <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#fff;flex-shrink:0;padding:0 .75rem;">
+        <button class="admin-sec-tab" :class="{active:adminSection==='users'}" @click="adminSection='users'">User Admin</button>
+        <button class="admin-sec-tab" :class="{active:adminSection==='usage'}" @click="adminSection='usage'">Usage Log</button>
+        <button class="admin-sec-tab" :class="{active:adminSection==='tags'}"  @click="switchAdminSection('tags')">Tag Maintenance</button>
+      </div>
+
+      <!-- Section content -->
+      <div style="flex:1;overflow:hidden;display:flex;">
+
+        <!-- ── User Admin ──────────────────────────────────────────────────── -->
+        <div x-show="adminSection==='users'" style="display:flex;width:100%;height:100%;overflow:hidden;">
+
+          <div class="col-left">
+            <div class="col-left-controls">
+              <template x-if="CURRENT_USER?.role === 'admin'">
+                <button class="rod-link" style="font-size:12px;padding:.3rem .75rem;width:100%;text-align:center;border:none;"
+                  @click="adminAction='add_user'; adminSelected=null; adminNewUser={username:'',password:'',role:'user',saving:false,msg:'',err:''}">
+                  + Add User
+                </button>
+              </template>
+            </div>
+            <div class="col-left-list">
+              <template x-if="adminUsersLoading">
+                <div class="loading-msg">Loading…</div>
+              </template>
+              <template x-if="!adminUsersLoading">
+                <div>
+                  <template x-for="u in adminUsers" :key="u.id">
+                    <div class="list-row" :class="{selected: adminSelected?.id === u.id}"
+                      @click="selectAdminUser(u)">
+                      <div style="display:flex;align-items:center;justify-content:space-between;gap:.4rem;">
+                        <span class="row-main" x-text="u.username"></span>
+                        <template x-if="CURRENT_USER?.role === 'admin'">
+                          <span class="badge"
+                            :class="u.role==='admin'?'badge-blue':u.role==='guest'?'badge-gray':'badge-green'"
+                            style="font-size:10px;padding:.1rem .35rem;flex-shrink:0;"
+                            x-text="u.role"></span>
+                        </template>
+                      </div>
+                      <div class="row-sub"
+                        x-text="u.last_login ? 'Last login ' + u.last_login.slice(0,16).replace('T',' ') : 'Never logged in'">
+                      </div>
+                    </div>
+                  </template>
+                  <template x-if="adminUsers.length === 0">
+                    <div class="empty-state" style="height:100px;">No users</div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="col-mid">
+            <div class="col-mid-inner">
+              <template x-if="!adminSelected && adminAction !== 'add_user'">
+                <div class="empty-state" style="height:60vh;">
+                  <span class="empty-icon">👤</span>
+                  <span>Select a user</span>
+                </div>
+              </template>
+              <template x-if="adminAction === 'add_user' && CURRENT_USER?.role === 'admin'">
+                <div>
+                  <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:1.25rem;">Add User</div>
+                  <div class="section">
+                    <div style="display:flex;flex-direction:column;gap:.6rem;max-width:320px;">
+                      <input class="search-input" type="text" placeholder="Username"
+                        x-model="adminNewUser.username" autocomplete="off">
+                      <input class="search-input" type="password" placeholder="Password"
+                        x-model="adminNewUser.password" autocomplete="new-password">
+                      <select class="ctrl-select" x-model="adminNewUser.role">
+                        <option value="guest">Guest — view only</option>
+                        <option value="user">User — can change own password</option>
+                        <option value="admin">Admin — full access</option>
+                      </select>
+                      <template x-if="adminNewUser.err">
+                        <div style="font-size:12px;color:#dc2626;" x-text="adminNewUser.err"></div>
+                      </template>
+                      <template x-if="adminNewUser.msg">
+                        <div style="font-size:12px;color:#16a34a;" x-text="adminNewUser.msg"></div>
+                      </template>
+                      <button class="rod-link" style="width:fit-content;font-size:13px;border:none;"
+                        @click="addAdminUser()" :disabled="adminNewUser.saving"
+                        x-text="adminNewUser.saving ? 'Adding…' : 'Add User'"></button>
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <template x-if="adminSelected && adminAction === 'change_pw'">
+                <div>
+                  <div style="margin-bottom:1.25rem;">
+                    <div style="font-size:18px;font-weight:700;color:#0f172a;" x-text="adminSelected.username"></div>
+                    <div style="font-size:13px;color:#64748b;margin-top:3px;"
+                      x-text="(adminSelected.role) + ' · ' + (adminSelected.last_login ? 'Last login ' + adminSelected.last_login.slice(0,16).replace('T',' ') : 'Never logged in')">
+                    </div>
+                  </div>
+                  <template x-if="canChangePassword(adminSelected.id)">
+                    <div class="section">
+                      <div class="section-title">Change Password</div>
+                      <div style="display:flex;flex-direction:column;gap:.6rem;max-width:320px;">
+                        <input class="search-input" type="password" placeholder="New password"
+                          x-model="adminPw.password" autocomplete="new-password">
+                        <input class="search-input" type="password" placeholder="Confirm password"
+                          x-model="adminPw.confirm" autocomplete="new-password"
+                          @keydown.enter="changeAdminPassword()">
+                        <template x-if="adminPw.err">
+                          <div style="font-size:12px;color:#dc2626;" x-text="adminPw.err"></div>
+                        </template>
+                        <template x-if="adminPw.msg">
+                          <div style="font-size:12px;color:#16a34a;" x-text="adminPw.msg"></div>
+                        </template>
+                        <button class="rod-link" style="width:fit-content;font-size:13px;border:none;"
+                          @click="changeAdminPassword()" :disabled="adminPw.saving"
+                          x-text="adminPw.saving ? 'Saving…' : 'Update Password'"></button>
+                      </div>
+                    </div>
+                  </template>
+                  <template x-if="!canChangePassword(adminSelected.id)">
+                    <div style="font-size:13px;color:#94a3b8;margin-top:.5rem;">
+                      You do not have permission to change this user's password.
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+
+        </div><!-- /users section -->
+
+        <!-- ── Usage Log ───────────────────────────────────────────────────── -->
+        <div x-show="adminSection==='usage'" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+          <div class="col-right-header" style="display:flex;align-items:center;gap:.5rem;">
+            <span>Usage Log</span>
+            <span x-show="!usageLoading" style="font-size:10px;color:#94a3b8;font-weight:400;text-transform:none;letter-spacing:0;"
+              x-text="filteredUsage.length.toLocaleString() + (usageSearch ? ' of ' + usageLog.length.toLocaleString() : '') + ' events'"></span>
+            <a :href="usageExportUrl" download
+              style="margin-left:auto;padding:.1rem .45rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:12px;color:#64748b;text-decoration:none;">↓ CSV</a>
+            <button @click="loadUsage()"
+              style="padding:.1rem .45rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:12px;color:#64748b;"
+              title="Refresh">↻</button>
+          </div>
+          <div style="padding:.4rem .6rem;border-bottom:1px solid #e2e8f0;flex-shrink:0;">
+            <input class="search-input" x-model="usageSearch"
+              placeholder="Search username, event, path, IP…" type="search" autocomplete="off">
+          </div>
+          <div style="flex:1;overflow:auto;">
+            <template x-if="usageLoading">
+              <div class="loading-msg">Loading…</div>
+            </template>
+            <template x-if="!usageLoading">
+              <table class="doc-table" style="font-size:11px;min-width:860px;">
+                <thead>
+                  <tr>
+                    <template x-for="col in usageCols" :key="col.key">
+                      <th @click="sortUsage(col.key)" style="cursor:pointer;white-space:nowrap;user-select:none;">
+                        <span x-text="col.label"></span>
+                        <span style="color:#3b82f6;" x-text="usageSort===col.key ? (usageSortDir==='asc'?'↑':'↓') : ''"></span>
+                      </th>
+                    </template>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="r in filteredUsage" :key="r.seq">
+                    <tr>
+                      <td style="white-space:nowrap;color:#64748b;" x-text="r.ts ? r.ts.replace('T',' ') : ''"></td>
+                      <td style="font-weight:500;" x-text="r.username || '—'"></td>
+                      <td style="font-family:monospace;font-size:10px;color:#94a3b8;" x-text="r.session_id || ''"></td>
+                      <td>
+                        <span class="badge"
+                          :class="r.event_type==='login'?'badge-green':r.event_type==='logout'?'badge-gray':r.event_type&&r.event_type.startsWith('admin')?'badge-orange':r.event_type==='adjudication'?'badge-purple':'badge-blue'"
+                          style="font-size:10px;padding:.05rem .3rem;"
+                          x-text="r.event_type || '—'"></span>
+                      </td>
+                      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" :title="r.api_call" x-text="r.api_call || ''"></td>
+                      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b;" :title="r.details" x-text="r.details || ''"></td>
+                      <td style="white-space:nowrap;font-family:monospace;font-size:10px;" x-text="r.ip || ''"></td>
+                      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#94a3b8;" :title="r.user_agent" x-text="r.user_agent || ''"></td>
+                    </tr>
+                  </template>
+                  <template x-if="filteredUsage.length === 0">
+                    <tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:2rem;">No events</td></tr>
+                  </template>
+                </tbody>
+              </table>
+            </template>
+          </div>
+        </div><!-- /usage section -->
+
+        <!-- ── Tag Maintenance ─────────────────────────────────────────────── -->
+        <div x-show="adminSection==='tags'" style="display:flex;width:100%;height:100%;overflow:hidden;">
+
+          <div class="col-left">
+            <div class="col-left-controls">
+              <template x-if="CURRENT_USER?.role === 'admin'">
+                <button class="rod-link" style="font-size:12px;padding:.3rem .75rem;width:100%;text-align:center;border:none;"
+                  @click="startNewTag()">+ Add Tag</button>
+              </template>
+            </div>
+            <div class="col-left-list">
+              <template x-if="adminTagsLoading">
+                <div class="loading-msg">Loading…</div>
+              </template>
+              <template x-if="!adminTagsLoading">
+                <div>
+                  <template x-for="t in allAdminTags" :key="t.tag_id">
+                    <div class="tag-list-row"
+                      :class="{selected: selectedTag?.tag_id===t.tag_id, deprecated: t.deprecated_at}"
+                      @click="selectTag(t)">
+                      <div style="display:flex;align-items:center;gap:.4rem;">
+                        <span class="row-main" x-text="t.name"></span>
+                        <template x-if="t.deprecated_at">
+                          <span class="badge badge-gray" style="font-size:9px;padding:.05rem .3rem;">deprecated</span>
+                        </template>
+                      </div>
+                      <div class="tag-states-preview" x-text="'[' + t.states_csv + ']'"></div>
+                      <div class="tag-usage-preview" x-text="tagUsageLine(t)"></div>
+                    </div>
+                  </template>
+                  <template x-if="allAdminTags.length === 0">
+                    <div class="empty-state" style="height:100px;">No tags</div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="col-mid">
+            <div class="col-mid-inner">
+              <template x-if="!selectedTag && !tagEditForm.isNew">
+                <div class="empty-state" style="height:60vh;">
+                  <span class="empty-icon">🏷</span>
+                  <span>Select a tag</span>
+                </div>
+              </template>
+              <template x-if="tagEditForm.isNew">
+                <div>
+                  <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:1.25rem;">New Tag</div>
+                  <div style="display:flex;flex-direction:column;gap:.6rem;">
+                    <input class="search-input" type="text" placeholder="Tag name (e.g. status)"
+                      x-model="tagEditForm.name" autocomplete="off">
+                    <input class="search-input" type="text" placeholder="States, comma-separated (e.g. new,reviewed)"
+                      x-model="tagEditForm.statesRaw" autocomplete="off">
+                    <template x-if="tagEditForm.err">
+                      <div style="font-size:12px;color:#dc2626;" x-text="tagEditForm.err"></div>
+                    </template>
+                    <button class="rod-link" style="width:fit-content;font-size:13px;border:none;"
+                      @click="saveNewTag()" :disabled="tagEditForm.saving"
+                      x-text="tagEditForm.saving ? 'Saving…' : 'Create Tag'"></button>
+                  </div>
+                </div>
+              </template>
+              <template x-if="selectedTag && !tagEditForm.isNew">
+                <div>
+                  <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:.3rem;" x-text="selectedTag.name"></div>
+                  <div style="font-size:12px;color:#94a3b8;margin-bottom:1.25rem;" x-text="selectedTag.deprecated_at ? 'Deprecated' : 'Active'"></div>
+                  <div class="section">
+                    <div class="section-title">Name</div>
+                    <input class="search-input" type="text" x-model="tagEditForm.name" autocomplete="off">
+                  </div>
+                  <div class="section" style="margin-top:.75rem;">
+                    <div class="section-title">States <span style="font-weight:400;text-transform:none;font-size:10px;color:#94a3b8;">(first = default)</span></div>
+                    <template x-for="(s, i) in tagEditForm.states" :key="i">
+                      <div class="tag-state-row">
+                        <span class="tag-state-handle">☰</span>
+                        <span class="tag-state-name" x-text="s"></span>
+                        <template x-if="i===0"><span class="tag-state-default">default</span></template>
+                        <button style="padding:.1rem .3rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;"
+                          :disabled="i===0" @click="moveTagState(i,-1)">↑</button>
+                        <button style="padding:.1rem .3rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;"
+                          :disabled="i===tagEditForm.states.length-1" @click="moveTagState(i,1)">↓</button>
+                        <button style="padding:.1rem .3rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;color:#dc2626;"
+                          @click="removeTagState(i)">✕</button>
+                      </div>
+                    </template>
+                    <div style="display:flex;gap:.35rem;margin-top:.5rem;">
+                      <input class="search-input" type="text" placeholder="New state…"
+                        x-model="tagEditForm.newState" style="flex:1;" @keydown.enter="addTagState()">
+                      <button style="padding:.3rem .6rem;border:1px solid #cbd5e1;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;"
+                        @click="addTagState()">Add</button>
+                    </div>
+                  </div>
+                  <div class="section" style="margin-top:.75rem;">
+                    <label style="display:flex;align-items:center;gap:.4rem;font-size:12px;cursor:pointer;">
+                      <input type="checkbox" x-model="tagEditForm.deprecated">
+                      <span>Deprecated (hidden from picker)</span>
+                    </label>
+                  </div>
+                  <template x-if="tagEditForm.err">
+                    <div style="font-size:12px;color:#dc2626;margin-top:.5rem;" x-text="tagEditForm.err"></div>
+                  </template>
+                  <template x-if="tagEditForm.msg">
+                    <div style="font-size:12px;color:#16a34a;margin-top:.5rem;" x-text="tagEditForm.msg"></div>
+                  </template>
+                  <div style="display:flex;gap:.5rem;margin-top:1rem;flex-wrap:wrap;">
+                    <button class="rod-link" style="font-size:13px;border:none;"
+                      @click="saveTag()" :disabled="tagEditForm.saving"
+                      x-text="tagEditForm.saving ? 'Saving…' : 'Save'"></button>
+                    <template x-if="CURRENT_USER?.role==='admin'">
+                      <button style="padding:.3rem .7rem;border:1px solid #fca5a5;border-radius:4px;background:#fff;color:#dc2626;cursor:pointer;font-size:12px;"
+                        @click="confirmDeleteTag()" :disabled="tagEditForm.deleting"
+                        x-text="tagEditForm.deleting ? 'Deleting…' : 'Delete tag'"></button>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+        </div><!-- /tags section -->
+
+      </div>
+
+    </div><!-- /admin tab -->
 
   </div><!-- /main -->
+
+  <!-- Tag picker close overlay (closes any open dropdown when clicking outside) -->
+  <div x-show="tagPickerOpen !== null"
+       @click="tagPickerOpen = null"
+       style="position:fixed;inset:0;z-index:15;"></div>
+
+  <!-- Tag confirmation dialog -->
+  <template x-if="tagConfirmDialog">
+    <div class="tag-confirm-overlay" @click.self="tagConfirmDialog = null">
+      <div class="tag-confirm-box">
+        <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:.75rem;" x-text="tagConfirmDialog.title"></div>
+        <div style="font-size:13px;color:#475569;margin-bottom:1.25rem;line-height:1.5;" x-text="tagConfirmDialog.body"></div>
+        <div style="display:flex;justify-content:flex-end;gap:.5rem;">
+          <button style="padding:.35rem .8rem;border:1px solid #cbd5e1;border-radius:4px;background:#fff;cursor:pointer;font-size:13px;"
+            @click="tagConfirmDialog = null">Cancel</button>
+          <button style="padding:.35rem .8rem;border:1px solid #fca5a5;border-radius:4px;background:#fee2e2;color:#dc2626;cursor:pointer;font-size:13px;font-weight:600;"
+            @click="tagConfirmDialog.confirm()">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </template>
 
   <script>
     // ── Keyword metadata (priority order) ────────────────────────────────────
@@ -989,6 +1552,8 @@
         docSearch:         '',
         docTypeFilter:     '',
         docKwFilter:       '',
+        docKwThreshold:    0.5,
+        docKwAdjudications:{},
         docSort:           'recorded_date',
         docSortDir:        'desc',
         docPage:           1,
@@ -998,6 +1563,66 @@
         docDetailLoading:  false,
         docDetailError:    null,
         docPdfUrl:         null,
+
+        // adjudications
+        docAdjudications:  {},
+        docAdjPending:     {},
+        adjHistOpen:       {},
+        adjHistory:        {},
+
+        // admin — users
+        adminUsers:        [],
+        adminUsersLoading: false,
+        adminSelected:     null,
+        adminAction:       null,
+        adminPw:           { password:'', confirm:'', saving:false, msg:'', err:'' },
+        adminNewUser:      { username:'', password:'', role:'user', saving:false, msg:'', err:'' },
+
+        // admin — tags
+        adminSection:    'users',
+        allAdminTags:    [],
+        adminTagsLoading:false,
+        selectedTag:     null,
+        tagEditForm:     { isNew:false, name:'', states:[], statesRaw:'', newState:'', deprecated:false, displayOrder:0, saving:false, deleting:false, err:'', msg:'' },
+        tagConfirmDialog:null,
+
+        // user-facing tags
+        allTags:       [],
+        tagsLoading:   false,
+        parcelTagState:{},
+        docTagState:   {},
+        tagPickerOpen: null,
+        tagPending:    {},
+
+        // admin — usage
+        usageLog:     [],
+        usageLoading: false,
+        usageSearch:  '',
+        usageSort:    'seq',
+        usageSortDir: 'desc',
+        usageCols: [
+          { key:'ts',         label:'Timestamp' },
+          { key:'username',   label:'User'      },
+          { key:'session_id', label:'Session'   },
+          { key:'event_type', label:'Event'     },
+          { key:'api_call',   label:'API Call'  },
+          { key:'details',    label:'Details'   },
+          { key:'ip',         label:'IP'        },
+          { key:'user_agent', label:'Agent'     },
+        ],
+
+        // ── Computed — usage ────────────────────────────────────────────────
+        get filteredUsage() {
+          const q = this.usageSearch.trim().toLowerCase();
+          const KEYS = ['username','session_id','event_type','api_call','details','ip','user_agent'];
+          let list = q
+            ? this.usageLog.filter(r => KEYS.some(k => (r[k]||'').toLowerCase().includes(q)))
+            : this.usageLog;
+          const f = this.usageSort, dir = this.usageSortDir==='asc' ? 1 : -1;
+          return [...list].sort((a,b) =>
+            dir * String(a[f]??'').localeCompare(String(b[f]??''), undefined, {numeric:true})
+          );
+        },
 
         // ── Computed — parcels ──────────────────────────────────────────────
         get filteredParcels() {
@@ -1035,7 +1660,10 @@
             (d.book+'').includes(q) ||
             (d.page+'').includes(q));
           if (this.docTypeFilter) list = list.filter(d=>d.instrument_type===this.docTypeFilter);
-          if (this.docKwFilter)   list = list.filter(d=>(d['kw_'+this.docKwFilter]||0)>KW_THRESHOLD);
+          if (this.docKwFilter) {
+            const thr = this.docKwThreshold, adjs = this.docKwAdjudications, kw = this.docKwFilter;
+            list = list.filter(d => adjs[d.book+'/'+d.page]==='yes' || (d['kw_'+kw]||0) >= thr);
+          }
           const f=this.docSort, dir=this.docSortDir==='asc'?1:-1;
           return [...list].sort((a,b)=>{
             const av=a[f], bv=b[f];
@@ -1048,6 +1676,25 @@
         get docTotalPages()    { return Math.max(1,Math.ceil(this.filteredDocuments.length/this.docPageSize)); },
         get pagedDocuments()   { const s=(this.docPage-1)*this.docPageSize; return this.filteredDocuments.slice(s,s+this.docPageSize); },
 
+        // ── Export URLs ─────────────────────────────────────────────────────
+        get parcelExportUrl() {
+          const p = new URLSearchParams();
+          if (this.parcelSearch.trim()) p.set('q', this.parcelSearch.trim());
+          return '/exports/parcels.csv' + (p.size ? '?' + p : '');
+        },
+        get docExportUrl() {
+          const p = new URLSearchParams();
+          if (this.docSearch.trim()) p.set('q', this.docSearch.trim());
+          if (this.docTypeFilter) p.set('type', this.docTypeFilter);
+          if (this.docKwFilter) { p.set('kw', this.docKwFilter); p.set('kw_threshold', this.docKwThreshold); }
+          return '/exports/documents.csv' + (p.size ? '?' + p : '');
+        },
+        get usageExportUrl() {
+          const p = new URLSearchParams();
+          if (this.usageSearch.trim()) p.set('q', this.usageSearch.trim());
+          return '/exports/usage.csv' + (p.size ? '?' + p : '');
+        },
+
         // ── Init ────────────────────────────────────────────────────────────
         async init() {
           this.$watch('parcelSearch',  ()=>{ this.parcelPage=1; });
@@ -1055,17 +1702,20 @@
           this.$watch('parcelSortDir', ()=>{ this.parcelPage=1; });
           this.$watch('docSearch',     ()=>{ this.docPage=1; });
           this.$watch('docTypeFilter', ()=>{ this.docPage=1; });
-          this.$watch('docKwFilter',   ()=>{ this.docPage=1; });
+          this.$watch('docKwFilter',   ()=>{ this.docPage=1; this.loadDocKwAdjudications(this.docKwFilter); });
           this.$watch('docSort',       ()=>{ this.docPage=1; });
           this.$watch('docSortDir',    ()=>{ this.docPage=1; });
           this.loadOverview();
           this.loadParcels();
+          if (CURRENT_USER) this.loadTags();
         },
 
         // ── Tab switch ───────────────────────────────────────────────────────
         switchTab(tab) {
           this.activeTab = tab;
+          this.tagPickerOpen = null;
           if (tab==='documents' && this.allDocuments.length===0) this.loadDocuments();
+          if (tab==='admin') { this.loadAdminUsers(); this.loadUsage(); this.adminSection = 'users'; }
         },
 
         // ── Loaders ──────────────────────────────────────────────────────────
@@ -1107,10 +1757,23 @@
           this.parcelGisOpen      = {};
           this.parcelDetailError  = null;
           this.parcelDetailLoading= true;
+          this.parcelTagState     = {};
+          this.tagPickerOpen      = null;
           try {
-            const r = await fetch('/api/parcels/'+encodeURIComponent(p.parcel_id));
-            if (!r.ok) throw new Error('Server returned '+r.status);
-            this.parcelDetail = await r.json();
+            const [detailResp, tagResp] = await Promise.all([
+              fetch('/api/parcels/'+encodeURIComponent(p.parcel_id)),
+              CURRENT_USER ? fetch('/api/tagging/parcel/'+encodeURIComponent(p.parcel_id)) : Promise.resolve(null),
+            ]);
+            if (!detailResp.ok) throw new Error('Server returned '+detailResp.status);
+            this.parcelDetail = await detailResp.json();
+            if (tagResp && tagResp.ok) {
+              const td = await tagResp.json();
+              this.allTags       = td.tags;
+              this.parcelTagState = {};
+              for (const [k, v] of Object.entries(td.current)) {
+                if (v !== null) this.parcelTagState[k] = v;
+              }
+            }
           } catch(e) { this.parcelDetailError = e.message; }
           finally    { this.parcelDetailLoading = false; }
         },
@@ -1134,15 +1797,392 @@
           this.docPdfUrl        = null;
           this.docDetailError   = null;
           this.docDetailLoading = true;
+          this.docAdjudications = {};
+          this.docAdjPending    = {};
+          this.adjHistOpen      = {};
+          this.adjHistory       = {};
+          this.docTagState      = {};
+          this.tagPickerOpen    = null;
+          const tid = d.book + '/' + d.page;
           try {
-            const r = await fetch('/api/documents/'+d.book+'/'+d.page);
-            if (!r.ok) throw new Error('Server returned '+r.status);
-            this.docDetail = await r.json();
+            const [docResp, adjResp, tagResp] = await Promise.all([
+              fetch('/api/documents/'+d.book+'/'+d.page),
+              fetch('/api/adjudications/document/'+d.book+'/'+d.page),
+              CURRENT_USER ? fetch('/api/tagging/document/'+tid) : Promise.resolve(null),
+            ]);
+            if (!docResp.ok) throw new Error('Server returned '+docResp.status);
+            this.docDetail = await docResp.json();
             this.docPdfUrl = this.docDetail.document.scan_cached
               ? '/api/documents/'+d.book+'/'+d.page+'/pdf'
               : null;
+            this.docAdjudications = adjResp.ok ? await adjResp.json() : {};
+            if (tagResp && tagResp.ok) {
+              const td = await tagResp.json();
+              this.allTags    = td.tags;
+              this.docTagState = {};
+              for (const [k, v] of Object.entries(td.current)) {
+                if (v !== null) this.docTagState[k] = v;
+              }
+            }
           } catch(e) { this.docDetailError = e.message; }
           finally    { this.docDetailLoading = false; }
+        },
+
+        async loadDocKwAdjudications(kwKey) {
+          if (!kwKey) { this.docKwAdjudications = {}; return; }
+          try {
+            const r = await fetch('/api/adjudications/by_keyword/'+kwKey);
+            this.docKwAdjudications = r.ok ? await r.json() : {};
+          } catch(e) { this.docKwAdjudications = {}; }
+        },
+
+        async adjudicate(kwKey, verdict) {
+          if (!this.docSelectedBP) return;
+          const {book, page} = this.docSelectedBP;
+          const tid   = book+'/'+page;
+          const prior = this.docAdjudications[kwKey];
+          // Optimistic update
+          this.docAdjudications = {...this.docAdjudications, [kwKey]: {verdict, username: CURRENT_USER?.username, created_at: new Date().toISOString()}};
+          this.docAdjPending    = {...this.docAdjPending, [kwKey]: true};
+          if (verdict === 'yes') this.docKwAdjudications = {...this.docKwAdjudications, [tid]: 'yes'};
+          try {
+            const r = await fetch('/api/adjudications', {
+              method: 'POST',
+              headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({target_type:'document', target_id:tid, keyword_id:kwKey, verdict}),
+            });
+            if (!r.ok) throw new Error(r.status);
+            // Refresh list adjudications so filter stays accurate
+            if (this.docKwFilter === kwKey) this.loadDocKwAdjudications(kwKey);
+          } catch(e) {
+            console.error('adjudication failed:', e);
+            this.docAdjudications = {...this.docAdjudications, [kwKey]: prior||undefined};
+            if (prior) {
+              this.docKwAdjudications = {...this.docKwAdjudications, [tid]: prior.verdict};
+            } else {
+              const d = {...this.docKwAdjudications}; delete d[tid]; this.docKwAdjudications = d;
+            }
+          } finally {
+            this.docAdjPending = {...this.docAdjPending, [kwKey]: false};
+          }
+        },
+
+        async toggleAdjHistory(kwKey) {
+          this.adjHistOpen = {...this.adjHistOpen, [kwKey]: !this.adjHistOpen[kwKey]};
+          if (this.adjHistOpen[kwKey]) {
+            const {book, page} = this.docSelectedBP;
+            this.adjHistory = {...this.adjHistory, [kwKey]: {loading:true, rows:[]}};
+            try {
+              const r = await fetch(`/api/adjudications/document/${book}/${page}/${kwKey}/history`);
+              const rows = r.ok ? await r.json() : [];
+              this.adjHistory = {...this.adjHistory, [kwKey]: {loading:false, rows}};
+            } catch(e) {
+              this.adjHistory = {...this.adjHistory, [kwKey]: {loading:false, rows:[]}};
+            }
+          }
+        },
+
+        verdictCls(verdict) {
+          return verdict==='yes' ? 'verdict-yes' : verdict==='no' ? 'verdict-no' : verdict==='unclear' ? 'verdict-unclear' : 'verdict-none';
+        },
+
+        // ── Tags (user-facing) ────────────────────────────────────────────────
+        async loadTags() {
+          this.tagsLoading = true;
+          try {
+            const r = await fetch('/api/tags');
+            this.allTags = r.ok ? await r.json() : [];
+          } catch(e) { this.allTags = []; }
+          finally { this.tagsLoading = false; }
+        },
+
+        toggleTagPicker(ns, tagId) {
+          const key = ns + ':' + tagId;
+          this.tagPickerOpen = this.tagPickerOpen === key ? null : key;
+        },
+
+        async applyTag(targetType, targetId, tagId, state) {
+          this.tagPickerOpen = null;
+          const stateMap  = targetType === 'parcel' ? 'parcelTagState' : 'docTagState';
+          const prior     = this[stateMap][tagId];
+          // Optimistic update
+          this.tagPending  = {...this.tagPending, [tagId]: true};
+          const next       = {...this[stateMap]};
+          if (state === null) { delete next[tagId]; } else { next[tagId] = state; }
+          this[stateMap]   = next;
+          try {
+            const r = await fetch('/api/tagging', {
+              method: 'POST',
+              headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({tag_id: tagId, state, target_type: targetType, target_id: targetId}),
+            });
+            if (!r.ok) throw new Error(r.status);
+          } catch(e) {
+            // revert
+            const reverted = {...this[stateMap]};
+            if (prior == null) { delete reverted[tagId]; } else { reverted[tagId] = prior; }
+            this[stateMap] = reverted;
+            console.error('tag apply failed:', e);
+          } finally {
+            this.tagPending = {...this.tagPending, [tagId]: false};
+          }
+        },
+
+        // ── Tags (admin) ──────────────────────────────────────────────────────
+        async switchAdminSection(section) {
+          this.adminSection = section;
+          this.selectedTag  = null;
+          this.tagEditForm  = { isNew:false, name:'', states:[], statesRaw:'', newState:'', deprecated:false, displayOrder:0, saving:false, deleting:false, err:'', msg:'' };
+          if (section === 'tags') await this.loadAdminTags();
+        },
+
+        async loadAdminTags() {
+          this.adminTagsLoading = true;
+          try {
+            const r = await fetch('/api/admin/tags');
+            this.allAdminTags = r.ok ? await r.json() : [];
+          } catch(e) { this.allAdminTags = []; }
+          finally { this.adminTagsLoading = false; }
+        },
+
+        selectTag(t) {
+          this.selectedTag = t;
+          this.tagEditForm = {
+            isNew:        false,
+            name:         t.name,
+            states:       t.states_csv.split(','),
+            statesRaw:    t.states_csv,
+            newState:     '',
+            deprecated:   !!t.deprecated_at,
+            displayOrder: t.display_order,
+            saving:       false,
+            deleting:     false,
+            err:          '',
+            msg:          '',
+          };
+        },
+
+        startNewTag() {
+          this.selectedTag  = null;
+          this.tagEditForm  = { isNew:true, name:'', states:[], statesRaw:'', newState:'', deprecated:false, displayOrder:0, saving:false, deleting:false, err:'', msg:'' };
+        },
+
+        addTagState() {
+          const s = this.tagEditForm.newState.trim();
+          if (!s) return;
+          if (this.tagEditForm.states.includes(s)) { this.tagEditForm.err = `State '${s}' already exists`; return; }
+          this.tagEditForm.states = [...this.tagEditForm.states, s];
+          this.tagEditForm.newState = '';
+          this.tagEditForm.err = '';
+        },
+
+        removeTagState(i) {
+          const next = [...this.tagEditForm.states];
+          next.splice(i, 1);
+          this.tagEditForm.states = next;
+        },
+
+        moveTagState(i, dir) {
+          const next = [...this.tagEditForm.states];
+          const j = i + dir;
+          if (j < 0 || j >= next.length) return;
+          [next[i], next[j]] = [next[j], next[i]];
+          this.tagEditForm.states = next;
+        },
+
+        tagUsageLine(t) {
+          if (!t.usage || Object.keys(t.usage).length === 0) return '';
+          const states = t.states_csv.split(',');
+          const parts = states
+            .filter(s => t.usage[s] > 0)
+            .map(s => `${t.usage[s]} ${s.slice(0,6)}`);
+          return parts.join(' · ');
+        },
+
+        async saveNewTag() {
+          const name   = this.tagEditForm.name.trim();
+          const states = this.tagEditForm.statesRaw.split(',').map(s=>s.trim()).filter(Boolean);
+          if (!name)          { this.tagEditForm.err = 'Name required'; return; }
+          if (!states.length) { this.tagEditForm.err = 'At least one state required'; return; }
+          this.tagEditForm.saving = true; this.tagEditForm.err = '';
+          try {
+            const r = await fetch('/api/admin/tags', {
+              method: 'POST', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({name, states_csv: states.join(','), display_order: 0}),
+            });
+            const d = await r.json();
+            if (!r.ok) { this.tagEditForm.err = d.error || 'Error'; return; }
+            await this.loadAdminTags();
+            await this.loadTags();
+            const created = this.allAdminTags.find(t => t.tag_id === d.tag_id);
+            if (created) this.selectTag(created);
+          } catch(e) { this.tagEditForm.err = 'Network error'; }
+          finally    { this.tagEditForm.saving = false; }
+        },
+
+        async saveTag(confirmed = false) {
+          if (!this.selectedTag) return;
+          if (!this.tagEditForm.states.length) { this.tagEditForm.err = 'At least one state required'; return; }
+          this.tagEditForm.saving = true; this.tagEditForm.err = ''; this.tagEditForm.msg = '';
+          try {
+            const payload = {
+              name:          this.tagEditForm.name.trim(),
+              states_csv:    this.tagEditForm.states.join(','),
+              display_order: this.tagEditForm.displayOrder,
+              deprecated:    this.tagEditForm.deprecated,
+              confirm:       confirmed,
+            };
+            const r = await fetch('/api/admin/tags/' + this.selectedTag.tag_id, {
+              method: 'PATCH', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify(payload),
+            });
+            const d = await r.json();
+            if (r.status === 409 && d.needs_confirm) {
+              this.tagEditForm.saving = false;
+              const lines = d.removed_states.map(x =>
+                x.n_affected > 0
+                  ? `${x.n_affected} node${x.n_affected!==1?'s':''} with "${x.state}" → reset to "${x.default_state}"`
+                  : `No nodes are currently in state "${x.state}"`
+              ).join('\n');
+              this.tagConfirmDialog = {
+                title:   'Confirm state removal',
+                body:    lines,
+                confirm: () => { this.tagConfirmDialog = null; this.saveTag(true); },
+              };
+              return;
+            }
+            if (!r.ok) { this.tagEditForm.err = d.error || 'Error'; return; }
+            this.tagEditForm.msg = 'Saved.';
+            await this.loadAdminTags();
+            await this.loadTags();
+            const updated = this.allAdminTags.find(t => t.tag_id === this.selectedTag.tag_id);
+            if (updated) { this.selectedTag = updated; }
+          } catch(e) { this.tagEditForm.err = 'Network error'; }
+          finally    { this.tagEditForm.saving = false; }
+        },
+
+        async confirmDeleteTag() {
+          if (!this.selectedTag) return;
+          this.tagEditForm.deleting = true; this.tagEditForm.err = '';
+          try {
+            // Dry-run: confirm:false to get n_affected from server
+            const r = await fetch('/api/admin/tags/' + this.selectedTag.tag_id, {
+              method: 'DELETE', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({confirm: false}),
+            });
+            const d = await r.json();
+            if (r.status === 409 && d.needs_confirm) {
+              const n = d.n_affected;
+              this.tagConfirmDialog = {
+                title:   `Delete tag "${d.tag_name}"?`,
+                body:    n > 0
+                  ? `There are ${n} node${n!==1?'s':''} tagged "${d.tag_name}". Removing this tag will untag all of them. This cannot be undone.`
+                  : `Remove tag "${d.tag_name}"? This cannot be undone.`,
+                confirm: () => { this.tagConfirmDialog = null; this.executeDeleteTag(); },
+              };
+              return;
+            }
+            // n_affected was 0 — server deleted immediately
+            if (!r.ok) { this.tagEditForm.err = d.error || 'Error'; return; }
+            this._afterTagDeleted();
+          } catch(e) { this.tagEditForm.err = 'Network error'; }
+          finally    { this.tagEditForm.deleting = false; }
+        },
+
+        async executeDeleteTag() {
+          if (!this.selectedTag) return;
+          this.tagEditForm.deleting = true; this.tagEditForm.err = '';
+          try {
+            const r = await fetch('/api/admin/tags/' + this.selectedTag.tag_id, {
+              method: 'DELETE', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({confirm: true}),
+            });
+            const d = await r.json();
+            if (!r.ok) { this.tagEditForm.err = d.error || 'Error'; return; }
+            this._afterTagDeleted();
+          } catch(e) { this.tagEditForm.err = 'Network error'; }
+          finally    { this.tagEditForm.deleting = false; }
+        },
+
+        async _afterTagDeleted() {
+          this.selectedTag = null;
+          this.tagEditForm = { isNew:false, name:'', states:[], statesRaw:'', newState:'', deprecated:false, displayOrder:0, saving:false, deleting:false, err:'', msg:'' };
+          await this.loadAdminTags();
+          await this.loadTags();
+        },
+
+        // ── Admin ─────────────────────────────────────────────────────────────
+        async loadUsage() {
+          this.usageLoading = true;
+          try {
+            const r = await fetch('/api/admin/usage');
+            this.usageLog = r.ok ? await r.json() : [];
+          } catch(e) { this.usageLog = []; }
+          finally { this.usageLoading = false; }
+        },
+
+        sortUsage(col) {
+          if (this.usageSort === col) {
+            this.usageSortDir = this.usageSortDir==='asc' ? 'desc' : 'asc';
+          } else {
+            this.usageSort = col;
+            this.usageSortDir = 'desc';
+          }
+        },
+
+        async loadAdminUsers() {
+          this.adminUsersLoading = true;
+          try {
+            const r = await fetch('/api/admin/users');
+            this.adminUsers = r.ok ? await r.json() : [];
+          } catch(e) { this.adminUsers = []; }
+          finally { this.adminUsersLoading = false; }
+        },
+
+        selectAdminUser(u) {
+          this.adminSelected = u;
+          this.adminAction   = 'change_pw';
+          this.adminPw       = { password:'', confirm:'', saving:false, msg:'', err:'' };
+        },
+
+        canChangePassword(userId) {
+          if (!CURRENT_USER) return false;
+          if (CURRENT_USER.role === 'admin') return true;
+          return CURRENT_USER.role === 'user' && CURRENT_USER.id === userId;
+        },
+
+        async changeAdminPassword() {
+          if (!this.adminSelected) return;
+          if (!this.adminPw.password)                       { this.adminPw.err = 'Password required'; return; }
+          if (this.adminPw.password !== this.adminPw.confirm) { this.adminPw.err = 'Passwords do not match'; return; }
+          this.adminPw.saving = true; this.adminPw.err = ''; this.adminPw.msg = '';
+          try {
+            const r = await fetch('/api/admin/users/'+this.adminSelected.id+'/password', {
+              method: 'POST', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({password: this.adminPw.password}),
+            });
+            if (!r.ok) { const d = await r.json(); this.adminPw.err = d.error||'Error'; return; }
+            this.adminPw.msg = 'Password updated.';
+            this.adminPw.password = ''; this.adminPw.confirm = '';
+          } catch(e) { this.adminPw.err = 'Network error'; }
+          finally { this.adminPw.saving = false; }
+        },
+
+        async addAdminUser() {
+          if (!this.adminNewUser.username) { this.adminNewUser.err = 'Username required'; return; }
+          if (!this.adminNewUser.password) { this.adminNewUser.err = 'Password required'; return; }
+          this.adminNewUser.saving = true; this.adminNewUser.err = ''; this.adminNewUser.msg = '';
+          try {
+            const r = await fetch('/api/admin/users', {
+              method: 'POST', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({username: this.adminNewUser.username, password: this.adminNewUser.password, role: this.adminNewUser.role}),
+            });
+            if (!r.ok) { const d = await r.json(); this.adminNewUser.err = d.error||'Error'; return; }
+            this.adminNewUser.msg = 'User added.';
+            this.adminNewUser.username = ''; this.adminNewUser.password = ''; this.adminNewUser.role = 'user';
+            await this.loadAdminUsers();
+          } catch(e) { this.adminNewUser.err = 'Network error'; }
+          finally { this.adminNewUser.saving = false; }
         },
 
         // ── Display helpers ──────────────────────────────────────────────────
