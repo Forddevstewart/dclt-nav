@@ -29,6 +29,9 @@
     }
     .nav-tab:hover { color: #e2e8f0; }
     .nav-tab.active { color: #f8fafc; border-bottom-color: #3b82f6; }
+    .nav-user { margin-left: auto; display: flex; align-items: center; gap: .75rem; font-size: 12px; color: #94a3b8; }
+    .nav-user a { color: #94a3b8; text-decoration: none; }
+    .nav-user a:hover { color: #e2e8f0; }
 
     /* ── Layout ──────────────────────────────────────────────────────────── */
     .main   { flex: 1; overflow: hidden; display: flex; }
@@ -276,6 +279,14 @@
       <div class="nav-tab" :class="{active:activeTab==='parcels'}"   @click="switchTab('parcels')">Parcels</div>
       <div class="nav-tab" :class="{active:activeTab==='documents'}" @click="switchTab('documents')">Documents</div>
       <div class="nav-tab" :class="{active:activeTab==='admin'}"     @click="activeTab='admin'">Admin</div>
+    </div>
+    <div class="nav-user">
+      {% if current_user.is_authenticated %}
+        <span>{{ current_user.username }}</span>
+        <a href="/logout">Sign out</a>
+      {% else %}
+        <a href="/login">Sign in</a>
+      {% endif %}
     </div>
   </nav>
 

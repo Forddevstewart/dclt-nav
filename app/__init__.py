@@ -9,13 +9,17 @@ def create_app():
     app.config["DATABASE"] = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), "data", "dclt.db"
     )
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-in-prod")
 
     from discovery.config import get_config
     app.config["REFERENCE_DATABASE"] = str(get_config().db_path("reference"))
 
+    from .auth import bp as auth_bp, login_manager
     from .routes import bp as routes_bp
     from .api import bp as api_bp
 
+    login_manager.init_app(app)
+    app.register_blueprint(auth_bp)
     app.register_blueprint(routes_bp)
     app.register_blueprint(api_bp)
 

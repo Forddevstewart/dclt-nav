@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in — DCLT Navigator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px; background: #f1f5f9; color: #1e293b;
+    }
+    .card {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+      padding: 2rem; width: 320px; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .brand { font-size: 13px; color: #64748b; margin-bottom: 1.25rem; }
+    h1 { font-size: 18px; font-weight: 700; margin-bottom: 1.25rem; color: #0f172a; }
+    label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: .3rem; }
+    input {
+      width: 100%; padding: .45rem .6rem; border: 1px solid #cbd5e1; border-radius: 4px;
+      font-size: 14px; outline: none; margin-bottom: 1rem;
+    }
+    input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px #bfdbfe; }
+    button {
+      width: 100%; padding: .55rem; background: #1e2d3d; color: #fff;
+      border: none; border-radius: 4px; font-size: 14px; font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #2d4258; }
+    .error { color: #dc2626; font-size: 12px; margin-bottom: .9rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">DCLT Navigator</div>
+    <h1>Sign in</h1>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="error">{{ messages[0] }}</div>
+      {% endif %}
+    {% endwith %}
+    <form method="post">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" autocomplete="username" autofocus>
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password">
+      <button type="submit">Sign in</button>
+    </form>
+  </div>
+</body>
+</html>
