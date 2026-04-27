@@ -169,9 +169,36 @@ def load_assessor(engine, path: Path) -> int:
     return len(df)
 
 
+def _polygon_centroid(geometry: dict) -> tuple[float, float] | tuple[None, None]:
+    """Return (lat, lon) centroid of a GeoJSON Polygon or MultiPolygon."""
+    try:
+        gtype = geometry.get("type")
+        if gtype == "Polygon":
+            ring = geometry["coordinates"][0]
+        elif gtype == "MultiPolygon":
+            # use the largest ring by vertex count
+            ring = max(
+                (poly[0] for poly in geometry["coordinates"]),
+                key=len,
+            )
+        else:
+            return None, None
+        lons = [c[0] for c in ring]
+        lats = [c[1] for c in ring]
+        return sum(lats) / len(lats), sum(lons) / len(lons)
+    except Exception:
+        return None, None
+
+
 def load_massgis(engine, path: Path) -> int:
     data = json.loads(path.read_text())
-    rows = [f["properties"] for f in data.get("features", [])]
+    rows = []
+    for f in data.get("features", []):
+        props = dict(f["properties"])
+        lat, lon = _polygon_centroid(f.get("geometry") or {})
+        props["centroid_lat"] = lat
+        props["centroid_lon"] = lon
+        rows.append(props)
     df = pd.DataFrame(rows)
     df = _norm_cols(df)
     df["_source_file"] = str(path)
@@ -519,6 +546,102 @@ def load_registry(engine, index_dir: Path) -> int:
     return len(df)
 
 
+# ── For-sale listings (manually pasted from Zillow) ──────────────────────────
+
+_ADDR_RE = re.compile(
+    r"^\d[\d\-A-Za-z]*\s+.+,\s+.+,\s+MA\s+\d{5}$"
+)
+_PRICE_RE = re.compile(r"^\$[\d,]+$|^\$--$")
+_DETAIL_RE = re.compile(
+    r"(for sale|new construction|foreclosure|auction|for sale by owner)",
+    re.IGNORECASE,
+)
+_BEDS_RE   = re.compile(r"(\d+)\s*bds?")
+_BATHS_RE  = re.compile(r"(\d+)\s*ba")
+_SQFT_RE   = re.compile(r"([\d,]+)\s*sqft")
+_ACRES_RE  = re.compile(r"([\d.]+)\s*acres?\s+lot")
+_TYPE_RE   = re.compile(
+    r"(House|Condo|Townhouse|Home|New construction|Lot / Land|Foreclosure|Auction|For sale by owner)",
+    re.IGNORECASE,
+)
+
+_ADDR_NORM = {
+    r"\bRd\b":    "Road",   r"\bSt\b":    "Street",
+    r"\bAve\b":   "Avenue", r"\bDr\b":    "Drive",
+    r"\bLn\b":    "Lane",   r"\bCir\b":   "Circle",
+    r"\bCt\b":    "Court",  r"\bPl\b":    "Place",
+    r"\bHwy\b":   "Highway",r"\bRte\b":   "Route",
+    r"\bExt\b":   "Extension",
+}
+
+
+def _norm_addr(addr: str) -> str:
+    a = addr.upper().strip()
+    for pat, repl in _ADDR_NORM.items():
+        a = re.sub(pat, repl.upper(), a, flags=re.IGNORECASE)
+    a = re.sub(r"\s+", " ", a)
+    return a
+
+
+def load_for_sale(engine, path: Path) -> int:
+    if not path.exists():
+        print("  SKIP — HomeForSale.txt not found")
+        return 0
+
+    lines = [l.rstrip() for l in path.read_text(encoding="utf-8").splitlines()]
+    listings: dict[str, dict] = {}  # keyed by normalized address to deduplicate
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if _PRICE_RE.match(line.strip()):
+            price_str = line.strip().lstrip("$").replace(",", "")
+            price = None if price_str == "--" else (int(price_str) if price_str.isdigit() else None)
+
+            # Scan next few lines for detail + address
+            detail_line = ""
+            addr_line = ""
+            for j in range(i + 1, min(i + 4, len(lines))):
+                l = lines[j].strip()
+                if not detail_line and _DETAIL_RE.search(l):
+                    detail_line = l
+                elif not addr_line and _ADDR_RE.match(l):
+                    addr_line = l
+                if detail_line and addr_line:
+                    break
+
+            if addr_line:
+                beds  = int(m.group(1)) if (m := _BEDS_RE.search(detail_line))  else None
+                baths = int(m.group(1)) if (m := _BATHS_RE.search(detail_line)) else None
+                sqft_m = _SQFT_RE.search(detail_line)
+                sqft  = int(sqft_m.group(1).replace(",", "")) if sqft_m else None
+                acres_m = _ACRES_RE.search(detail_line)
+                acres = float(acres_m.group(1)) if acres_m else None
+                ptype = m.group(1).title() if (m := _TYPE_RE.search(detail_line)) else ""
+
+                norm = _norm_addr(addr_line)
+                if norm not in listings:
+                    listings[norm] = {
+                        "raw_address":  addr_line,
+                        "norm_address": norm,
+                        "price":        price,
+                        "property_type": ptype,
+                        "beds":         beds,
+                        "baths":        baths,
+                        "sqft":         sqft,
+                        "acres":        acres,
+                    }
+        i += 1
+
+    if not listings:
+        return 0
+
+    df = pd.DataFrame(listings.values())
+    df["_loaded_at"] = now_utc()
+    df.to_sql("layer_for_sale", engine, if_exists="replace", index=False)
+    return len(df)
+
+
 # ── Reference tables ──────────────────────────────────────────────────────────
 
 def load_schema_columns(engine) -> int:
@@ -661,6 +784,7 @@ def build_parcels(engine) -> int:
         "site_addr",
         "use_code_norm", "use_code_desc", "property_class", "is_public",
         "billingacres", "totalapprvalue", "zonedesc",
+        "centroid_lat", "centroid_lon",
     ]
     keep = [c for c in display_cols if c in parcels.columns]
     parcels[keep].to_sql("parcels", engine, if_exists="replace", index=False)
@@ -698,7 +822,8 @@ def main() -> None:
     soil_path           = root / "gis" / "dennis_soil.csv"
     gis_dir             = root / "gis"
     registry_index      = cfg.output_dir("registry") / "index"
-    registry_docs   = cfg.output_dir("registry") / "documents"
+    registry_docs       = cfg.output_dir("registry") / "documents"
+    for_sale_path       = Path(__file__).parent.parent / "HomeForSale.txt"
 
     db_path = cfg.db_path("raw")
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -714,6 +839,7 @@ def main() -> None:
         ("GIS layers dir", gis_dir),
         ("Registry index", registry_index),
         ("Registry OCR",   registry_docs),
+        ("For Sale",       for_sale_path),
     ]:
         print(f"  {label}: {'OK' if path.exists() else 'not found — stage will be skipped'}")
 
@@ -744,6 +870,7 @@ def main() -> None:
         ("parcels_gis",    gis_dir,        lambda e: load_gis_layers(e, gis_dir)),
         ("load_registry",  registry_index, lambda e: load_registry(e, registry_index)),
         ("load_ocr",       registry_docs,  lambda e: load_ocr(e, registry_docs)),
+        ("load_for_sale",  for_sale_path,  lambda e: load_for_sale(e, for_sale_path)),
         ("schema_columns",  None,           lambda e: load_schema_columns(e)),
         ("gis_sources",     None,           lambda e: load_gis_sources(e)),
         ("ref_use_codes",   None,           lambda e: load_ref_use_codes(e)),

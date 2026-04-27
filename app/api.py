@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from pathlib import Path
 from flask import Blueprint, jsonify, send_file, redirect, abort
 from .models import get_all_items, get_reference_db
 
@@ -178,12 +179,71 @@ def overview():
 @bp.route("/parcels")
 def parcels_list():
     db = get_reference_db()
-    rows = db.execute(
-        "SELECT parcel_id, site_addr, owner_name, owner_category,"
-        "       property_class, use_code_norm, use_code_desc,"
-        "       totalapprvalue, billingacres, village, is_public, condo_units"
-        " FROM parcels ORDER BY site_addr"
-    ).fetchall()
+    has_gis      = _table_exists(db, "parcels_gis")
+    has_ocr      = _table_exists(db, "registry_ocr") and _table_exists(db, "registry_documents")
+    has_for_sale = _table_exists(db, "layer_for_sale")
+
+    if has_gis:
+        gis_select = """,
+            CASE WHEN g.wetlands_code IS NOT NULL AND g.wetlands_code !='' THEN 1 ELSE 0 END has_wetlands,
+            CASE WHEN g.zone1_type    IS NOT NULL AND g.zone1_type    !='' THEN 1 ELSE 0 END has_zone1,
+            CASE WHEN g.zone2_id      IS NOT NULL AND g.zone2_id      !='' THEN 1 ELSE 0 END has_zone2,
+            CASE WHEN g.prihab_id     IS NOT NULL AND g.prihab_id     !='' THEN 1 ELSE 0 END has_prihab,
+            CASE WHEN g.esthab_id     IS NOT NULL AND g.esthab_id     !='' THEN 1 ELSE 0 END has_esthab,
+            CASE WHEN g.natcomm_id    IS NOT NULL AND g.natcomm_id    !='' THEN 1 ELSE 0 END has_natcomm,
+            CASE WHEN (g.bm3_vp_id  IS NOT NULL AND g.bm3_vp_id !='')
+                   OR (g.bm3_wc_id  IS NOT NULL AND g.bm3_wc_id !='')
+                   OR (g.bm3_ch_id  IS NOT NULL AND g.bm3_ch_id !='')
+                   OR (g.bm3_cnl_id IS NOT NULL AND g.bm3_cnl_id!='') THEN 1 ELSE 0 END has_bm3,
+            CASE WHEN g.os_site_name  IS NOT NULL AND g.os_site_name  !='' THEN 1 ELSE 0 END has_openspace"""
+        gis_join = "LEFT JOIN parcels_gis g ON g.parcel_id = p.parcel_id"
+    else:
+        gis_select = ", 0 has_wetlands, 0 has_zone1, 0 has_zone2, 0 has_prihab, 0 has_esthab, 0 has_natcomm, 0 has_bm3, 0 has_openspace"
+        gis_join = ""
+
+    if has_ocr:
+        kw_select = "".join(
+            f",\n            COALESCE(kw.kw_{k}, 0) kw_{k}" for k in KW_KEYS
+        )
+        kw_agg = ",\n                   ".join(
+            f"MAX(CASE WHEN ro.kw_{k} > 0.4 THEN 1 ELSE 0 END) kw_{k}" for k in KW_KEYS
+        )
+        kw_join = f"""LEFT JOIN (
+            SELECT rd.parcel_id,
+                   {kw_agg}
+            FROM registry_documents rd
+            JOIN registry_ocr ro ON ro.book = rd.book AND ro.page = rd.page
+            GROUP BY rd.parcel_id
+        ) kw ON kw.parcel_id = p.parcel_id"""
+    else:
+        kw_select = "".join(f", 0 kw_{k}" for k in KW_KEYS)
+        kw_join = ""
+
+    if has_for_sale:
+        fs_select = ", CASE WHEN fs.norm_address IS NOT NULL THEN 1 ELSE 0 END for_sale"
+        fs_join = (
+            "LEFT JOIN layer_for_sale fs"
+            " ON p.locno IS NOT NULL AND p.locno != ''"
+            " AND p.locst IS NOT NULL AND p.locst != ''"
+            " AND UPPER(fs.norm_address) LIKE printf('%d', CAST(p.locno AS REAL))||' '||UPPER(p.locst)||'%'"
+        )
+    else:
+        fs_select = ", 0 for_sale"
+        fs_join = ""
+
+    sql = f"""
+        SELECT p.parcel_id, p.site_addr, p.owner_name, p.owner_category,
+               p.property_class, p.use_code_norm, p.use_code_desc,
+               p.totalapprvalue, p.billingacres, p.village, p.is_public, p.condo_units,
+               p.centroid_lat
+               {gis_select}{kw_select}{fs_select}
+        FROM parcels p
+        {gis_join}
+        {kw_join}
+        {fs_join}
+        ORDER BY p.locst NULLS LAST, p.locno NULLS LAST
+    """
+    rows = db.execute(sql).fetchall()
     db.close()
     return jsonify([dict(r) for r in rows])
 
@@ -230,6 +290,40 @@ def parcel_detail(parcel_id):
         "gis":       _clean(dict(gis), _GIS_SKIP) if gis else None,
         "soil":      _clean(dict(soil), _SOIL_SKIP) if soil else None,
     })
+
+
+# ── Parcel geometry ───────────────────────────────────────────────────────────
+
+_geojson_index: dict | None = None
+
+
+def _get_geojson_index() -> dict:
+    global _geojson_index
+    if _geojson_index is not None:
+        return _geojson_index
+    from discovery.config import get_config
+    cfg = get_config()
+    gis_files = cfg.collection_files("gis")
+    path = Path(gis_files[0]["abs_path"]) if gis_files else cfg.root / "gis" / "dennis_parcels.geojson"
+    if not path.exists():
+        _geojson_index = {}
+        return _geojson_index
+    data = json.loads(path.read_text())
+    _geojson_index = {
+        f["properties"].get("MAP_PAR_ID"): f
+        for f in data.get("features", [])
+        if f.get("properties", {}).get("MAP_PAR_ID")
+    }
+    return _geojson_index
+
+
+@bp.route("/parcels/<parcel_id>/geometry")
+def parcel_geometry(parcel_id):
+    idx = _get_geojson_index()
+    feature = idx.get(parcel_id)
+    if not feature:
+        abort(404)
+    return jsonify(feature)
 
 
 # ── Documents list ────────────────────────────────────────────────────────────

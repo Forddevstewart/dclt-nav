@@ -7,6 +7,8 @@
   <script>
     const CURRENT_USER = {{ ({"id": current_user.id, "username": current_user.username, "role": current_user.role} | tojson) if current_user.is_authenticated else "null" }};
   </script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -588,8 +590,29 @@
       <!-- Left: parcel list -->
       <div class="col-left">
         <div class="col-left-controls">
-          <input class="search-input" x-model.debounce.300ms="parcelSearch"
-            placeholder="Search address, owner, parcel ID…" type="search" autocomplete="off">
+          <div style="position:relative">
+            <input class="search-input" x-model="parcelSearch"
+              placeholder="Type wetlands, article 97, or anything to filter properties"
+              type="search" autocomplete="off"
+              @focus="parcelSearchOpen=true"
+              @blur="setTimeout(()=>parcelSearchOpen=false,150)"
+              @input="parcelSearchKeyword=null; parcelPage=1">
+            <div x-show="parcelSearchOpen && parcelSearch.trim()"
+              style="position:absolute;top:100%;left:0;right:0;z-index:50;background:#fff;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.12);margin-top:2px;overflow:hidden">
+              <template x-for="kw in parcelKeywordSuggestions" :key="kw.key">
+                <div style="padding:8px 12px;cursor:pointer;font-size:.875rem"
+                  @mousedown.prevent="parcelSearchKeyword=kw.key; parcelSearch=kw.label; parcelSearchOpen=false; parcelPage=1"
+                  @mouseover="$el.style.background='#f3f4f6'" @mouseout="$el.style.background=''">
+                  <span x-text="kw.label"></span>
+                </div>
+              </template>
+              <div style="padding:8px 12px;cursor:pointer;font-size:.875rem;color:#6b7280;border-top:1px solid #e5e7eb"
+                @mousedown.prevent="parcelSearchKeyword=null; parcelSearchOpen=false; parcelPage=1"
+                @mouseover="$el.style.background='#f3f4f6'" @mouseout="$el.style.background=''">
+                Search for '<span x-text="parcelSearch"></span>'
+              </div>
+            </div>
+          </div>
           <div class="sort-row">
             <span class="sort-label">Sort</span>
             <select class="ctrl-select" x-model="parcelSort">
@@ -604,6 +627,22 @@
               :title="parcelSortDir==='asc'?'Ascending':'Descending'">
               <span x-text="parcelSortDir==='asc'?'↑':'↓'"></span>
             </button>
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:#64748b;cursor:pointer;padding-top:2px;">
+            <input type="checkbox" x-model="parcelHideUnmappable" @change="parcelPage=1">
+            Only mappable parcels
+          </label>
+        </div>
+
+        <div class="col-left-footer">
+          <span x-text="parcelFilteredCount.toLocaleString()+' parcel'+(parcelFilteredCount!==1?'s':'')+(parcelSearch.trim()?' found':'')"></span>
+          <a :href="parcelExportUrl" class="paging-btn" style="text-decoration:none;" download>↓ CSV</a>
+          <div class="paging-btns">
+            <button class="paging-btn" @click="parcelPage=1"            :disabled="parcelPage===1">«</button>
+            <button class="paging-btn" @click="parcelPage--"            :disabled="parcelPage===1">‹</button>
+            <span   class="paging-page" x-text="parcelPage+' / '+parcelTotalPages"></span>
+            <button class="paging-btn" @click="parcelPage++"            :disabled="parcelPage>=parcelTotalPages">›</button>
+            <button class="paging-btn" @click="parcelPage=parcelTotalPages" :disabled="parcelPage>=parcelTotalPages">»</button>
           </div>
         </div>
 
@@ -623,18 +662,6 @@
               </template>
             </div>
           </template>
-        </div>
-
-        <div class="col-left-footer">
-          <span x-text="parcelFilteredCount.toLocaleString()+' parcel'+(parcelFilteredCount!==1?'s':'')+(parcelSearch.trim()?' found':'')"></span>
-          <a :href="parcelExportUrl" class="paging-btn" style="text-decoration:none;" download>↓ CSV</a>
-          <div class="paging-btns">
-            <button class="paging-btn" @click="parcelPage=1"            :disabled="parcelPage===1">«</button>
-            <button class="paging-btn" @click="parcelPage--"            :disabled="parcelPage===1">‹</button>
-            <span   class="paging-page" x-text="parcelPage+' / '+parcelTotalPages"></span>
-            <button class="paging-btn" @click="parcelPage++"            :disabled="parcelPage>=parcelTotalPages">›</button>
-            <button class="paging-btn" @click="parcelPage=parcelTotalPages" :disabled="parcelPage>=parcelTotalPages">»</button>
-          </div>
         </div>
       </div>
 
@@ -800,26 +827,23 @@
         </div>
       </div>
 
-      <!-- Right: PDF viewer -->
+      <!-- Right: Map / PDF viewer -->
       <div class="col-right">
-        <div class="col-right-header">Document View</div>
+        <div class="col-right-header" x-text="parcelSelectedDoc ? 'Document View' : (selectedParcelId ? 'Parcel Map' : 'Document View')"></div>
         <div class="col-right-body">
-          <template x-if="!parcelSelectedDoc">
-            <div class="empty-state"><span class="empty-icon">📄</span><span>Click a document row</span></div>
-          </template>
-          <template x-if="parcelSelectedDoc && !parcelPdfUrl">
-            <div class="no-scan-panel">
-              <div class="rod-doc-meta" x-text="(parcelSelectedDoc.instrument_type||'Document')+' · Book '+parcelSelectedDoc.book+', Page '+parcelSelectedDoc.page"></div>
-              <div style="font-size:13px;color:#64748b;">No local scan</div>
-              <button class="rod-link"
-                @click="parcelPdfUrl='/api/documents/'+parcelSelectedDoc.book+'/'+parcelSelectedDoc.page+'/rod'">
-                Read from Registry of Deeds
-              </button>
-            </div>
-          </template>
-          <template x-if="parcelSelectedDoc && parcelPdfUrl">
-            <iframe :src="parcelPdfUrl" style="flex:1;width:100%;height:100%;border:none;"></iframe>
-          </template>
+          <div x-show="!selectedParcelId" class="empty-state">
+            <span class="empty-icon">📄</span><span>Select a parcel</span>
+          </div>
+          <div id="parcel-map" x-show="selectedParcelId && !parcelSelectedDoc" style="flex:1;width:100%;min-height:0;"></div>
+          <div x-show="parcelSelectedDoc && !parcelPdfUrl" class="no-scan-panel">
+            <div class="rod-doc-meta" x-text="parcelSelectedDoc ? (parcelSelectedDoc.instrument_type||'Document')+' · Book '+parcelSelectedDoc.book+', Page '+parcelSelectedDoc.page : ''"></div>
+            <div style="font-size:13px;color:#64748b;">No local scan</div>
+            <button class="rod-link"
+              @click="parcelPdfUrl='/api/documents/'+parcelSelectedDoc.book+'/'+parcelSelectedDoc.page+'/rod'">
+              Read from Registry of Deeds
+            </button>
+          </div>
+          <iframe x-show="parcelSelectedDoc && parcelPdfUrl" :src="parcelPdfUrl || ''" style="flex:1;width:100%;height:100%;border:none;"></iframe>
         </div>
       </div>
 
@@ -1519,6 +1543,97 @@
       ];
     }
 
+    // ── Parcel map (Leaflet, managed outside Alpine reactivity) ──────────────
+    const _WMS = 'https://gis-prod.digital.mass.gov/geoserver/wms';
+
+    // Maps parcels_gis column key → WMS config. Only layers with a WMS equivalent.
+    const _GIS_WMS = {
+      zone1_type:   { label: 'Zone 1 WHP',              wmsLayer: 'massgis:GISDATA.ZONE1_POLY_DISSOLVE' },
+      zone2_id:     { label: 'Zone 2 WHP',              wmsLayer: 'massgis:GISDATA.ZONE2_POLY_DISSOLVE' },
+      prihab_id:    { label: 'Priority Habitat',         wmsLayer: 'massgis:GISDATA.PRIHAB_POLY' },
+      esthab_id:    { label: 'Estimated Habitat',        wmsLayer: 'massgis:GISDATA.ESTHAB_POLY' },
+      natcomm_id:   { label: 'Natural Community',        wmsLayer: 'massgis:GISDATA.NATCOMM_POLY' },
+      bm3_vp_id:    { label: 'BioMap3 Vernal Pool',      wmsLayer: 'massgis:GISDATA.BM3_CH_VERNAL_POOLS_CORE' },
+      bm3_wc_id:    { label: 'BioMap3 Wetland Corridor', wmsLayer: 'massgis:GISDATA.BM3_LOCAL_WETLANDS' },
+      bm3_ch_id:    { label: 'BioMap3 Core Habitat',     wmsLayer: 'massgis:GISDATA.BM3_CORE_HABITAT' },
+      bm3_cnl_id:   { label: 'BioMap3 CNL',              wmsLayer: 'massgis:GISDATA.BM3_CRITICAL_NATURAL_LANDSCAPE' },
+      os_site_name: { label: 'Open Space',               wmsLayer: 'massgis:GISDATA.OPENSPACE_POLY' },
+      wetlands_code:{ label: 'Wetlands',                 wmsLayer: 'massgis:GISDATA.WETLANDSDEP_POLY',
+                      styles: 'GISDATA.WETLANDSDEP_POLY::General_Categories_Max_24000' },
+    };
+
+    let _lmap        = null;
+    let _lLayer      = null;
+    let _lWmsControl = null;
+    let _lWmsLayers  = {};
+
+    function _initParcelMap() {
+      if (_lmap) return;
+      _lmap = L.map('parcel-map', { zoomControl: true });
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 20,
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(_lmap);
+    }
+
+    function _clearWmsLayers() {
+      Object.values(_lWmsLayers).forEach(l => _lmap.removeLayer(l));
+      _lWmsLayers = {};
+      if (_lWmsControl) { _lWmsControl.remove(); _lWmsControl = null; }
+    }
+
+    async function _updateParcelMap(parcelId, centroidLat, centroidLon, gis) {
+      _initParcelMap();
+      // Wait for the browser to finish layout before measuring the container,
+      // so invalidateSize() sees the real dimensions before fitBounds() runs.
+      await new Promise(r => requestAnimationFrame(r));
+      _lmap.invalidateSize();
+
+      if (_lLayer) { _lmap.removeLayer(_lLayer); _lLayer = null; }
+      _clearWmsLayers();
+
+      // parcel polygon
+      try {
+        const resp = await fetch('/api/parcels/' + encodeURIComponent(parcelId) + '/geometry');
+        if (resp.ok) {
+          const feature = await resp.json();
+          _lLayer = L.geoJSON(feature, {
+            style: { color: '#2563eb', weight: 2, fillColor: '#3b82f6', fillOpacity: 0.2 },
+          }).addTo(_lmap);
+          _lmap.fitBounds(_lLayer.getBounds(), { maxZoom: 18, padding: [20, 20] });
+        }
+      } catch(_) {}
+
+      // fallback: centroid pin
+      if (!_lLayer && centroidLat && centroidLon) {
+        _lLayer = L.marker([centroidLat, centroidLon]).addTo(_lmap);
+        _lmap.setView([centroidLat, centroidLon], 17);
+      }
+
+      // no location at all — reset to Dennis town view
+      if (!_lLayer) {
+        _lmap.setView([41.7352, -70.1939], 13);
+      }
+
+      // WMS layers present on this parcel, listed but unchecked
+      const overlays = {};
+      for (const [key, cfg] of Object.entries(_GIS_WMS)) {
+        const val = gis && gis[key];
+        if (val === null || val === undefined || val === '' || val === 0) continue;
+        const opts = {
+          layers: cfg.wmsLayer, format: 'image/png',
+          transparent: true, version: '1.1.1', attribution: 'MassGIS',
+        };
+        if (cfg.styles) opts.styles = cfg.styles;
+        const layer = L.tileLayer.wms(_WMS, opts);
+        _lWmsLayers[key] = layer;
+        overlays[cfg.label] = layer;
+      }
+      if (Object.keys(overlays).length > 0) {
+        _lWmsControl = L.control.layers(null, overlays, { collapsed: false }).addTo(_lmap);
+      }
+    }
+
     // ── Alpine component ──────────────────────────────────────────────────────
     function app() {
       return {
@@ -1531,20 +1646,23 @@
         overviewLoading: false,
 
         // parcels
-        allParcels:         [],
-        parcelsLoading:     true,
-        parcelSearch:       '',
-        parcelSort:         'site_addr',
-        parcelSortDir:      'asc',
-        parcelPage:         1,
-        parcelPageSize:     50,
-        selectedParcelId:   null,
-        parcelDetail:       null,
-        parcelDetailLoading:false,
-        parcelDetailError:  null,
-        parcelSelectedDoc:  null,
-        parcelPdfUrl:       null,
-        parcelGisOpen:      {},
+        allParcels:          [],
+        parcelsLoading:      true,
+        parcelSearch:        '',
+        parcelSearchKeyword: null,
+        parcelSearchOpen:    false,
+        parcelSort:          'site_addr',
+        parcelSortDir:       'asc',
+        parcelHideUnmappable: true,
+        parcelPage:          1,
+        parcelPageSize:      50,
+        selectedParcelId:    null,
+        parcelDetail:        null,
+        parcelDetailLoading: false,
+        parcelDetailError:   null,
+        parcelSelectedDoc:   null,
+        parcelPdfUrl:        null,
+        parcelGisOpen:       {},
 
         // documents
         allDocuments:      [],
@@ -1625,14 +1743,66 @@
         },
 
         // ── Computed — parcels ──────────────────────────────────────────────
+        get parcelKeywords() {
+          return [
+            { label: 'Wetlands',                      key: 'wetlands'      },
+            { label: 'Zone 1 WHP',                    key: 'zone1'         },
+            { label: 'Zone 2 WHP',                    key: 'zone2'         },
+            { label: 'Priority Habitat',              key: 'priority habitat' },
+            { label: 'Estimated Habitat',             key: 'estimated habitat' },
+            { label: 'BioMap3',                       key: 'biomap'        },
+            { label: 'Open Space',                    key: 'open space'    },
+            { label: 'Article 97',                    key: 'article97'     },
+            { label: 'CCR',                           key: 'ccr'           },
+            { label: 'Chapter 61',                    key: 'chapter61'     },
+            { label: 'Conservation Restriction',      key: 'conservation'  },
+            { label: 'Deed Restriction',              key: 'deed restriction' },
+            { label: 'Perpetual Restriction',         key: 'perpetual'     },
+            { label: 'Ag. Preservation Restriction',  key: 'apr'           },
+            { label: 'For Sale',                      key: 'for sale'      },
+          ];
+        },
+        get parcelKeywordSuggestions() {
+          const q = this.parcelSearch.trim().toLowerCase();
+          if (!q) return [];
+          return this.parcelKeywords.filter(k =>
+            k.label.toLowerCase().includes(q) || k.key.toLowerCase().includes(q)
+          );
+        },
         get filteredParcels() {
           const q = this.parcelSearch.trim().toLowerCase();
-          let list = q
-            ? this.allParcels.filter(p =>
-                (p.site_addr  ||'').toLowerCase().includes(q) ||
-                (p.owner_name ||'').toLowerCase().includes(q) ||
-                (p.parcel_id  ||'').toLowerCase().includes(q))
+          const KW = {
+            'wetlands':          p => p.has_wetlands,
+            'zone1':             p => p.has_zone1,
+            'zone2':             p => p.has_zone2,
+            'habitat':           p => p.has_prihab || p.has_esthab,
+            'priority habitat':  p => p.has_prihab,
+            'estimated habitat': p => p.has_esthab,
+            'biomap':            p => p.has_bm3,
+            'bm3':               p => p.has_bm3,
+            'open space':        p => p.has_openspace,
+            'article97':         p => p.kw_article_97,
+            'ccr':               p => p.kw_ccr,
+            'chapter61':         p => p.kw_chapter_61,
+            'conservation':      p => p.kw_conservation_restriction || p.has_openspace,
+            'deed restriction':  p => p.kw_deed_restriction,
+            'perpetual':         p => p.kw_perpetual_restriction,
+            'apr':               p => p.kw_agricultural_preservation_restriction,
+            'for sale':          p => p.for_sale,
+          };
+          let list = this.parcelHideUnmappable
+            ? this.allParcels.filter(p => p.centroid_lat != null)
             : this.allParcels;
+          if (this.parcelSearchKeyword && KW[this.parcelSearchKeyword]) {
+            list = list.filter(KW[this.parcelSearchKeyword]);
+          } else if (q) {
+            list = list.filter(p =>
+              (p.site_addr     ||'').toLowerCase().includes(q) ||
+              (p.owner_name    ||'').toLowerCase().includes(q) ||
+              (p.parcel_id     ||'').toLowerCase().includes(q) ||
+              (p.property_class||'').toLowerCase().includes(q) ||
+              (p.use_code_desc ||'').toLowerCase().includes(q));
+          }
           const f = this.parcelSort, d = this.parcelSortDir==='asc'?1:-1;
           return [...list].sort((a,b)=>{
             const av=a[f], bv=b[f];
@@ -1705,6 +1875,10 @@
           this.$watch('docKwFilter',   ()=>{ this.docPage=1; this.loadDocKwAdjudications(this.docKwFilter); });
           this.$watch('docSort',       ()=>{ this.docPage=1; });
           this.$watch('docSortDir',    ()=>{ this.docPage=1; });
+          // when user closes a doc, the map re-appears — tell Leaflet to recalculate size
+          this.$watch('parcelSelectedDoc', (val) => {
+            if (!val && _lmap) this.$nextTick(() => _lmap.invalidateSize());
+          });
           this.loadOverview();
           this.loadParcels();
           if (CURRENT_USER) this.loadTags();
@@ -1716,6 +1890,17 @@
           this.tagPickerOpen = null;
           if (tab==='documents' && this.allDocuments.length===0) this.loadDocuments();
           if (tab==='admin') { this.loadAdminUsers(); this.loadUsage(); this.adminSection = 'users'; }
+          if (tab==='parcels' && _lmap) {
+            setTimeout(() => {
+              _lmap.invalidateSize();
+              if (_lLayer) {
+                try {
+                  if (_lLayer.getBounds) _lmap.fitBounds(_lLayer.getBounds(), { maxZoom: 18, padding: [20, 20] });
+                  else if (_lLayer.getLatLng) _lmap.setView(_lLayer.getLatLng(), 17);
+                } catch(_) {}
+              }
+            }, 50);
+          }
         },
 
         // ── Loaders ──────────────────────────────────────────────────────────
@@ -1734,6 +1919,8 @@
             const r = await fetch('/api/parcels');
             if (!r.ok) throw new Error(r.status);
             this.allParcels = await r.json();
+            const def = this.allParcels.find(p => p.parcel_id === '392-8');
+            if (def) this.selectParcel(def);
           } finally { this.parcelsLoading = false; }
         },
 
@@ -1774,6 +1961,13 @@
                 if (v !== null) this.parcelTagState[k] = v;
               }
             }
+            const parcel = this.parcelDetail.parcel;
+            this.$nextTick(() => _updateParcelMap(
+              p.parcel_id,
+              parcel.centroid_lat,
+              parcel.centroid_lon,
+              this.parcelDetail.gis,
+            ));
           } catch(e) { this.parcelDetailError = e.message; }
           finally    { this.parcelDetailLoading = false; }
         },
