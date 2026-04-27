@@ -9,21 +9,22 @@ login_manager = LoginManager()
 
 
 class User(UserMixin):
-    def __init__(self, id, username, role="user"):
+    def __init__(self, id, username, role="user", full_name=None):
         self.id = id
         self.username = username
         self.role = role
+        self.full_name = full_name or username
 
 
 @login_manager.user_loader
 def load_user(user_id):
     db = get_db()
     row = db.execute(
-        "SELECT id, username, role FROM users WHERE id = ?", (user_id,)
+        "SELECT id, username, role, full_name FROM users WHERE id = ?", (user_id,)
     ).fetchone()
     db.close()
     if row:
-        return User(row["id"], row["username"], row["role"])
+        return User(row["id"], row["username"], row["role"], row["full_name"])
     return None
 
 
@@ -41,7 +42,7 @@ def login():
         password = request.form.get("password", "")
         db = get_db()
         row = db.execute(
-            "SELECT id, username, password_hash, role FROM users WHERE username = ?",
+            "SELECT id, username, password_hash, role, full_name FROM users WHERE lower(username) = lower(?)",
             (username,),
         ).fetchone()
         if row and check_password_hash(row["password_hash"], password):
@@ -51,7 +52,7 @@ def login():
             )
             db.commit()
             db.close()
-            login_user(User(row["id"], row["username"], row["role"]), remember=True)
+            login_user(User(row["id"], row["username"], row["role"], row["full_name"]), remember=True)
             from .usage import log_event
             log_event("login", api_call="/login", details=f"user={username}")
             return redirect(request.args.get("next") or url_for("routes.index"))
@@ -74,14 +75,19 @@ def ensure_ford(db_path: str) -> None:
     pw = os.environ.get("FORD_PASSWORD", "ford")
     conn = sqlite3.connect(db_path)
     row = conn.execute(
-        "SELECT id, role FROM users WHERE username = 'ford'"
+        "SELECT id, role FROM users WHERE lower(username) = 'ford'"
     ).fetchone()
     if not row:
         conn.execute(
-            "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
-            ("ford", generate_password_hash(pw), "admin"),
+            "INSERT INTO users (username, password_hash, role, full_name) VALUES (?, ?, ?, ?)",
+            ("ford", generate_password_hash(pw), "admin", "ford"),
         )
-    elif row[1] != "admin":
-        conn.execute("UPDATE users SET role = 'admin' WHERE username = 'ford'")
+    else:
+        if row[1] != "admin":
+            conn.execute("UPDATE users SET role = 'admin' WHERE id = ?", (row[0],))
+        conn.execute(
+            "UPDATE users SET full_name = username WHERE id = ? AND (full_name IS NULL OR full_name = '')",
+            (row[0],),
+        )
     conn.commit()
     conn.close()

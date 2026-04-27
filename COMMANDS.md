@@ -30,6 +30,21 @@ python3 -m discovery.agenda_center.pull --full
 
 Optional flags: `--limit N` (cap downloads), `--delay SEC` (between PDFs, default 1.0), `--start-date YYYY-MM-DD`, `--end-date YYYY-MM-DD`.
 
+### Registry scan download (after enumerate)
+
+Selective download of scan PDFs filtered to approved instrument types. Run after the enumerate pass.
+
+```bash
+# Step 1: review what will be downloaded
+python3 -m discovery.registry.download --override-robots
+
+# Step 2: confirm and download
+python3 -m discovery.registry.download --override-robots --confirm
+
+# Cap the run
+python3 -m discovery.registry.download --override-robots --confirm --limit 200
+```
+
 ### Registry queue (after new assessor data)
 
 ```bash
@@ -78,6 +93,40 @@ rsync ionos-vps:/var/www/dclt-nav/civictwin/db/transactional.db \
 python3 -m processing.publish
 ```
 
+### OCR — Tesseract pass (PDF → keyword-scored JSON)
+
+Runs Tesseract (+ PaddleOCR if available) on every PDF under an input root. Output JSON is written alongside each PDF.
+
+```bash
+# Registry documents
+python3 -m processing.ocr.ocr_pipeline \
+  --input-root /Volumes/DigitalTwin/CivicTwin/registry/documents
+
+# Town agendas / minutes (AgendaCenter)
+python3 -m processing.ocr.ocr_pipeline \
+  --input-root /Volumes/DigitalTwin/CivicTwin/ma-dennis/agendacenter
+
+# Warrants
+python3 -m processing.ocr.ocr_pipeline \
+  --input-root /Volumes/DigitalTwin/CivicTwin/ma-dennis/warrants/pdfs
+```
+
+Optional flags: `--workers N` (parallel pages, default 4), `--force` (reprocess already-done PDFs), `--dry-run` (list without processing).
+
+### OCR — VLM re-pass (targeted enrichment)
+
+Runs a vision-language model (via Ollama) on candidate pages — those with a composite score above the threshold but no confirmed exact match. Requires Ollama running locally with `qwen2.5vl:7b` pulled.
+
+```bash
+python3 -m processing.ocr.vlm_repass \
+  --input-roots \
+    /Volumes/DigitalTwin/CivicTwin/registry/documents \
+    /Volumes/DigitalTwin/CivicTwin/ma-dennis/agendacenter \
+    /Volumes/DigitalTwin/CivicTwin/ma-dennis/warrants/pdfs
+```
+
+Optional flags: `--dry-run` (count candidates without running VLM), `--force` (re-score already-scored pages), `--min-composite FLOAT` (default 0.15), `--vlm-model MODEL`, `--vlm-url URL`.
+
 ### Tag migrations (one-off, safe to re-run)
 
 ```bash
@@ -120,15 +169,34 @@ rsync -avz --progress \
   /Volumes/DigitalTwin/CivicTwin/db/reference.db \
   ionos-vps:/var/www/dclt-nav/civictwin/db/reference.db
 
-# Registry PDFs (incremental)
+# Registry PDFs + JSON (incremental)
 rsync -avz --progress \
   /Volumes/DigitalTwin/CivicTwin/registry/documents/ \
   ionos-vps:/var/www/dclt-nav/civictwin/registry/documents/
+
+# ma-dennis PDFs + JSON (incremental)
+rsync -avz --progress \
+  /Volumes/DigitalTwin/CivicTwin/ma-dennis/ \
+  ionos-vps:/var/www/dclt-nav/civictwin/ma-dennis/
 ```
 
 ---
 
 ## Server
+
+### Start local dev server
+
+```bash
+flask run -p 5001
+```
+
+Or, if you need to test WSGI behaviour directly:
+
+```bash
+python3 wsgi.py
+```
+
+Runs on http://127.0.0.1:5001. Port 5000 is taken by macOS AirPlay Receiver.
 
 ### Logs and status
 

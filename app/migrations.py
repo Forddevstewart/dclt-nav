@@ -181,4 +181,8 @@ CREATE INDEX IF NOT EXISTS idx_parcel_links_doc
 CREATE INDEX IF NOT EXISTS idx_parcel_links_parcel
     ON parcel_links (parcel_id, status);
 """),
+    (10, """
+ALTER TABLE users ADD COLUMN full_name TEXT;
+UPDATE users SET full_name = username WHERE full_name IS NULL OR full_name = '';
+"""),
 ]

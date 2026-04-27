@@ -17,6 +17,8 @@ APP="/var/www/dclt-nav"
 CIVICTWIN="$APP/civictwin"
 LOCAL_DB="/Volumes/DigitalTwin/CivicTwin/db/reference.db"
 LOCAL_PDFS="/Volumes/DigitalTwin/CivicTwin/registry/documents/"
+LOCAL_MA_DENNIS="/Volumes/DigitalTwin/CivicTwin/ma-dennis/"
+LOCAL_GIS="/Volumes/DigitalTwin/CivicTwin/gis/"
 
 STAMP=$(date -u +"%Y%m%dT%H%M%SZ")
 
@@ -31,6 +33,12 @@ rsync -avz --progress "$LOCAL_DB" "$VPS:$CIVICTWIN/db/reference.db"
 
 echo "==> Sync registry PDFs (incremental)"
 rsync -avz --progress "$LOCAL_PDFS" "$VPS:$CIVICTWIN/registry/documents/"
+
+echo "==> Sync ma-dennis PDFs + JSON (incremental)"
+rsync -avz --progress "$LOCAL_MA_DENNIS" "$VPS:$CIVICTWIN/ma-dennis/"
+
+echo "==> Sync GIS files (parcel geometry + overlays)"
+rsync -avz --progress --include="*.geojson" --include="*.csv" --exclude="*" "$LOCAL_GIS" "$VPS:$CIVICTWIN/gis/"
 
 echo "==> Start server"
 ssh "$VPS" "sudo systemctl start dclt-nav"

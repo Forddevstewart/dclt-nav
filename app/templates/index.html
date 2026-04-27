@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DCLT Navigator</title>
   <script>
-    const CURRENT_USER = {{ ({"id": current_user.id, "username": current_user.username, "role": current_user.role} | tojson) if current_user.is_authenticated else "null" }};
+    const CURRENT_USER = {{ ({"id": current_user.id, "username": current_user.username, "full_name": current_user.full_name, "role": current_user.role} | tojson) if current_user.is_authenticated else "null" }};
   </script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -492,7 +492,7 @@
     </div>
     <div class="nav-user">
       {% if current_user.is_authenticated %}
-        <span>{{ current_user.username }}</span>
+        <span>{{ current_user.full_name }}</span>
         <a href="/logout">Sign out</a>
       {% else %}
         <a href="/login">Sign in</a>
@@ -1495,7 +1495,7 @@
             <div class="col-left-controls">
               <template x-if="CURRENT_USER?.role === 'admin'">
                 <button class="rod-link" style="font-size:12px;padding:.3rem .75rem;width:100%;text-align:center;border:none;"
-                  @click="adminAction='add_user'; adminSelected=null; adminNewUser={username:'',password:'',role:'user',saving:false,msg:'',err:''}">
+                  @click="adminAction='add_user'; adminSelected=null; adminNewUser={username:'',full_name:'',password:'',role:'user',saving:false,msg:'',err:''}">
                   + Add User
                 </button>
               </template>
@@ -1546,6 +1546,8 @@
                     <div style="display:flex;flex-direction:column;gap:.6rem;max-width:320px;">
                       <input class="search-input" type="text" placeholder="Username"
                         x-model="adminNewUser.username" autocomplete="off">
+                      <input class="search-input" type="text" placeholder="Full Name"
+                        x-model="adminNewUser.full_name" autocomplete="off">
                       <input class="search-input" type="password" placeholder="Password"
                         x-model="adminNewUser.password" autocomplete="new-password">
                       <select class="ctrl-select" x-model="adminNewUser.role">
@@ -1569,11 +1571,30 @@
               <template x-if="adminSelected && adminAction === 'change_pw'">
                 <div>
                   <div style="margin-bottom:1.25rem;">
-                    <div style="font-size:18px;font-weight:700;color:#0f172a;" x-text="adminSelected.username"></div>
+                    <div style="font-size:18px;font-weight:700;color:#0f172a;" x-text="adminSelected.full_name || adminSelected.username"></div>
                     <div style="font-size:13px;color:#64748b;margin-top:3px;"
                       x-text="(adminSelected.role) + ' · ' + (adminSelected.last_login ? 'Last login ' + adminSelected.last_login.slice(0,16).replace('T',' ') : 'Never logged in')">
                     </div>
                   </div>
+                  <template x-if="canChangePassword(adminSelected.id)">
+                    <div class="section">
+                      <div class="section-title">Full Name</div>
+                      <div style="display:flex;flex-direction:column;gap:.6rem;max-width:320px;">
+                        <input class="search-input" type="text" placeholder="Full Name"
+                          x-model="adminName.full_name" autocomplete="off"
+                          @keydown.enter="changeAdminFullName()">
+                        <template x-if="adminName.err">
+                          <div style="font-size:12px;color:#dc2626;" x-text="adminName.err"></div>
+                        </template>
+                        <template x-if="adminName.msg">
+                          <div style="font-size:12px;color:#16a34a;" x-text="adminName.msg"></div>
+                        </template>
+                        <button class="rod-link" style="width:fit-content;font-size:13px;border:none;"
+                          @click="changeAdminFullName()" :disabled="adminName.saving"
+                          x-text="adminName.saving ? 'Saving…' : 'Update Name'"></button>
+                      </div>
+                    </div>
+                  </template>
                   <template x-if="canChangePassword(adminSelected.id)">
                     <div class="section">
                       <div class="section-title">Change Password</div>
@@ -2231,7 +2252,8 @@
         adminSelected:     null,
         adminAction:       null,
         adminPw:           { password:'', confirm:'', saving:false, msg:'', err:'' },
-        adminNewUser:      { username:'', password:'', role:'user', saving:false, msg:'', err:'' },
+        adminName:         { full_name:'', saving:false, msg:'', err:'' },
+        adminNewUser:      { username:'', full_name:'', password:'', role:'user', saving:false, msg:'', err:'' },
 
         // admin — tags
         adminSection:    'users',
@@ -3063,6 +3085,24 @@
           this.adminSelected = u;
           this.adminAction   = 'change_pw';
           this.adminPw       = { password:'', confirm:'', saving:false, msg:'', err:'' };
+          this.adminName     = { full_name: u.full_name || u.username, saving:false, msg:'', err:'' };
+        },
+
+        async changeAdminFullName() {
+          if (!this.adminSelected) return;
+          if (!this.adminName.full_name.trim()) { this.adminName.err = 'Full name required'; return; }
+          this.adminName.saving = true; this.adminName.err = ''; this.adminName.msg = '';
+          try {
+            const r = await fetch('/api/admin/users/'+this.adminSelected.id, {
+              method: 'PATCH', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({full_name: this.adminName.full_name.trim()}),
+            });
+            if (!r.ok) { const d = await r.json(); this.adminName.err = d.error||'Error'; return; }
+            this.adminSelected.full_name = this.adminName.full_name.trim();
+            this.adminName.msg = 'Name updated.';
+            await this.loadAdminUsers();
+          } catch(e) { this.adminName.err = 'Network error'; }
+          finally { this.adminName.saving = false; }
         },
 
         canChangePassword(userId) {
@@ -3090,16 +3130,17 @@
 
         async addAdminUser() {
           if (!this.adminNewUser.username) { this.adminNewUser.err = 'Username required'; return; }
+          if (!this.adminNewUser.full_name) { this.adminNewUser.err = 'Full name required'; return; }
           if (!this.adminNewUser.password) { this.adminNewUser.err = 'Password required'; return; }
           this.adminNewUser.saving = true; this.adminNewUser.err = ''; this.adminNewUser.msg = '';
           try {
             const r = await fetch('/api/admin/users', {
               method: 'POST', headers: {'Content-Type':'application/json'},
-              body: JSON.stringify({username: this.adminNewUser.username, password: this.adminNewUser.password, role: this.adminNewUser.role}),
+              body: JSON.stringify({username: this.adminNewUser.username, full_name: this.adminNewUser.full_name, password: this.adminNewUser.password, role: this.adminNewUser.role}),
             });
             if (!r.ok) { const d = await r.json(); this.adminNewUser.err = d.error||'Error'; return; }
             this.adminNewUser.msg = 'User added.';
-            this.adminNewUser.username = ''; this.adminNewUser.password = ''; this.adminNewUser.role = 'user';
+            this.adminNewUser.username = ''; this.adminNewUser.full_name = ''; this.adminNewUser.password = ''; this.adminNewUser.role = 'user';
             await this.loadAdminUsers();
           } catch(e) { this.adminNewUser.err = 'Network error'; }
           finally { this.adminNewUser.saving = false; }

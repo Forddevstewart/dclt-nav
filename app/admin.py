@@ -24,7 +24,7 @@ def _can_change_password(target_user_id):
 def list_users():
     db = get_db()
     rows = db.execute(
-        "SELECT id, username, role, last_login FROM users ORDER BY username"
+        "SELECT id, username, full_name, role, last_login FROM users ORDER BY username"
     ).fetchall()
     db.close()
     return jsonify([dict(r) for r in rows])
@@ -36,17 +36,26 @@ def add_user():
         return jsonify({"error": "Forbidden"}), 403
     data = request.get_json() or {}
     username = (data.get("username") or "").strip()
+    full_name = (data.get("full_name") or "").strip()
     password = data.get("password") or ""
     role = data.get("role") or "user"
     if not username or not password:
         return jsonify({"error": "Username and password required"}), 400
+    if not full_name:
+        return jsonify({"error": "Full name required"}), 400
     if role not in VALID_ROLES:
         return jsonify({"error": "Invalid role"}), 400
     db = get_db()
+    existing = db.execute(
+        "SELECT id FROM users WHERE lower(username) = lower(?)", (username,)
+    ).fetchone()
+    if existing:
+        db.close()
+        return jsonify({"error": "Username already taken"}), 409
     try:
         db.execute(
-            "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
-            (username, generate_password_hash(password), role),
+            "INSERT INTO users (username, password_hash, role, full_name) VALUES (?, ?, ?, ?)",
+            (username, generate_password_hash(password), role, full_name),
         )
         db.commit()
     except Exception:
@@ -65,6 +74,21 @@ def usage_log():
     ).fetchall()
     db.close()
     return jsonify([dict(r) for r in rows])
+
+
+@bp.route("/users/<int:user_id>", methods=["PATCH"])
+def update_user(user_id):
+    if not _can_change_password(user_id):
+        return jsonify({"error": "Forbidden"}), 403
+    data = request.get_json() or {}
+    full_name = (data.get("full_name") or "").strip()
+    if not full_name:
+        return jsonify({"error": "Full name required"}), 400
+    db = get_db()
+    db.execute("UPDATE users SET full_name = ? WHERE id = ?", (full_name, user_id))
+    db.commit()
+    db.close()
+    return jsonify({"ok": True})
 
 
 @bp.route("/users/<int:user_id>/password", methods=["POST"])
