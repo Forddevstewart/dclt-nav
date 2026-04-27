@@ -1,0 +1,96 @@
+article_97:
+  primary_terms:
+    - "Article 97"
+    - "Art. 97"
+    - "Article XCVII"
+  abbreviations:
+    - "A97"
+    - "A.97"
+  context_terms:
+    - "conservation"
+    - "open space"
+    - "restriction"
+    - "town meeting"
+    - "protected"
+    - "public use"
+
+ccr:
+  primary_terms:
+    - "Covenants, Conditions, and Restrictions"
+    - "Declaration of Covenants"
+  abbreviations:
+    - "CC&R"
+    - "CCR"
+  context_terms:
+    - "homeowners"
+    - "deed"
+    - "property"
+    - "restriction"
+    - "association"
+
+chapter_61:
+  primary_terms:
+    - "Chapter 61"
+    - "Chapter 61A"
+    - "Chapter 61B"
+    - "current use"
+  abbreviations:
+    - "Ch. 61"
+  context_terms:
+    - "forest"
+    - "agricultural"
+    - "recreational"
+    - "tax assessment"
+    - "preferential"
+
+deed_restriction:
+  primary_terms:
+    - "deed restriction"
+    - "restrictive covenant"
+  abbreviations: []
+  context_terms:
+    - "encumbrance"
+    - "covenant"
+    - "binding"
+    - "successors"
+    - "assigns"
+
+conservation_restriction:
+  primary_terms:
+    - "conservation restriction"
+    - "conservation easement"
+  abbreviations:
+    - "CR"
+  context_terms:
+    - "open space"
+    - "natural resources"
+    - "scenic"
+    - "wildlife"
+    - "habitat"
+    - "grantee"
+
+agricultural_preservation_restriction:
+  primary_terms:
+    - "agricultural preservation restriction"
+    - "agricultural restriction"
+  abbreviations:
+    - "APR"
+  context_terms:
+    - "farmland"
+    - "agricultural"
+    - "preservation"
+    - "farming"
+    - "prime farmland"
+
+perpetual_restriction:
+  primary_terms:
+    - "in perpetuity"
+    - "perpetual"
+    - "forever"
+  abbreviations: []
+  context_terms:
+    - "restriction"
+    - "binding"
+    - "heirs"
+    - "successors"
+    - "assigns"
