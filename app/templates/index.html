@@ -88,6 +88,18 @@
     .tag-dd-remove { color:#dc2626; }
     .tag-dd-remove:hover { background:#fee2e2; }
 
+    /* ── Filter chips (list-level tag picker, toggleable) ───────────────────── */
+    .filter-chips { display:flex; flex-wrap:wrap; gap:.3rem; margin-top:.25rem; }
+    .filter-chip {
+      padding:.18rem .55rem; border-radius:12px; font-size:11px; font-weight:500;
+      cursor:pointer; user-select:none; white-space:nowrap; border:1px solid #cbd5e1;
+      background:#fff; color:#475569; transition:border-color .1s, background .1s;
+    }
+    .filter-chip:hover { border-color:#94a3b8; background:#f8fafc; }
+    .filter-chip.active.user-tag   { background:#dbeafe; border-color:#93c5fd; color:#1d4ed8; }
+    .filter-chip.active.system-tag { background:#ede9fe; border-color:#c4b5fd; color:#6d28d9; }
+    .filter-section { font-size:11px; color:#94a3b8; margin-bottom:.25rem; }
+
     /* ── Admin secondary tabs ───────────────────────────────────────────────── */
     .admin-sec-tab {
       height:36px; padding:0 1.1rem; border:none; background:transparent;
@@ -128,6 +140,10 @@
     .tab-panel { width: 100%; height: 100%; display: flex; }
     .three-col { display: flex; width: 100%; height: 100%; overflow: hidden; }
     .stub-panel { align-items: center; justify-content: center; color: #94a3b8; }
+    /* Section divs inside a flex-column tab (e.g. Town sub-tabs).
+       display:flex must live in CSS, not inline style, so Alpine's x-show
+       restores flex layout instead of falling back to block. */
+    .tab-section { flex: 1; min-height: 0; display: flex; overflow: hidden; }
 
     /* ── Left column (shared) ────────────────────────────────────────────── */
     .col-left {
@@ -314,11 +330,83 @@
       overflow-y: auto; border: 1px solid #e2e8f0;
     }
 
+    /* ── Overview landing page ──────────────────────────────────────────── */
+    .ov-page { width: 100%; height: 100%; overflow-y: auto; background: #f4f8f5; }
+    .ov-hero {
+      padding: 2.25rem 2.5rem 2rem;
+      background: linear-gradient(135deg, #1a4731 0%, #2d6a4f 55%, #40916c 100%);
+    }
+    .ov-hero-eyebrow {
+      font-size: 11px; font-weight: 600; letter-spacing: .12em;
+      text-transform: uppercase; color: #95d5b2; margin-bottom: .45rem;
+    }
+    .ov-hero-title { font-size: 26px; font-weight: 800; color: #fff; margin-bottom: .6rem; line-height: 1.2; }
+    .ov-hero-lead  { font-size: 13.5px; line-height: 1.72; color: #d8f3dc; max-width: 660px; }
+    .ov-layout {
+      display: grid; grid-template-columns: 1fr 272px; gap: 2rem;
+      padding: 1.75rem 2.5rem 3rem; max-width: 1100px;
+    }
+    .ov-main { display: flex; flex-direction: column; gap: 2.25rem; }
+    .ov-eyebrow {
+      font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+      color: #40916c; margin-bottom: .3rem;
+    }
+    .ov-section-title { font-size: 17px; font-weight: 700; color: #1a4731; margin-bottom: .45rem; }
+    .ov-section-lead  { font-size: 13px; line-height: 1.68; color: #475569; margin-bottom: 1rem; }
+    .ov-cards { display: flex; flex-direction: column; gap: .65rem; }
+    .ov-card {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+      padding: .9rem 1rem; display: flex; gap: .85rem; align-items: flex-start;
+      border-left: 3px solid #52b788;
+    }
+    .ov-badge {
+      flex-shrink: 0; width: 30px; height: 30px; border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800;
+    }
+    .ov-badge-p { background: #d1fae5; color: #065f46; }
+    .ov-badge-d { background: #dbeafe; color: #1e40af; }
+    .ov-badge-l { background: #fef9c3; color: #854d0e; }
+    .ov-badge-t { background: #ede9fe; color: #5b21b6; }
+    .ov-card-title { font-size: 13px; font-weight: 700; color: #1a4731; margin-bottom: .2rem; }
+    .ov-card-text  { font-size: 12.5px; color: #475569; line-height: 1.65; }
+    .ov-steps { display: flex; flex-direction: column; }
+    .ov-step  { display: flex; gap: 1rem; align-items: flex-start; }
+    .ov-step-num {
+      flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+      background: #2d6a4f; color: #fff; font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .ov-step-body  { flex: 1; padding-bottom: 1rem; }
+    .ov-step-title { font-size: 13px; font-weight: 700; color: #1a4731; margin-bottom: .2rem; }
+    .ov-step-text  { font-size: 12.5px; color: #475569; line-height: 1.65; }
+    .ov-connector  { width: 2px; height: 1rem; background: #b7e4c7; margin-left: 13px; }
+    .ov-sidebar { display: flex; flex-direction: column; gap: .9rem; }
+    .ov-sb-card {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.1rem;
+    }
+    .ov-sb-title { font-size: 13px; font-weight: 700; color: #1a4731; margin-bottom: .5rem; }
+    .ov-sb-text  { font-size: 12px; color: #475569; line-height: 1.65; }
+    .ov-sb-btn {
+      display: block; margin-top: .8rem; padding: .42rem 0; border-radius: 6px;
+      font-size: 12px; font-weight: 600; text-align: center; text-decoration: none;
+      transition: background .12s;
+    }
+    .ov-sb-btn-green  { background: #2d6a4f; color: #fff; }
+    .ov-sb-btn-green:hover  { background: #1a4731; }
+    .ov-sb-btn-light  { background: #ecfdf5; color: #2d6a4f; border: 1px solid #a7f3d0; }
+    .ov-sb-btn-light:hover  { background: #d1fae5; }
+
     /* ── Overview tab ────────────────────────────────────────────────────── */
     .overview-page { width: 100%; height: 100%; overflow-y: auto; padding: 1.5rem; }
     .overview-hdr  { margin-bottom: 1.25rem; }
     .overview-hdr h2  { font-size: 18px; font-weight: 700; color: #0f172a; }
     .overview-hdr p   { font-size: 12px; color: #94a3b8; margin-top: .2rem; }
+    .overview-section-hdr {
+      grid-column: 1 / -1; font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .1em; color: #64748b; padding: .75rem 0 .3rem;
+      border-bottom: 2px solid #e2e8f0;
+    }
     .stat-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -361,14 +449,46 @@
 </head>
 <body x-data="app()">
 
+  <!-- WIP Stamp -->
+  <template x-if="activeTab === 'overview'">
+    <div style="
+      position:fixed; top:48px; left:0; right:0; bottom:0; pointer-events:none; z-index:9999;
+      display:flex; align-items:center; justify-content:center;
+    ">
+      <div style="
+        transform:rotate(-30deg);
+        border:10px solid rgba(180,0,0,0.45);
+        border-radius:8px;
+        padding:18px 40px;
+        color:rgba(180,0,0,0.45);
+        font-family:'Arial Black',Arial,sans-serif;
+        font-size:clamp(28px,5vw,56px);
+        font-weight:900;
+        letter-spacing:.12em;
+        text-transform:uppercase;
+        white-space:nowrap;
+        text-align:center;
+        line-height:1.2;
+        text-shadow:2px 2px 0 rgba(180,0,0,0.15);
+        user-select:none;
+      ">Work in Progress<br>Untested</div>
+    </div>
+  </template>
+
   <!-- Nav -->
   <nav>
     <span class="nav-brand">DCLT Navigator</span>
     <div class="nav-tabs">
       <div class="nav-tab" :class="{active:activeTab==='overview'}"  @click="switchTab('overview')">Overview</div>
-      <div class="nav-tab" :class="{active:activeTab==='parcels'}"   @click="switchTab('parcels')">Parcels</div>
-      <div class="nav-tab" :class="{active:activeTab==='documents'}" @click="switchTab('documents')">Documents</div>
-      <div class="nav-tab" :class="{active:activeTab==='admin'}"     @click="switchTab('admin')">Admin</div>
+      <template x-if="CURRENT_USER">
+        <div style="display:contents;">
+          <div class="nav-tab" :class="{active:activeTab==='assets'}"    @click="switchTab('assets')">Assets</div>
+          <div class="nav-tab" :class="{active:activeTab==='parcels'}"   @click="switchTab('parcels')">Parcels</div>
+          <div class="nav-tab" :class="{active:activeTab==='registry'}" @click="switchTab('registry')">Registry</div>
+          <div class="nav-tab" :class="{active:activeTab==='town'}"      @click="switchTab('town')">Town</div>
+          <div class="nav-tab" :class="{active:activeTab==='admin'}"     @click="switchTab('admin')">Admin</div>
+        </div>
+      </template>
     </div>
     <div class="nav-user">
       {% if current_user.is_authenticated %}
@@ -384,6 +504,142 @@
 
     <!-- ═══════════════════════════ OVERVIEW TAB ════════════════════════════ -->
     <div class="tab-panel" x-show="activeTab==='overview'" style="overflow:hidden;">
+      <div class="ov-page">
+
+        <!-- Hero -->
+        <div class="ov-hero">
+          <div class="ov-hero-eyebrow">Dennis Conservation Land Trust</div>
+          <h1 class="ov-hero-title">DCLT Navigator</h1>
+          <p class="ov-hero-lead">A private research portal that consolidates parcel records from the Town of Dennis, deed documents from the Barnstable Registry of Deeds, geographic data from MassGIS, and information gathered directly by DCLT — bringing it all into one searchable tool for land conservation decision support and exportable analysis.</p>
+        </div>
+
+        <!-- Two-column body -->
+        <div class="ov-layout">
+
+          <div class="ov-main">
+
+            <!-- What's in the portal -->
+            <section>
+              <div class="ov-eyebrow">What's in the portal</div>
+              <h2 class="ov-section-title">Four kinds of information</h2>
+              <p class="ov-section-lead">Every record in DCLT Navigator belongs to one of four categories. Understanding them helps you know where to look and what each piece of data represents.</p>
+              <div class="ov-cards">
+
+                <div class="ov-card">
+                  <div class="ov-badge ov-badge-p">P</div>
+                  <div>
+                    <div class="ov-card-title">Parcels</div>
+                    <p class="ov-card-text">The foundation of everything in this portal. A parcel is a single, legally-defined plot of land identified by the Town of Dennis Assessing Department. Every deed record, GIS overlay, and annotation in the system links back to one or more parcels. Start here when you want to know about a specific piece of land — who owns it, what it's assessed at, whether it carries any restrictions, and whether it's currently on the market.</p>
+                  </div>
+                </div>
+
+                <div class="ov-card">
+                  <div class="ov-badge ov-badge-d">D</div>
+                  <div>
+                    <div class="ov-card-title">Documents</div>
+                    <p class="ov-card-text">Legal instruments recorded with the Barnstable Registry of Deeds: warranty deeds, conservation restrictions, deed restrictions, Chapter 61 agreements, easements, and more. Documents tell the ownership and encumbrance history of land. Where deed scans are available locally, the portal processes them with optical character recognition to automatically score language relevant to conservation — restrictions, Article 97 protections, agricultural preservation, and similar terms.</p>
+                  </div>
+                </div>
+
+                <div class="ov-card">
+                  <div class="ov-badge ov-badge-l">L</div>
+                  <div>
+                    <div class="ov-card-title">Layers</div>
+                    <p class="ov-card-text">Geographic and assessor datasets that enrich individual parcel records in bulk. MassGIS environmental overlays identify wetlands, priority wildlife habitat, watershed protection zones, and BioMap core areas. Annual assessor data provides property valuations, acreage, and use classifications. Other layers track current real estate listings. Think of a layer as a map overlay that applies to many parcels at once — a single data source adding context across the entire town.</p>
+                  </div>
+                </div>
+
+                <div class="ov-card">
+                  <div class="ov-badge ov-badge-t">T</div>
+                  <div>
+                    <div class="ov-card-title">Tags</div>
+                    <p class="ov-card-text">Annotations on parcels and documents that flag records of interest. Some tags are applied automatically — when OCR finds conservation restriction language in a deed, or when a GIS layer confirms a parcel sits in a priority habitat or water protection zone. Others are applied by hand by DCLT staff: acquisition targets, items under review, and other working labels. Tags are the primary tool for triage and prioritization, and can be combined to build focused shortlists for action.</p>
+                  </div>
+                </div>
+
+              </div>
+            </section>
+
+            <!-- How the data gets here -->
+            <section>
+              <div class="ov-eyebrow">How the data gets here</div>
+              <h2 class="ov-section-title">Three steps from source to screen</h2>
+              <p class="ov-section-lead">The information in this portal isn't pulled from a single place. It's assembled in three stages, each building on the last.</p>
+              <div class="ov-steps">
+
+                <div class="ov-step">
+                  <div class="ov-step-num">1</div>
+                  <div class="ov-step-body">
+                    <div class="ov-step-title">Collection</div>
+                    <p class="ov-step-text">Raw data is gathered from external sources: parcel and assessor records from the Town of Dennis, deed documents from the Barnstable Registry of Deeds ALIS system, environmental layers from MassGIS, real estate listings, and other inputs DCLT collects directly. Collection runs on a DCLT workstation and writes files to a shared drive — it never touches the live portal directly.</p>
+                  </div>
+                </div>
+
+                <div class="ov-connector"></div>
+
+                <div class="ov-step">
+                  <div class="ov-step-num">2</div>
+                  <div class="ov-step-body">
+                    <div class="ov-step-title">Processing</div>
+                    <p class="ov-step-text">Collected files are normalized, cross-referenced, and compiled into a single reference database. Registry documents with available scans are processed with OCR and scored for conservation-relevant keywords. Parcel records are joined to GIS overlays, assessor attributes, and listing data. The resulting database is then deployed to the portal server as the read-only foundation the app queries against.</p>
+                  </div>
+                </div>
+
+                <div class="ov-connector"></div>
+
+                <div class="ov-step">
+                  <div class="ov-step-num">3</div>
+                  <div class="ov-step-body">
+                    <div class="ov-step-title">The portal</div>
+                    <p class="ov-step-text">What you're viewing right now. Authenticated users can search and filter parcels and documents, review OCR keyword scores, apply tags to track items of interest, and export filtered results as CSV reports. Staff can also enter information directly — notes, tags, and curated data that supplement the automated sources. The portal is hosted on a private server and access is controlled.</p>
+                  </div>
+                </div>
+
+              </div>
+            </section>
+
+          </div><!-- /ov-main -->
+
+          <!-- Sidebar -->
+          <aside class="ov-sidebar">
+
+            <div class="ov-sb-card" style="border-top:3px solid #2d6a4f;">
+              <div class="ov-sb-title">Access is restricted</div>
+              <p class="ov-sb-text">DCLT Navigator is a private tool for DCLT staff and authorized partners. It is not a public-facing portal.</p>
+              <p class="ov-sb-text" style="margin-top:.55rem;">If you believe you should have access — as a DCLT volunteer, board member, partner organization, or municipal contact — please reach out directly.</p>
+              <a href="mailto:info@dennisconservationlandtrust.org" class="ov-sb-btn ov-sb-btn-green">Contact DCLT →</a>
+              <template x-if="!CURRENT_USER">
+                <div style="margin-top:.85rem;padding-top:.85rem;border-top:1px solid #e2e8f0;">
+                  <p class="ov-sb-text" style="margin-bottom:.35rem;">Already have access?</p>
+                  <a href="/login" class="ov-sb-btn ov-sb-btn-light">Sign in →</a>
+                </div>
+              </template>
+            </div>
+
+            <div class="ov-sb-card">
+              <div class="ov-sb-title">About DCLT</div>
+              <p class="ov-sb-text">The Dennis Conservation Land Trust is a 501(c)(3) nonprofit dedicated to protecting and stewarding natural lands in Dennis, Massachusetts for the benefit of present and future generations.</p>
+              <a href="https://dennisconservationlandtrust.org" target="_blank" rel="noopener"
+                 style="display:inline-block;margin-top:.7rem;font-size:12px;font-weight:600;color:#2d6a4f;text-decoration:none;">
+                dennisconservationlandtrust.org ↗
+              </a>
+            </div>
+
+            <template x-if="CURRENT_USER">
+              <div class="ov-sb-card" style="background:#f0fdf4;border-color:#bbf7d0;">
+                <div style="font-size:12px;font-weight:600;color:#166534;margin-bottom:.3rem;">Signed in as <span x-text="CURRENT_USER.username"></span></div>
+                <p class="ov-sb-text" style="color:#166534;">You have full access to Parcels, Registry, and the rest of the portal.</p>
+              </div>
+            </template>
+
+          </aside>
+
+        </div><!-- /ov-layout -->
+      </div><!-- /ov-page -->
+    </div>
+
+    <!-- ════════════════════════════ ASSETS TAB ═════════════════════════════ -->
+    <div class="tab-panel" x-show="activeTab==='assets'" style="overflow:hidden;">
       <div class="overview-page">
 
         <template x-if="overviewLoading">
@@ -393,196 +649,241 @@
         <template x-if="!overviewLoading && overviewData">
           <div>
             <div class="overview-hdr">
-              <h2>Reference Database</h2>
+              <h2>DCLT Navigator</h2>
               <p x-text="overviewData.pipeline.last_run
-                ? 'Last built ' + overviewData.pipeline.last_run.run_at.slice(0,10)
-                : 'Build date unknown'"></p>
+                ? 'Reference database last built ' + overviewData.pipeline.last_run.run_at.slice(0,10)
+                : 'Reference database build date unknown'"></p>
             </div>
 
-            <div class="stat-grid">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;align-items:start;">
 
-              <!-- Registry of Deeds -->
-              <div class="stat-card">
-                <div class="stat-card-title">Registry of Deeds</div>
-                <div class="stat-primary">
-                  <span class="stat-big" x-text="overviewData.registry.documents.toLocaleString()"></span>
-                  <span class="stat-unit">documents</span>
-                </div>
-                <div class="stat-subs">
-                  <div class="stat-sub">
-                    <span>Local scans</span>
-                    <span class="stat-sub-val"
-                      x-text="overviewData.registry.scan_cached.toLocaleString()
-                        + ' (' + Math.round(overviewData.registry.scan_cached/overviewData.registry.documents*100) + '%)'">
-                    </span>
+              <!-- ── Parcels ────────────────────────────────────────────────── -->
+              <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <div class="overview-section-hdr" style="grid-column:unset;">Parcels</div>
+                <div class="stat-card">
+                  <div class="stat-card-title">Parcels</div>
+                  <div class="stat-primary">
+                    <span class="stat-big" x-text="overviewData.parcels.total.toLocaleString()"></span>
+                    <span class="stat-unit">parcels</span>
                   </div>
-                  <div class="stat-sub">
-                    <span>OCR processed</span>
-                    <span class="stat-sub-val" x-text="overviewData.registry.ocr.toLocaleString()"></span>
-                  </div>
-                </div>
-                <div>
-                  <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">By instrument type</div>
-                  <div class="brk-list">
-                    <template x-for="row in overviewData.registry.by_type.slice(0,10)" :key="row.instrument_type">
-                      <div>
-                        <div class="brk-row">
-                          <span class="brk-label" x-text="row.instrument_type || '(blank)'"></span>
-                          <span class="brk-count" x-text="row.n.toLocaleString()"></span>
-                        </div>
-                        <div class="brk-bar-wrap">
-                          <div class="brk-bar" :style="'width:'+Math.min(100,row.n/overviewData.registry.documents*100)+'%'"></div>
-                        </div>
-                      </div>
-                    </template>
-                  </div>
-                </div>
-                <template x-if="overviewData.registry.kw_hits && Object.keys(overviewData.registry.kw_hits).length">
                   <div>
-                    <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">Keyword hits in OCR corpus (score&gt;0.4)</div>
-                    <table class="kw-hits-table">
-                      <template x-for="(info, kw) in overviewData.registry.kw_hits" :key="kw">
-                        <tr>
-                          <td x-text="info.label"></td>
-                          <td x-text="info.n_04.toLocaleString()"></td>
-                        </tr>
+                    <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">By property class</div>
+                    <div class="brk-list">
+                      <template x-for="row in overviewData.parcels.by_class" :key="row.property_class">
+                        <div>
+                          <div class="brk-row">
+                            <span class="brk-label" x-text="row.property_class || 'Other'"></span>
+                            <span class="brk-count" x-text="row.n.toLocaleString()"></span>
+                          </div>
+                          <div class="brk-bar-wrap">
+                            <div class="brk-bar" :style="'width:'+Math.min(100,row.n/overviewData.parcels.total*100)+'%'"></div>
+                          </div>
+                        </div>
                       </template>
-                    </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ── Documents ──────────────────────────────────────────────── -->
+              <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <div class="overview-section-hdr" style="grid-column:unset;">Documents</div>
+                <div class="stat-card">
+                  <div class="stat-card-title">Registry of Deeds</div>
+                  <div class="stat-primary">
+                    <span class="stat-big" x-text="overviewData.registry.documents.toLocaleString()"></span>
+                    <span class="stat-unit">documents</span>
+                  </div>
+                  <div class="stat-subs">
+                    <div class="stat-sub">
+                      <span>Local scans</span>
+                      <span class="stat-sub-val"
+                        x-text="overviewData.registry.scan_cached.toLocaleString()
+                          + ' (' + Math.round(overviewData.registry.scan_cached/overviewData.registry.documents*100) + '%)'">
+                      </span>
+                    </div>
+                    <div class="stat-sub">
+                      <span>OCR processed</span>
+                      <span class="stat-sub-val" x-text="overviewData.registry.ocr.toLocaleString()"></span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">By instrument type</div>
+                    <div class="brk-list">
+                      <template x-for="row in overviewData.registry.by_type.slice(0,10)" :key="row.instrument_type">
+                        <div>
+                          <div class="brk-row">
+                            <span class="brk-label" x-text="row.instrument_type || '(blank)'"></span>
+                            <span class="brk-count" x-text="row.n.toLocaleString()"></span>
+                          </div>
+                          <div class="brk-bar-wrap">
+                            <div class="brk-bar" :style="'width:'+Math.min(100,row.n/overviewData.registry.documents*100)+'%'"></div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-card-title">Town Meeting Warrants</div>
+                  <div class="stat-primary">
+                    <span class="stat-big" x-text="overviewData.warrants.total.toLocaleString()"></span>
+                    <span class="stat-unit">articles</span>
+                  </div>
+                  <div class="stat-subs">
+                    <div class="stat-sub">
+                      <span>Year range</span>
+                      <span class="stat-sub-val"
+                        x-text="overviewData.warrants.year_range.min_year + ' – ' + overviewData.warrants.year_range.max_year">
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">By result</div>
+                    <div class="brk-list">
+                      <template x-for="row in overviewData.warrants.by_result" :key="row.result">
+                        <div>
+                          <div class="brk-row">
+                            <span class="brk-label" x-text="row.result"></span>
+                            <span class="brk-count" x-text="row.n.toLocaleString()"></span>
+                          </div>
+                          <div class="brk-bar-wrap">
+                            <div class="brk-bar" :style="'width:'+Math.min(100,row.n/overviewData.warrants.total*100)+'%'"></div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+                <template x-if="townDocsOverview && townDocsOverview.total > 0">
+                  <div class="stat-card">
+                    <div class="stat-card-title">Town Documents</div>
+                    <div class="stat-primary">
+                      <span class="stat-big" x-text="townDocsOverview.total.toLocaleString()"></span>
+                      <span class="stat-unit">documents</span>
+                    </div>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:.4rem;">Agendas, minutes, and packets from 60+ committees. Parcel links are adjudicated in the Town tab.</div>
+                    <div>
+                      <div style="font-size:11px;color:#94a3b8;font-weight:600;margin:.6rem 0 .3rem;">By type</div>
+                      <div class="brk-list">
+                        <template x-for="row in townDocsOverview.by_doc_type.slice(0,6)" :key="row.doc_type">
+                          <div>
+                            <div class="brk-row">
+                              <span class="brk-label" x-text="row.doc_type"></span>
+                              <span class="brk-count" x-text="row.n.toLocaleString()"></span>
+                            </div>
+                            <div class="brk-bar-wrap">
+                              <div class="brk-bar" :style="'width:'+Math.min(100,row.n/townDocsOverview.total*100)+'%'"></div>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
                   </div>
                 </template>
               </div>
 
-              <!-- Parcels -->
-              <div class="stat-card">
-                <div class="stat-card-title">Parcels</div>
-                <div class="stat-primary">
-                  <span class="stat-big" x-text="overviewData.parcels.total.toLocaleString()"></span>
-                  <span class="stat-unit">parcels</span>
+              <!-- ── Layers ─────────────────────────────────────────────────── -->
+              <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <div class="overview-section-hdr" style="grid-column:unset;">Layers</div>
+                <div class="stat-card">
+                  <div class="stat-card-title">GIS Overlay</div>
+                  <div class="stat-primary">
+                    <span class="stat-big" x-text="overviewData.gis.total_parcels.toLocaleString()"></span>
+                    <span class="stat-unit">parcels with overlay</span>
+                  </div>
+                  <div>
+                    <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">Layer coverage</div>
+                    <table class="layer-table">
+                      <template x-for="row in overviewData.gis.layer_coverage" :key="row.layer">
+                        <tr>
+                          <td>
+                            <span class="layer-dot" x-show="row.n > 0"></span>
+                            <span x-text="row.layer"></span>
+                          </td>
+                          <td x-text="row.n.toLocaleString()"></td>
+                        </tr>
+                      </template>
+                    </table>
+                  </div>
                 </div>
-                <div>
-                  <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">By property class</div>
-                  <div class="brk-list">
-                    <template x-for="row in overviewData.parcels.by_class" :key="row.property_class">
-                      <div>
-                        <div class="brk-row">
-                          <span class="brk-label" x-text="row.property_class || 'Other'"></span>
-                          <span class="brk-count" x-text="row.n.toLocaleString()"></span>
-                        </div>
-                        <div class="brk-bar-wrap">
-                          <div class="brk-bar" :style="'width:'+Math.min(100,row.n/overviewData.parcels.total*100)+'%'"></div>
-                        </div>
+                <div class="stat-card">
+                  <div class="stat-card-title">Assessor &amp; MassGIS</div>
+                  <div class="stat-subs">
+                    <div class="stat-sub">
+                      <span>Assessor records (incl. condo units)</span>
+                      <span class="stat-sub-val" x-text="overviewData.assessor.records.toLocaleString()"></span>
+                    </div>
+                    <div class="stat-sub">
+                      <span>MassGIS parcel features (raw)</span>
+                      <span class="stat-sub-val" x-text="overviewData.massgis.raw.toLocaleString()"></span>
+                    </div>
+                    <div class="stat-sub">
+                      <span>MassGIS normalized (1 per parcel)</span>
+                      <span class="stat-sub-val" x-text="overviewData.massgis.normalized.toLocaleString()"></span>
+                    </div>
+                    <div class="stat-sub">
+                      <span>GIS data sources</span>
+                      <span class="stat-sub-val" x-text="overviewData.gis.sources"></span>
+                    </div>
+                    <div class="stat-sub">
+                      <span>Land use codes</span>
+                      <span class="stat-sub-val" x-text="overviewData.reference.use_codes"></span>
+                    </div>
+                    <div class="stat-sub">
+                      <span>Schema columns documented</span>
+                      <span class="stat-sub-val" x-text="overviewData.reference.schema_columns"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ── Tags ───────────────────────────────────────────────────── -->
+              <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <div class="overview-section-hdr" style="grid-column:unset;">Tags</div>
+                <div class="stat-card">
+                  <div class="stat-card-title">Tags</div>
+                  <template x-if="allTags.length === 0">
+                    <div style="font-size:12px;color:#94a3b8;">No tags defined</div>
+                  </template>
+                  <template x-if="allTags.filter(t=>t.tag_type==='system').length > 0">
+                    <div>
+                      <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">
+                        System
+                        <span style="font-weight:400;" x-text="'— ' + allTags.filter(t=>t.tag_type==='system').length"></span>
                       </div>
-                    </template>
-                  </div>
-                </div>
-              </div>
-
-              <!-- GIS Layers -->
-              <div class="stat-card">
-                <div class="stat-card-title">GIS Layers</div>
-                <div class="stat-primary">
-                  <span class="stat-big" x-text="overviewData.gis.total_parcels.toLocaleString()"></span>
-                  <span class="stat-unit">parcels with overlay</span>
-                </div>
-                <div class="stat-subs">
-                  <div class="stat-sub">
-                    <span>Data sources</span>
-                    <span class="stat-sub-val" x-text="overviewData.gis.sources + ' layers'"></span>
-                  </div>
-                </div>
-                <div>
-                  <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">Layer coverage</div>
-                  <table class="layer-table">
-                    <template x-for="row in overviewData.gis.layer_coverage" :key="row.layer">
-                      <tr>
-                        <td>
-                          <span class="layer-dot" x-show="row.n > 0"></span>
-                          <span x-text="row.layer"></span>
-                        </td>
-                        <td x-text="row.n.toLocaleString()"></td>
-                      </tr>
-                    </template>
-                  </table>
-                </div>
-              </div>
-
-              <!-- Assessor + MassGIS -->
-              <div class="stat-card">
-                <div class="stat-card-title">Assessor &amp; MassGIS</div>
-                <div class="stat-subs">
-                  <div class="stat-sub">
-                    <span>Assessor records (incl. condo units)</span>
-                    <span class="stat-sub-val" x-text="overviewData.assessor.records.toLocaleString()"></span>
-                  </div>
-                  <div class="stat-sub">
-                    <span>MassGIS parcel features (raw)</span>
-                    <span class="stat-sub-val" x-text="overviewData.massgis.raw.toLocaleString()"></span>
-                  </div>
-                  <div class="stat-sub">
-                    <span>MassGIS normalized (1 per parcel)</span>
-                    <span class="stat-sub-val" x-text="overviewData.massgis.normalized.toLocaleString()"></span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Town Meeting -->
-              <div class="stat-card">
-                <div class="stat-card-title">Town Meeting Warrants</div>
-                <div class="stat-primary">
-                  <span class="stat-big" x-text="overviewData.warrants.total.toLocaleString()"></span>
-                  <span class="stat-unit">articles</span>
-                </div>
-                <div class="stat-subs">
-                  <div class="stat-sub">
-                    <span>Year range</span>
-                    <span class="stat-sub-val"
-                      x-text="overviewData.warrants.year_range.min_year + ' – ' + overviewData.warrants.year_range.max_year">
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">By result</div>
-                  <div class="brk-list">
-                    <template x-for="row in overviewData.warrants.by_result" :key="row.result">
-                      <div>
-                        <div class="brk-row">
-                          <span class="brk-label" x-text="row.result"></span>
-                          <span class="brk-count" x-text="row.n.toLocaleString()"></span>
-                        </div>
-                        <div class="brk-bar-wrap">
-                          <div class="brk-bar" :style="'width:'+Math.min(100,row.n/overviewData.warrants.total*100)+'%'"></div>
-                        </div>
+                      <div style="display:flex;flex-wrap:wrap;gap:.3rem;">
+                        <template x-for="tag in allTags.filter(t=>t.tag_type==='system')" :key="tag.tag_id">
+                          <span style="display:inline-flex;align-items:center;gap:.25rem;padding:.18rem .55rem;border-radius:12px;font-size:11px;font-weight:500;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;">
+                            <span x-text="tag.name"></span>
+                            <span style="font-size:9px;opacity:.65;" x-text="tag.target_entity==='document'?'doc':tag.target_entity==='parcel'?'parcel':''"></span>
+                          </span>
+                        </template>
                       </div>
-                    </template>
-                  </div>
+                    </div>
+                  </template>
+                  <template x-if="allTags.filter(t=>t.tag_type==='user').length > 0">
+                    <div>
+                      <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">
+                        User
+                        <span style="font-weight:400;" x-text="'— ' + allTags.filter(t=>t.tag_type==='user').length"></span>
+                      </div>
+                      <div style="display:flex;flex-wrap:wrap;gap:.3rem;">
+                        <template x-for="tag in allTags.filter(t=>t.tag_type==='user')" :key="tag.tag_id">
+                          <span style="padding:.18rem .55rem;border-radius:12px;font-size:11px;font-weight:500;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;" x-text="tag.name"></span>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
                 </div>
               </div>
 
-              <!-- Reference -->
-              <div class="stat-card">
-                <div class="stat-card-title">Reference Tables</div>
-                <div class="stat-subs">
-                  <div class="stat-sub">
-                    <span>Land use codes</span>
-                    <span class="stat-sub-val" x-text="overviewData.reference.use_codes"></span>
-                  </div>
-                  <div class="stat-sub">
-                    <span>Schema columns documented</span>
-                    <span class="stat-sub-val" x-text="overviewData.reference.schema_columns"></span>
-                  </div>
-                  <div class="stat-sub">
-                    <span>GIS data sources</span>
-                    <span class="stat-sub-val" x-text="overviewData.gis.sources"></span>
-                  </div>
-                </div>
-              </div>
-
-            </div><!-- /stat-grid -->
+            </div><!-- /columns -->
           </div>
         </template>
 
       </div>
-    </div><!-- /overview tab -->
+    </div><!-- /assets tab -->
 
     <!-- ═══════════════════════════ PARCELS TAB ══════════════════════════════ -->
     <div class="tab-panel three-col" x-show="activeTab==='parcels'">
@@ -590,29 +891,23 @@
       <!-- Left: parcel list -->
       <div class="col-left">
         <div class="col-left-controls">
-          <div style="position:relative">
-            <input class="search-input" x-model="parcelSearch"
-              placeholder="Type wetlands, article 97, or anything to filter properties"
-              type="search" autocomplete="off"
-              @focus="parcelSearchOpen=true"
-              @blur="setTimeout(()=>parcelSearchOpen=false,150)"
-              @input="parcelSearchKeyword=null; parcelPage=1">
-            <div x-show="parcelSearchOpen && parcelSearch.trim()"
-              style="position:absolute;top:100%;left:0;right:0;z-index:50;background:#fff;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.12);margin-top:2px;overflow:hidden">
-              <template x-for="kw in parcelKeywordSuggestions" :key="kw.key">
-                <div style="padding:8px 12px;cursor:pointer;font-size:.875rem"
-                  @mousedown.prevent="parcelSearchKeyword=kw.key; parcelSearch=kw.label; parcelSearchOpen=false; parcelPage=1"
-                  @mouseover="$el.style.background='#f3f4f6'" @mouseout="$el.style.background=''">
-                  <span x-text="kw.label"></span>
-                </div>
-              </template>
-              <div style="padding:8px 12px;cursor:pointer;font-size:.875rem;color:#6b7280;border-top:1px solid #e5e7eb"
-                @mousedown.prevent="parcelSearchKeyword=null; parcelSearchOpen=false; parcelPage=1"
-                @mouseover="$el.style.background='#f3f4f6'" @mouseout="$el.style.background=''">
-                Search for '<span x-text="parcelSearch"></span>'
+          <input class="search-input" x-model.debounce.200ms="parcelSearch"
+            placeholder="Name or address" type="search" autocomplete="off"
+            @input="parcelPage=1">
+          <template x-if="allParcelTagOptions.length">
+            <div>
+              <div class="filter-section">Filter by tag</div>
+              <div class="filter-chips">
+                <template x-for="tag in allParcelTagOptions" :key="tag.tag_id">
+                  <button class="filter-chip"
+                    :class="{active: parcelTagFilter.includes(tag.tag_id), 'user-tag': tag.tag_type==='user', 'system-tag': tag.tag_type==='system'}"
+                    @click="toggleParcelTag(tag.tag_id)"
+                    x-text="tag.name">
+                  </button>
+                </template>
               </div>
             </div>
-          </div>
+          </template>
           <div class="sort-row">
             <span class="sort-label">Sort</span>
             <select class="ctrl-select" x-model="parcelSort">
@@ -708,20 +1003,20 @@
 
               <div class="section">
                 <div class="section-title">Registry of Deeds
-                  <template x-if="parcelDetail.documents.length">
+                  <template x-if="(parcelDetail.documents||[]).length">
                     <span style="font-weight:400;text-transform:none;letter-spacing:0;"
-                      x-text="' — '+parcelDetail.documents.length+' record'+(parcelDetail.documents.length!==1?'s':'')"></span>
+                      x-text="' — '+(parcelDetail.documents||[]).length+' record'+((parcelDetail.documents||[]).length!==1?'s':'')"></span>
                   </template>
                 </div>
-                <template x-if="parcelDetail.documents.length===0">
+                <template x-if="(parcelDetail.documents||[]).length===0">
                   <div style="color:#94a3b8;font-size:13px;">No records found</div>
                 </template>
-                <template x-if="parcelDetail.documents.length>0">
+                <template x-if="(parcelDetail.documents||[]).length>0">
                   <div style="overflow-x:auto;">
                     <table class="doc-table">
                       <thead><tr><th>#</th><th>Type</th><th>Recorded</th><th>Grantor</th><th>Grantee</th><th>Book/Page</th><th>PDF</th></tr></thead>
                       <tbody>
-                        <template x-for="doc in parcelDetail.documents" :key="doc.doc_rank">
+                        <template x-for="doc in (parcelDetail.documents||[])" :key="doc.doc_rank">
                           <tr class="doc-row" :class="{active:parcelSelectedDoc&&parcelSelectedDoc.doc_rank===doc.doc_rank}" @click="selectParcelDoc(doc)">
                             <td x-text="doc.doc_rank"></td>
                             <td x-text="doc.instrument_type||'—'"></td>
@@ -739,6 +1034,39 @@
                     </table>
                   </div>
                 </template>
+              </div>
+
+              <div class="section" x-show="parcelTownDocs && parcelTownDocs.length > 0">
+                <div class="section-title">Town Documents
+                  <span style="font-weight:400;text-transform:none;letter-spacing:0;"
+                    x-text="parcelTownDocs ? ' — '+parcelTownDocs.length+' confirmed link'+(parcelTownDocs.length!==1?'s':'') : ''"></span>
+                </div>
+                <div style="overflow-x:auto;">
+                  <table class="doc-table">
+                    <thead><tr><th>Committee</th><th>Type</th><th>Date</th><th>Match</th></tr></thead>
+                    <tbody>
+                      <template x-for="td in parcelTownDocs" :key="td.link_id">
+                        <tr class="doc-row" :class="{active: parcelSelectedTownDoc && parcelSelectedTownDoc.link_id===td.link_id}" @click="selectParcelTownDoc(td)">
+                          <td x-text="(td.committee||'').replace(/_/g,' ')"></td>
+                          <td>
+                            <template x-if="td.doc_type==='Updated'">
+                              <span class="badge badge-blue" style="font-size:10px;padding:.1rem .35rem;">Updated</span>
+                            </template>
+                            <template x-if="td.doc_type!=='Updated'">
+                              <span x-text="td.doc_type||'—'"></span>
+                            </template>
+                          </td>
+                          <td x-text="td.meeting_date||'—'"></td>
+                          <td>
+                            <span style="font-size:10px;padding:.1rem .3rem;border-radius:3px;"
+                              :style="td.match_type==='ocr_map_lot' ? 'background:#dcfce7;color:#166534;' : td.match_type==='ocr_address' ? 'background:#dbeafe;color:#1d4ed8;' : 'background:#fef9c3;color:#854d0e;'"
+                              x-text="td.match_type==='ocr_map_lot' ? 'Map/Lot' : td.match_type==='ocr_address' ? 'Address' : 'Manual'"></span>
+                          </td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               <div class="section">
@@ -785,7 +1113,7 @@
                     <div style="font-size:12px;color:#94a3b8;">Loading…</div>
                   </template>
                   <div class="tag-chips">
-                    <template x-for="tag in allTags" :key="tag.tag_id">
+                    <template x-for="tag in allTags.filter(t=>t.tag_type==='user')" :key="tag.tag_id">
                       <div class="tag-chip"
                         :class="{
                           applied:  parcelTagState[tag.tag_id] != null,
@@ -829,12 +1157,12 @@
 
       <!-- Right: Map / PDF viewer -->
       <div class="col-right">
-        <div class="col-right-header" x-text="parcelSelectedDoc ? 'Document View' : (selectedParcelId ? 'Parcel Map' : 'Document View')"></div>
+        <div class="col-right-header" x-text="parcelSelectedTownDoc ? 'Town Document' : parcelSelectedDoc ? 'Document View' : (selectedParcelId ? 'Parcel Map' : 'Document View')"></div>
         <div class="col-right-body">
           <div x-show="!selectedParcelId" class="empty-state">
             <span class="empty-icon">📄</span><span>Select a parcel</span>
           </div>
-          <div id="parcel-map" x-show="selectedParcelId && !parcelSelectedDoc" style="flex:1;width:100%;min-height:0;"></div>
+          <div id="parcel-map" x-show="selectedParcelId && !parcelSelectedDoc && !parcelSelectedTownDoc" style="flex:1;width:100%;min-height:0;"></div>
           <div x-show="parcelSelectedDoc && !parcelPdfUrl" class="no-scan-panel">
             <div class="rod-doc-meta" x-text="parcelSelectedDoc ? (parcelSelectedDoc.instrument_type||'Document')+' · Book '+parcelSelectedDoc.book+', Page '+parcelSelectedDoc.page : ''"></div>
             <div style="font-size:13px;color:#64748b;">No local scan</div>
@@ -844,13 +1172,14 @@
             </button>
           </div>
           <iframe x-show="parcelSelectedDoc && parcelPdfUrl" :src="parcelPdfUrl || ''" style="flex:1;width:100%;height:100%;border:none;"></iframe>
+          <iframe x-show="parcelSelectedTownDoc" :src="parcelSelectedTownDoc ? '/api/town-docs/'+parcelSelectedTownDoc.doc_id+'/pdf' : ''" style="flex:1;width:100%;height:100%;border:none;"></iframe>
         </div>
       </div>
 
     </div><!-- /parcels tab -->
 
     <!-- ══════════════════════════ DOCUMENTS TAB ════════════════════════════ -->
-    <div class="tab-panel three-col" x-show="activeTab==='documents'">
+    <div class="tab-panel three-col" x-show="activeTab==='registry'">
 
       <!-- Left: document list -->
       <div class="col-left">
@@ -861,21 +1190,25 @@
             <option value="">All instrument types</option>
             <template x-for="t in docTypes" :key="t"><option :value="t" x-text="t"></option></template>
           </select>
-          <select class="ctrl-select" x-model="docKwFilter">
-            <option value="">All keyword scores</option>
-            <option value="conservation_restriction">Conservation Restriction</option>
-            <option value="article_97">Article 97</option>
-            <option value="deed_restriction">Deed Restriction</option>
-            <option value="chapter_61">Chapter 61</option>
-            <option value="agricultural_preservation_restriction">Ag. Preservation</option>
-            <option value="perpetual_restriction">Perpetual Restriction</option>
-            <option value="ccr">CC&amp;R</option>
-          </select>
-          <template x-if="docKwFilter">
-            <div style="display:flex;align-items:center;gap:.4rem;">
-              <span style="font-size:11px;color:#94a3b8;white-space:nowrap;">Min confidence</span>
-              <input type="range" min="0" max="1" step="0.05" x-model.number="docKwThreshold" style="flex:1;accent-color:#3b82f6;">
-              <span style="font-size:11px;color:#64748b;white-space:nowrap;min-width:2.5rem;" x-text="docKwThreshold.toFixed(2)"></span>
+          <template x-if="allDocTagOptions.length">
+            <div>
+              <div class="filter-section">Filter by tag</div>
+              <div class="filter-chips">
+                <template x-for="tag in allDocTagOptions" :key="tag.tag_id">
+                  <button class="filter-chip"
+                    :class="{active: docTagFilter.includes(tag.tag_id), 'system-tag': tag.tag_type==='system', 'user-tag': tag.tag_type==='user'}"
+                    @click="toggleDocTag(tag.tag_id)"
+                    x-text="tag.name">
+                  </button>
+                </template>
+              </div>
+              <template x-if="docTagFilter.some(id => allDocTagOptions.find(t=>t.tag_id===id)?.tag_type==='system')">
+                <div style="display:flex;align-items:center;gap:.4rem;margin-top:.35rem;">
+                  <span style="font-size:11px;color:#94a3b8;white-space:nowrap;">Min confidence</span>
+                  <input type="range" min="0" max="1" step="0.05" x-model.number="docTagThreshold" style="flex:1;accent-color:#3b82f6;">
+                  <span style="font-size:11px;color:#64748b;white-space:nowrap;min-width:2.5rem;" x-text="docTagThreshold.toFixed(2)"></span>
+                </div>
+              </template>
             </div>
           </template>
           <div class="sort-row">
@@ -898,13 +1231,13 @@
         </div>
 
         <div class="col-left-list">
-          <template x-if="docsLoading"><div class="loading-msg">Loading…</div></template>
-          <template x-if="!docsLoading && allDocuments.length===0">
+          <template x-if="regLoading"><div class="loading-msg">Loading…</div></template>
+          <template x-if="!regLoading && allRegistry.length===0">
             <div class="empty-state"><span class="empty-icon">📁</span><span>No documents loaded</span></div>
           </template>
-          <template x-if="!docsLoading && allDocuments.length>0">
+          <template x-if="!regLoading && allRegistry.length>0">
             <div>
-              <template x-for="d in pagedDocuments" :key="d.book+'_'+d.page">
+              <template x-for="d in pagedRegistry" :key="d.book+'_'+d.page">
                 <div class="list-row"
                   :class="{selected: docSelectedBP && docSelectedBP.book===d.book && docSelectedBP.page===d.page}"
                   @click="selectDoc(d)">
@@ -921,14 +1254,10 @@
                     <template x-if="d.scan_cached">
                       <span class="kw-badge" style="background:#f0fdf4;color:#166534;">PDF</span>
                     </template>
-                    <template x-if="docKwFilter">
-                      <span :class="verdictCls(docKwAdjudications[d.book+'/'+d.page])"
-                        x-text="docKwAdjudications[d.book+'/'+d.page]||'—'"></span>
-                    </template>
                   </div>
                 </div>
               </template>
-              <template x-if="pagedDocuments.length===0">
+              <template x-if="pagedRegistry.length===0">
                 <div class="empty-state" style="height:100px;">No results</div>
               </template>
             </div>
@@ -936,14 +1265,14 @@
         </div>
 
         <div class="col-left-footer">
-          <span x-text="docFilteredCount.toLocaleString()+' doc'+(docFilteredCount!==1?'s':'')"></span>
+          <span x-text="regFilteredCount.toLocaleString()+' doc'+(regFilteredCount!==1?'s':'')"></span>
           <a :href="docExportUrl" class="paging-btn" style="text-decoration:none;" download>↓ CSV</a>
           <div class="paging-btns">
-            <button class="paging-btn" @click="docPage=1"            :disabled="docPage===1">«</button>
-            <button class="paging-btn" @click="docPage--"            :disabled="docPage===1">‹</button>
-            <span   class="paging-page" x-text="docPage+' / '+docTotalPages"></span>
-            <button class="paging-btn" @click="docPage++"            :disabled="docPage>=docTotalPages">›</button>
-            <button class="paging-btn" @click="docPage=docTotalPages" :disabled="docPage>=docTotalPages">»</button>
+            <button class="paging-btn" @click="regPage=1"            :disabled="regPage===1">«</button>
+            <button class="paging-btn" @click="regPage--"            :disabled="regPage===1">‹</button>
+            <span   class="paging-page" x-text="regPage+' / '+regTotalPages"></span>
+            <button class="paging-btn" @click="regPage++"            :disabled="regPage>=regTotalPages">›</button>
+            <button class="paging-btn" @click="regPage=regTotalPages" :disabled="regPage>=regTotalPages">»</button>
           </div>
         </div>
       </div>
@@ -1079,7 +1408,7 @@
                     <div style="font-size:12px;color:#94a3b8;">Loading…</div>
                   </template>
                   <div class="tag-chips">
-                    <template x-for="tag in allTags" :key="tag.tag_id">
+                    <template x-for="tag in allTags.filter(t=>t.tag_type==='user')" :key="tag.tag_id">
                       <div class="tag-chip"
                         :class="{
                           applied:  docTagState[tag.tag_id] != null,
@@ -1144,7 +1473,7 @@
         </div>
       </div>
 
-    </div><!-- /documents tab -->
+    </div><!-- /registry tab -->
 
     <!-- ════════════════════════════ ADMIN TAB ═════════════════════════════ -->
     <div class="tab-panel" x-show="activeTab==='admin'" style="overflow:hidden;display:flex;flex-direction:column;">
@@ -1463,6 +1792,202 @@
 
     </div><!-- /admin tab -->
 
+    <!-- ══════════════════════════ DATA HYGIENE TAB ══════════════════════════ -->
+    <div class="tab-panel" x-show="activeTab==='town'" style="overflow:hidden;display:flex;flex-direction:column;">
+
+      <!-- Sub-tab bar -->
+      <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#fff;flex-shrink:0;padding:0 .75rem;">
+        <button class="admin-sec-tab" :class="{active:townSection==='town_doc_links'}" @click="townSection='town_doc_links'">Town Doc Links</button>
+        <button class="admin-sec-tab" :class="{active:townSection==='for_sale'}"       @click="townSection='for_sale'">For Sale</button>
+      </div>
+
+        <!-- ── Town Doc Links ──────────────────────────────────────────────── -->
+        <div class="tab-section" x-show="townSection==='town_doc_links'">
+
+          <!-- Left: doc list -->
+          <div class="col-left">
+            <div class="col-left-controls">
+              <select x-model="townCommitteeFilter" @change="townDocPage=1" class="ctrl-select">
+                <option value="">All committees</option>
+                <template x-for="c in townDocCommittees" :key="c">
+                  <option :value="c" x-text="c.replace(/_/g,' ')"></option>
+                </template>
+              </select>
+              <select x-model="townStatusFilter" @change="loadTownDocs()" class="ctrl-select">
+                <option value="">All with links</option>
+                <option value="candidate">Has candidates</option>
+                <option value="confirmed">Has confirmed</option>
+                <option value="rejected">Has rejected</option>
+              </select>
+            </div>
+            <div class="col-left-list">
+              <template x-if="townDocListLoading">
+                <div class="loading-msg">Loading…</div>
+              </template>
+              <template x-if="!townDocListLoading && filteredTownDocs.length===0">
+                <div class="empty-state" style="height:100px;">No documents</div>
+              </template>
+              <template x-for="doc in pagedTownDocs" :key="doc.doc_id">
+                <div class="list-row" :class="{selected: selectedTownDocId===doc.doc_id}" @click="selectTownDoc(doc)">
+                  <div class="row-main" x-text="doc.committee.replace(/_/g,' ')"></div>
+                  <div class="row-sub">
+                    <span x-text="doc.doc_type"></span>
+                    <span x-text="doc.meeting_date ? ' · ' + doc.meeting_date : ''"></span>
+                  </div>
+                  <div style="display:flex;gap:.3rem;margin-top:.25rem;flex-wrap:wrap;">
+                    <span x-show="doc.n_candidate>0" style="font-size:10px;padding:.1rem .35rem;border-radius:3px;background:#fef9c3;color:#854d0e;font-weight:600;" x-text="doc.n_candidate+' pending'"></span>
+                    <span x-show="doc.n_confirmed>0" style="font-size:10px;padding:.1rem .35rem;border-radius:3px;background:#dcfce7;color:#166534;font-weight:600;" x-text="doc.n_confirmed+' confirmed'"></span>
+                    <span x-show="doc.n_rejected>0"  style="font-size:10px;padding:.1rem .35rem;border-radius:3px;background:#fee2e2;color:#991b1b;font-weight:600;" x-text="doc.n_rejected+' rejected'"></span>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <div class="col-left-footer">
+              <span x-text="filteredTownDocs.length.toLocaleString()+' docs'"></span>
+              <div style="display:flex;gap:.3rem;align-items:center;">
+                <button class="sort-dir-btn" :disabled="townDocPage<=1" @click="townDocPage--">&#8249;</button>
+                <span x-text="townDocPage+'/'+townDocTotalPages"></span>
+                <button class="sort-dir-btn" :disabled="townDocPage>=townDocTotalPages" @click="townDocPage++">&#8250;</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Middle: OCR text → picker → candidates (narrowed) -->
+          <div class="col-mid" style="flex:0 0 560px;border-right:1px solid #e2e8f0;">
+            <div x-show="!selectedTownDocId" class="empty-state" style="height:100%;">Select a document to adjudicate</div>
+            <div x-show="townDetailLoading" class="loading-msg">Loading…</div>
+            <div x-show="selectedTownDocId && !townDetailLoading && townDocDetail" class="col-mid-inner">
+
+                <!-- Doc header -->
+                <div style="margin-bottom:.75rem;">
+                  <div style="font-size:14px;font-weight:700;color:#0f172a;" x-text="townDocDetail && townDocDetail.doc.committee.replace(/_/g,' ')"></div>
+                  <div style="font-size:11px;color:#64748b;margin-top:2px;">
+                    <span x-text="townDocDetail && townDocDetail.doc.doc_type"></span>
+                    <span x-text="townDocDetail && townDocDetail.doc.meeting_date ? ' · ' + townDocDetail.doc.meeting_date : ''"></span>
+                  </div>
+                </div>
+
+                <!-- OCR text -->
+                <div style="margin-bottom:.75rem;border-bottom:1px solid #e2e8f0;padding-bottom:.75rem;">
+                  <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:.3rem;display:flex;justify-content:space-between;align-items:center;text-transform:uppercase;letter-spacing:.05em;">
+                    <span>OCR Text</span>
+                    <button @click="townOcrOpen=!townOcrOpen"
+                      style="font-size:11px;color:#94a3b8;background:none;border:none;cursor:pointer;padding:.1rem .3rem;text-transform:none;"
+                      x-text="townOcrOpen ? 'Hide' : 'Show'"></button>
+                  </div>
+                  <div x-show="townOcrOpen"
+                    style="font-size:11px;line-height:1.6;color:#374151;white-space:pre-wrap;word-break:break-word;max-height:260px;overflow-y:auto;background:#f8fafc;border-radius:4px;padding:.5rem .6rem;border:1px solid #e2e8f0;"
+                    x-text="townDocDetail && townDocDetail.doc.full_text"></div>
+                </div>
+
+                <!-- Parcel picker -->
+                <div style="margin-bottom:.75rem;border-bottom:1px solid #e2e8f0;padding-bottom:.75rem;">
+                  <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.05em;">Add Parcel</div>
+                  <div style="position:relative;">
+                    <input class="search-input" x-model.debounce.150ms="pickerQuery"
+                      placeholder="Address or parcel ID" type="search" autocomplete="off"
+                      style="font-size:12px;" @keydown.escape="pickerQuery=''">
+                    <div x-show="pickerQuery.trim() && pickerSuggestions.length"
+                      style="position:absolute;top:100%;left:0;right:0;z-index:30;background:#fff;border:1px solid #e2e8f0;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.1);max-height:200px;overflow-y:auto;">
+                      <template x-for="p in pickerSuggestions" :key="p.parcel_id">
+                        <div style="padding:.35rem .6rem;cursor:pointer;font-size:11.5px;border-bottom:1px solid #f8fafc;"
+                          @mousedown.prevent="addManualLink(p)">
+                          <div style="font-weight:600;color:#0f172a;" x-text="p.parcel_id"></div>
+                          <div style="color:#64748b;font-size:11px;" x-text="p.site_addr||''"></div>
+                          <div x-show="p.owner_name" style="color:#94a3b8;font-size:10px;" x-text="p.owner_name||''"></div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Candidates list placeholder (actual list rendered via x-if below, outside x-show) -->
+                <div>
+                  <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em;">Parcel References</div>
+                  <div x-show="visibleTownLinks.length===0"
+                    style="font-size:12px;color:#94a3b8;"
+                    x-text="townDocDetail && townDocDetail.links.length===0 ? 'No candidates detected by OCR.' : 'All links adjudicated for this filter.'"></div>
+                </div>
+
+            </div><!-- /col-mid-inner (no x-for inside) -->
+
+            <!-- Candidates: simple assignment in @click (the only thing that works in
+                 x-if scope); $watch in init() handles the actual work. -->
+            <template x-if="townDocDetail">
+              <div style="padding:0 1.1rem 1rem;"
+                @click="townAdjRequest = ($event.target.closest('button[name]')?.name || '') + ':' + ($event.target.closest('.lk-card')?.querySelector('.lk-pid')?.textContent?.trim() || '')">
+                <template x-for="lk in visibleTownLinks" :key="lk.link_id">
+                  <div :style="lk.status!=='candidate' ? 'opacity:.5' : ''" style="margin-bottom:.35rem;">
+                    <div class="lk-card" style="display:grid;grid-template-columns:1fr auto;align-items:start;gap:.5rem;padding:.45rem .55rem;border-radius:5px;border:1px solid #e2e8f0;background:#fff;">
+                      <div>
+                        <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;margin-bottom:.2rem;">
+                          <span class="lk-pid" style="font-size:11.5px;font-weight:700;color:#0f172a;" x-text="lk.parcel_id"></span>
+                          <span style="font-size:10px;padding:.1rem .3rem;border-radius:3px;"
+                            :style="lk.match_type==='ocr_map_lot'?'background:#dcfce7;color:#166534;':lk.match_type==='ocr_address'?'background:#dbeafe;color:#1d4ed8;':'background:#fef9c3;color:#854d0e;'"
+                            x-text="lk.match_type==='ocr_map_lot'?'Map/Lot':lk.match_type==='ocr_address'?'Address':'Manual'"></span>
+                        </div>
+                        <div style="font-size:11px;color:#374151;" x-text="(allParcels.find(p=>p.parcel_id===lk.parcel_id)||{}).site_addr||''"></div>
+                        <div style="font-size:10px;color:#94a3b8;" x-text="(allParcels.find(p=>p.parcel_id===lk.parcel_id)||{}).owner_name||''"></div>
+                        <div x-show="lk.match_text" style="font-size:10px;color:#94a3b8;margin-top:.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" :title="lk.match_text" x-text="lk.match_text"></div>
+                        <div x-show="lk.confidence" style="display:flex;align-items:center;gap:.35rem;margin-top:.2rem;">
+                          <div style="height:3px;background:#e2e8f0;border-radius:2px;width:80px;">
+                            <div style="height:3px;border-radius:2px;background:#3b82f6;" :style="'width:'+Math.round((lk.confidence||0)*100)+'%'"></div>
+                          </div>
+                          <span style="font-size:10px;color:#94a3b8;" x-text="Math.round((lk.confidence||0)*100)+'%'"></span>
+                        </div>
+                      </div>
+                      <!-- :style works on initial creation; :class does not in this
+                           Alpine 3.14 x-for/x-if context. Use inline style for states. -->
+                      <div style="display:flex;flex-direction:column;gap:.25rem;">
+                        <button type="button" name="confirmed" class="adj-btn"
+                          :style="lk.status==='confirmed' ? 'background:#dcfce7;border-color:#86efac;color:#166534;' : ''"
+                          style="font-size:11px;cursor:pointer;">Confirm</button>
+                        <button type="button" name="rejected" class="adj-btn"
+                          :style="lk.status==='rejected' ? 'background:#fee2e2;border-color:#fca5a5;color:#991b1b;' : ''"
+                          style="font-size:11px;cursor:pointer;">Reject</button>
+                        <button type="button" name="del" class="adj-btn"
+                          x-show="lk.match_type==='user_manual'"
+                          style="font-size:11px;cursor:pointer;color:#dc2626;border-color:#fca5a5;">Remove</button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+          </div><!-- /col-mid -->
+
+          <!-- Right: PDF (flex:1 so it fills remaining space) -->
+          <div class="col-right" style="flex:1;width:auto;">
+            <div class="col-right-header">Document View</div>
+            <div class="col-right-body">
+              <div x-show="!selectedTownDocId" class="empty-state">
+                <span class="empty-icon">📄</span><span>Click a document</span>
+              </div>
+              <iframe x-show="selectedTownDocId && townPdfUrl"
+                :src="townPdfUrl || ''"
+                style="flex:1;width:100%;height:100%;border:none;"></iframe>
+              <div x-show="selectedTownDocId && !townPdfUrl && !townDetailLoading"
+                class="empty-state">
+                <span style="color:#94a3b8;font-size:13px;">PDF not available locally</span>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /town_doc_links section -->
+
+        <!-- ── For Sale stub ───────────────────────────────────────────────── -->
+        <div class="tab-section" x-show="townSection==='for_sale'"
+          style="align-items:center;justify-content:center;color:#94a3b8;">
+          <div style="text-align:center;">
+            <div style="font-size:28px;margin-bottom:.5rem;opacity:.5;">$</div>
+            <div style="font-size:14px;font-weight:600;color:#475569;">For Sale Ingestion</div>
+            <div style="font-size:12px;margin-top:.35rem;">Manual for-sale data entry and parcel linkage — coming soon</div>
+          </div>
+        </div>
+
+    </div><!-- /town tab -->
+
   </div><!-- /main -->
 
   <!-- Tag picker close overlay (closes any open dropdown when clicking outside) -->
@@ -1487,7 +2012,18 @@
   </template>
 
   <script>
-    // ── Keyword metadata (priority order) ────────────────────────────────────
+    // ── System tag name → kw_* column (for client-side doc filtering) ────────
+    const _KW_COL_MAP = {
+      'Conservation Restriction':           'kw_conservation_restriction',
+      'Article 97':                         'kw_article_97',
+      'Deed Restriction':                   'kw_deed_restriction',
+      'Chapter 61':                         'kw_chapter_61',
+      'Ag. Preservation Restriction':       'kw_agricultural_preservation_restriction',
+      'Perpetual Restriction':              'kw_perpetual_restriction',
+      'CC&R':                               'kw_ccr',
+    };
+
+    // ── Keyword metadata (priority order, for detail view score bars) ─────────
     const KW_ORDER = [
       { key:'conservation_restriction',             label:'Conservation Restriction', abbr:'CR',  cls:'cr'  },
       { key:'article_97',                           label:'Article 97',               abbr:'A97', cls:'a97' },
@@ -1649,8 +2185,6 @@
         allParcels:          [],
         parcelsLoading:      true,
         parcelSearch:        '',
-        parcelSearchKeyword: null,
-        parcelSearchOpen:    false,
         parcelSort:          'site_addr',
         parcelSortDir:       'asc',
         parcelHideUnmappable: true,
@@ -1660,22 +2194,25 @@
         parcelDetail:        null,
         parcelDetailLoading: false,
         parcelDetailError:   null,
-        parcelSelectedDoc:   null,
-        parcelPdfUrl:        null,
+        parcelSelectedDoc:     null,
+        parcelPdfUrl:          null,
+        parcelSelectedTownDoc: null,
         parcelGisOpen:       {},
+        parcelTagFilter:     [],
+        parcelTaggedIds:     null,
 
-        // documents
-        allDocuments:      [],
-        docsLoading:       false,
+        // registry
+        allRegistry:       [],
+        regLoading:        false,
         docSearch:         '',
         docTypeFilter:     '',
-        docKwFilter:       '',
-        docKwThreshold:    0.5,
-        docKwAdjudications:{},
+        docTagFilter:      [],
+        docTagThreshold:   0.4,
+        docTaggedIds:      null,
         docSort:           'recorded_date',
         docSortDir:        'desc',
-        docPage:           1,
-        docPageSize:       50,
+        regPage:           1,
+        regPageSize:       50,
         docSelectedBP:     null,
         docDetail:         null,
         docDetailLoading:  false,
@@ -1703,6 +2240,25 @@
         selectedTag:     null,
         tagEditForm:     { isNew:false, name:'', states:[], statesRaw:'', newState:'', deprecated:false, displayOrder:0, saving:false, deleting:false, err:'', msg:'' },
         tagConfirmDialog:null,
+
+        // town
+        townSection:         'town_doc_links',
+        townDocList:         [],
+        townDocListLoading:  false,
+        townCommitteeFilter: '',
+        townStatusFilter:    'candidate',
+        townDocPage:         1,
+        townDocPageSize:     50,
+        selectedTownDocId:   null,
+        townDocDetail:       null,
+        townDetailLoading:   false,
+        townLinkPending:     {},
+        townPdfUrl:          null,
+        townOcrOpen:         false,
+        townAdjRequest:      null,   // set by x-if outer div @click; watched in init()
+        pickerQuery:            '',
+        townDocsOverview:       null,
+        parcelTownDocs:         null,
 
         // user-facing tags
         allTags:       [],
@@ -1742,66 +2298,28 @@
           );
         },
 
+        // ── Computed — tag filter options ───────────────────────────────────
+        get allDocTagOptions() {
+          return this.allTags.filter(t => t.target_entity === 'document' || t.target_entity === 'any');
+        },
+        get allParcelTagOptions() {
+          return this.allTags.filter(t => t.target_entity === 'parcel' || t.target_entity === 'any');
+        },
+
         // ── Computed — parcels ──────────────────────────────────────────────
-        get parcelKeywords() {
-          return [
-            { label: 'Wetlands',                      key: 'wetlands'      },
-            { label: 'Zone 1 WHP',                    key: 'zone1'         },
-            { label: 'Zone 2 WHP',                    key: 'zone2'         },
-            { label: 'Priority Habitat',              key: 'priority habitat' },
-            { label: 'Estimated Habitat',             key: 'estimated habitat' },
-            { label: 'BioMap3',                       key: 'biomap'        },
-            { label: 'Open Space',                    key: 'open space'    },
-            { label: 'Article 97',                    key: 'article97'     },
-            { label: 'CCR',                           key: 'ccr'           },
-            { label: 'Chapter 61',                    key: 'chapter61'     },
-            { label: 'Conservation Restriction',      key: 'conservation'  },
-            { label: 'Deed Restriction',              key: 'deed restriction' },
-            { label: 'Perpetual Restriction',         key: 'perpetual'     },
-            { label: 'Ag. Preservation Restriction',  key: 'apr'           },
-            { label: 'For Sale',                      key: 'for sale'      },
-          ];
-        },
-        get parcelKeywordSuggestions() {
-          const q = this.parcelSearch.trim().toLowerCase();
-          if (!q) return [];
-          return this.parcelKeywords.filter(k =>
-            k.label.toLowerCase().includes(q) || k.key.toLowerCase().includes(q)
-          );
-        },
         get filteredParcels() {
-          const q = this.parcelSearch.trim().toLowerCase();
-          const KW = {
-            'wetlands':          p => p.has_wetlands,
-            'zone1':             p => p.has_zone1,
-            'zone2':             p => p.has_zone2,
-            'habitat':           p => p.has_prihab || p.has_esthab,
-            'priority habitat':  p => p.has_prihab,
-            'estimated habitat': p => p.has_esthab,
-            'biomap':            p => p.has_bm3,
-            'bm3':               p => p.has_bm3,
-            'open space':        p => p.has_openspace,
-            'article97':         p => p.kw_article_97,
-            'ccr':               p => p.kw_ccr,
-            'chapter61':         p => p.kw_chapter_61,
-            'conservation':      p => p.kw_conservation_restriction || p.has_openspace,
-            'deed restriction':  p => p.kw_deed_restriction,
-            'perpetual':         p => p.kw_perpetual_restriction,
-            'apr':               p => p.kw_agricultural_preservation_restriction,
-            'for sale':          p => p.for_sale,
-          };
           let list = this.parcelHideUnmappable
             ? this.allParcels.filter(p => p.centroid_lat != null)
             : this.allParcels;
-          if (this.parcelSearchKeyword && KW[this.parcelSearchKeyword]) {
-            list = list.filter(KW[this.parcelSearchKeyword]);
-          } else if (q) {
+          if (this.parcelTagFilter.length && this.parcelTaggedIds !== null) {
+            list = list.filter(p => this.parcelTaggedIds.has(p.parcel_id));
+          }
+          const q = this.parcelSearch.trim().toLowerCase();
+          if (q) {
             list = list.filter(p =>
-              (p.site_addr     ||'').toLowerCase().includes(q) ||
-              (p.owner_name    ||'').toLowerCase().includes(q) ||
-              (p.parcel_id     ||'').toLowerCase().includes(q) ||
-              (p.property_class||'').toLowerCase().includes(q) ||
-              (p.use_code_desc ||'').toLowerCase().includes(q));
+              (p.site_addr  ||'').toLowerCase().includes(q) ||
+              (p.owner_name ||'').toLowerCase().includes(q) ||
+              (p.parcel_id  ||'').toLowerCase().includes(q));
           }
           const f = this.parcelSort, d = this.parcelSortDir==='asc'?1:-1;
           return [...list].sort((a,b)=>{
@@ -1815,13 +2333,15 @@
         get parcelTotalPages()    { return Math.max(1,Math.ceil(this.filteredParcels.length/this.parcelPageSize)); },
         get pagedParcels()        { const s=(this.parcelPage-1)*this.parcelPageSize; return this.filteredParcels.slice(s,s+this.parcelPageSize); },
 
-        // ── Computed — documents ────────────────────────────────────────────
+        // ── Computed — registry ─────────────────────────────────────────────
         get docTypes() {
-          return [...new Set(this.allDocuments.map(d=>d.instrument_type||'').filter(Boolean))].sort();
+          return [...new Set(this.allRegistry.map(d=>d.instrument_type||'').filter(Boolean))]
+            .filter(t => /^[A-Z][a-z]/.test(t))
+            .sort();
         },
-        get filteredDocuments() {
+        get filteredRegistry() {
           const q = this.docSearch.trim().toLowerCase();
-          let list = this.allDocuments;
+          let list = this.allRegistry;
           if (q) list = list.filter(d =>
             (d.grantor||'').toLowerCase().includes(q) ||
             (d.grantee||'').toLowerCase().includes(q) ||
@@ -1830,9 +2350,18 @@
             (d.book+'').includes(q) ||
             (d.page+'').includes(q));
           if (this.docTypeFilter) list = list.filter(d=>d.instrument_type===this.docTypeFilter);
-          if (this.docKwFilter) {
-            const thr = this.docKwThreshold, adjs = this.docKwAdjudications, kw = this.docKwFilter;
-            list = list.filter(d => adjs[d.book+'/'+d.page]==='yes' || (d['kw_'+kw]||0) >= thr);
+          if (this.docTagFilter.length) {
+            const tags = this.allDocTagOptions;
+            const thr  = this.docTagThreshold;
+            list = list.filter(d => this.docTagFilter.every(tagId => {
+              const tag = tags.find(t => t.tag_id === tagId);
+              if (!tag) return false;
+              if (tag.tag_type === 'system') {
+                const col = _KW_COL_MAP[tag.name];
+                return col && (d[col] || 0) >= thr;
+              }
+              return this.docTaggedIds ? this.docTaggedIds.has(d.book + '/' + d.page) : false;
+            }));
           }
           const f=this.docSort, dir=this.docSortDir==='asc'?1:-1;
           return [...list].sort((a,b)=>{
@@ -1842,9 +2371,46 @@
             return dir*String(av??'').localeCompare(String(bv??''),undefined,{numeric:true});
           });
         },
-        get docFilteredCount() { return this.filteredDocuments.length; },
-        get docTotalPages()    { return Math.max(1,Math.ceil(this.filteredDocuments.length/this.docPageSize)); },
-        get pagedDocuments()   { const s=(this.docPage-1)*this.docPageSize; return this.filteredDocuments.slice(s,s+this.docPageSize); },
+        get regFilteredCount() { return this.filteredRegistry.length; },
+        get regTotalPages()    { return Math.max(1,Math.ceil(this.filteredRegistry.length/this.regPageSize)); },
+        get pagedRegistry()    { const s=(this.regPage-1)*this.regPageSize; return this.filteredRegistry.slice(s,s+this.regPageSize); },
+
+        // ── Computed — town ─────────────────────────────────────────────────
+        get townDocCommittees() {
+          return [...new Set(this.townDocList.map(d=>d.committee))].sort();
+        },
+        get filteredTownDocs() {
+          let list = this.townDocList;
+          if (this.townCommitteeFilter)
+            list = list.filter(d => d.committee === this.townCommitteeFilter);
+          if (this.townStatusFilter)
+            list = list.filter(d => d['n_'+this.townStatusFilter] > 0);
+          return list;
+        },
+        get townDocTotalPages() { return Math.max(1, Math.ceil(this.filteredTownDocs.length / this.townDocPageSize)); },
+        get pagedTownDocs() {
+          const s = (this.townDocPage-1)*this.townDocPageSize;
+          return this.filteredTownDocs.slice(s, s+this.townDocPageSize);
+        },
+        get visibleTownLinks() {
+          if (!this.townDocDetail) return [];
+          const order = {candidate: 0, confirmed: 1, rejected: 2};
+          // Show all links sorted: pending first, then adjudicated (dimmed in UI).
+          // townStatusFilter controls which *docs* appear in the left list, not which
+          // links show here — items must stay visible so buttons can remain highlighted.
+          return [...this.townDocDetail.links].sort((a, b) => (order[a.status]??0) - (order[b.status]??0));
+        },
+        get pickerSuggestions() {
+          const q = this.pickerQuery.trim().toLowerCase();
+          if (!q) return [];
+          return this.allParcels
+            .filter(p =>
+              (p.site_addr||'').toLowerCase().includes(q) ||
+              (p.parcel_id||'').toLowerCase().includes(q) ||
+              (p.owner_name||'').toLowerCase().includes(q)
+            )
+            .slice(0, 10);
+        },
 
         // ── Export URLs ─────────────────────────────────────────────────────
         get parcelExportUrl() {
@@ -1856,7 +2422,6 @@
           const p = new URLSearchParams();
           if (this.docSearch.trim()) p.set('q', this.docSearch.trim());
           if (this.docTypeFilter) p.set('type', this.docTypeFilter);
-          if (this.docKwFilter) { p.set('kw', this.docKwFilter); p.set('kw_threshold', this.docKwThreshold); }
           return '/exports/documents.csv' + (p.size ? '?' + p : '');
         },
         get usageExportUrl() {
@@ -1867,28 +2432,52 @@
 
         // ── Init ────────────────────────────────────────────────────────────
         async init() {
-          this.$watch('parcelSearch',  ()=>{ this.parcelPage=1; });
-          this.$watch('parcelSort',    ()=>{ this.parcelPage=1; });
-          this.$watch('parcelSortDir', ()=>{ this.parcelPage=1; });
-          this.$watch('docSearch',     ()=>{ this.docPage=1; });
-          this.$watch('docTypeFilter', ()=>{ this.docPage=1; });
-          this.$watch('docKwFilter',   ()=>{ this.docPage=1; this.loadDocKwAdjudications(this.docKwFilter); });
-          this.$watch('docSort',       ()=>{ this.docPage=1; });
-          this.$watch('docSortDir',    ()=>{ this.docPage=1; });
+          this.$watch('parcelSearch',    ()=>{ this.parcelPage=1; });
+          this.$watch('parcelSort',      ()=>{ this.parcelPage=1; });
+          this.$watch('parcelSortDir',   ()=>{ this.parcelPage=1; });
+          this.$watch('parcelTagFilter', ()=>{ this.parcelPage=1; });
+          this.$watch('docSearch',       ()=>{ this.regPage=1; });
+          this.$watch('docTypeFilter',   ()=>{ this.regPage=1; });
+          this.$watch('docTagFilter',    ()=>{ this.regPage=1; });
+          this.$watch('docTagThreshold', ()=>{ this.regPage=1; });
+          this.$watch('docSort',         ()=>{ this.regPage=1; });
+          this.$watch('docSortDir',      ()=>{ this.regPage=1; });
           // when user closes a doc, the map re-appears — tell Leaflet to recalculate size
           this.$watch('parcelSelectedDoc', (val) => {
             if (!val && _lmap) this.$nextTick(() => _lmap.invalidateSize());
           });
-          this.loadOverview();
-          this.loadParcels();
-          if (CURRENT_USER) this.loadTags();
+          // Town adjudication: the outer x-if div's @click sets townAdjRequest
+          // to "action:linkId" via a simple DOM expression (only pattern that works
+          // in Alpine x-if scope). This watcher runs in the component scope where
+          // updateLinkStatus / deleteTownLink are properly accessible.
+          this.$watch('townAdjRequest', val => {
+            if (!val || typeof val !== 'string') return;
+            const colon = val.indexOf(':');
+            if (colon < 0) return;
+            const action   = val.slice(0, colon);
+            const parcelId = val.slice(colon + 1);
+            if (!action || !parcelId) return;
+            // Look up link_id by parcel_id — avoids any dynamic binding on buttons
+            const link = this.townDocDetail?.links.find(l => l.parcel_id === parcelId);
+            if (!link) return;
+            if (action === 'del') this.deleteTownLink(link.link_id);
+            else                  this.updateLinkStatus(link.link_id, action);
+            this.townAdjRequest = null;
+          });
+          if (CURRENT_USER) {
+            this.loadParcels();
+            this.loadTags();
+          }
         },
 
         // ── Tab switch ───────────────────────────────────────────────────────
         switchTab(tab) {
+          if (!CURRENT_USER && tab !== 'overview') return;
           this.activeTab = tab;
           this.tagPickerOpen = null;
-          if (tab==='documents' && this.allDocuments.length===0) this.loadDocuments();
+          if (tab==='assets' && !this.overviewData && !this.overviewLoading) this.loadOverview();
+          if (tab==='registry' && this.allRegistry.length===0) this.loadRegistry();
+          if (tab==='town' && this.townDocList.length===0) this.loadTownDocs();
           if (tab==='admin') { this.loadAdminUsers(); this.loadUsage(); this.adminSection = 'users'; }
           if (tab==='parcels' && _lmap) {
             setTimeout(() => {
@@ -1907,9 +2496,13 @@
         async loadOverview() {
           this.overviewLoading = true;
           try {
-            const r = await fetch('/api/overview');
-            if (!r.ok) throw new Error(r.status);
-            this.overviewData = await r.json();
+            const [ovR, tdR] = await Promise.all([
+              fetch('/api/overview'),
+              fetch('/api/town-docs/overview'),
+            ]);
+            if (!ovR.ok) throw new Error(ovR.status);
+            this.overviewData    = await ovR.json();
+            this.townDocsOverview = tdR.ok ? await tdR.json() : null;
           } catch(e) { console.error('overview:', e); }
           finally { this.overviewLoading = false; }
         },
@@ -1924,41 +2517,49 @@
           } finally { this.parcelsLoading = false; }
         },
 
-        async loadDocuments() {
-          this.docsLoading = true;
+        async loadRegistry() {
+          this.regLoading = true;
           try {
             const r = await fetch('/api/documents');
             if (!r.ok) throw new Error(r.status);
-            this.allDocuments = await r.json();
-          } catch(e) { console.error('documents:', e); }
-          finally { this.docsLoading = false; }
+            this.allRegistry = await r.json();
+            if (!this.docSelectedBP) {
+              const def = this.allRegistry.find(d => d.book === '35807' && d.page === '166');
+              if (def) this.selectDoc(def);
+            }
+          } catch(e) { console.error('registry:', e); }
+          finally { this.regLoading = false; }
         },
 
         // ── Actions — parcels ────────────────────────────────────────────────
         async selectParcel(p) {
           if (this.selectedParcelId===p.parcel_id) return;
-          this.selectedParcelId   = p.parcel_id;
-          this.parcelDetail       = null;
-          this.parcelSelectedDoc  = null;
-          this.parcelPdfUrl       = null;
+          this.selectedParcelId      = p.parcel_id;
+          this.parcelDetail          = null;
+          this.parcelSelectedDoc     = null;
+          this.parcelPdfUrl          = null;
+          this.parcelSelectedTownDoc = null;
           this.parcelGisOpen      = {};
           this.parcelDetailError  = null;
           this.parcelDetailLoading= true;
           this.parcelTagState     = {};
+          this.parcelTownDocs     = null;
           this.tagPickerOpen      = null;
           try {
-            const [detailResp, tagResp] = await Promise.all([
+            const [detailResp, tagResp, tdResp] = await Promise.all([
               fetch('/api/parcels/'+encodeURIComponent(p.parcel_id)),
               CURRENT_USER ? fetch('/api/tagging/parcel/'+encodeURIComponent(p.parcel_id)) : Promise.resolve(null),
+              fetch('/api/parcels/'+encodeURIComponent(p.parcel_id)+'/town-docs'),
             ]);
             if (!detailResp.ok) throw new Error('Server returned '+detailResp.status);
-            this.parcelDetail = await detailResp.json();
+            this.parcelDetail   = await detailResp.json();
+            this.parcelTownDocs = tdResp.ok ? await tdResp.json() : [];
             if (tagResp && tagResp.ok) {
               const td = await tagResp.json();
               this.allTags       = td.tags;
               this.parcelTagState = {};
               for (const [k, v] of Object.entries(td.current)) {
-                if (v !== null) this.parcelTagState[k] = v;
+                if (v !== null && v.state !== null) this.parcelTagState[k] = v.state;
               }
             }
             const parcel = this.parcelDetail.parcel;
@@ -1973,10 +2574,17 @@
         },
 
         selectParcelDoc(doc) {
-          this.parcelSelectedDoc = doc;
+          this.parcelSelectedDoc     = doc;
+          this.parcelSelectedTownDoc = null;
           this.parcelPdfUrl = doc.scan_cached
             ? '/api/documents/'+doc.book+'/'+doc.page+'/pdf'
             : null;
+        },
+
+        selectParcelTownDoc(td) {
+          this.parcelSelectedTownDoc = td;
+          this.parcelSelectedDoc     = null;
+          this.parcelPdfUrl          = null;
         },
 
         toggleGis(key) {
@@ -2015,19 +2623,47 @@
               this.allTags    = td.tags;
               this.docTagState = {};
               for (const [k, v] of Object.entries(td.current)) {
-                if (v !== null) this.docTagState[k] = v;
+                if (v !== null && v.state !== null) this.docTagState[k] = v.state;
               }
             }
           } catch(e) { this.docDetailError = e.message; }
           finally    { this.docDetailLoading = false; }
         },
 
-        async loadDocKwAdjudications(kwKey) {
-          if (!kwKey) { this.docKwAdjudications = {}; return; }
+        toggleDocTag(tagId) {
+          this.docTagFilter = this.docTagFilter.includes(tagId)
+            ? this.docTagFilter.filter(id => id !== tagId)
+            : [...this.docTagFilter, tagId];
+          this.refreshDocTagFilter();
+        },
+
+        async refreshDocTagFilter() {
+          const userTagIds = this.docTagFilter.filter(id => {
+            const tag = this.allDocTagOptions.find(t => t.tag_id === id);
+            return tag && tag.tag_type !== 'system';
+          });
+          if (!userTagIds.length) { this.docTaggedIds = null; return; }
           try {
-            const r = await fetch('/api/adjudications/by_keyword/'+kwKey);
-            this.docKwAdjudications = r.ok ? await r.json() : {};
-          } catch(e) { this.docKwAdjudications = {}; }
+            const url = '/api/tagged/document?tag_ids=' + userTagIds.join(',');
+            const r = await fetch(url);
+            this.docTaggedIds = r.ok ? new Set(await r.json()) : null;
+          } catch(e) { this.docTaggedIds = null; }
+        },
+
+        toggleParcelTag(tagId) {
+          this.parcelTagFilter = this.parcelTagFilter.includes(tagId)
+            ? this.parcelTagFilter.filter(id => id !== tagId)
+            : [...this.parcelTagFilter, tagId];
+          this.refreshParcelTagFilter();
+        },
+
+        async refreshParcelTagFilter() {
+          if (!this.parcelTagFilter.length) { this.parcelTaggedIds = null; return; }
+          try {
+            const url = '/api/tagged/parcel?tag_ids=' + this.parcelTagFilter.join(',');
+            const r = await fetch(url);
+            this.parcelTaggedIds = r.ok ? new Set(await r.json()) : new Set();
+          } catch(e) { this.parcelTaggedIds = new Set(); }
         },
 
         async adjudicate(kwKey, verdict) {
@@ -2035,10 +2671,8 @@
           const {book, page} = this.docSelectedBP;
           const tid   = book+'/'+page;
           const prior = this.docAdjudications[kwKey];
-          // Optimistic update
           this.docAdjudications = {...this.docAdjudications, [kwKey]: {verdict, username: CURRENT_USER?.username, created_at: new Date().toISOString()}};
           this.docAdjPending    = {...this.docAdjPending, [kwKey]: true};
-          if (verdict === 'yes') this.docKwAdjudications = {...this.docKwAdjudications, [tid]: 'yes'};
           try {
             const r = await fetch('/api/adjudications', {
               method: 'POST',
@@ -2046,16 +2680,9 @@
               body: JSON.stringify({target_type:'document', target_id:tid, keyword_id:kwKey, verdict}),
             });
             if (!r.ok) throw new Error(r.status);
-            // Refresh list adjudications so filter stays accurate
-            if (this.docKwFilter === kwKey) this.loadDocKwAdjudications(kwKey);
           } catch(e) {
             console.error('adjudication failed:', e);
             this.docAdjudications = {...this.docAdjudications, [kwKey]: prior||undefined};
-            if (prior) {
-              this.docKwAdjudications = {...this.docKwAdjudications, [tid]: prior.verdict};
-            } else {
-              const d = {...this.docKwAdjudications}; delete d[tid]; this.docKwAdjudications = d;
-            }
           } finally {
             this.docAdjPending = {...this.docAdjPending, [kwKey]: false};
           }
@@ -2078,6 +2705,105 @@
 
         verdictCls(verdict) {
           return verdict==='yes' ? 'verdict-yes' : verdict==='no' ? 'verdict-no' : verdict==='unclear' ? 'verdict-unclear' : 'verdict-none';
+        },
+
+        // ── Town ─────────────────────────────────────────────────────────────
+        async loadTownDocs() {
+          this.townDocListLoading = true;
+          try {
+            const r = await fetch('/api/town-docs');
+            this.townDocList = r.ok ? await r.json() : [];
+          } catch(e) { this.townDocList = []; }
+          finally { this.townDocListLoading = false; }
+        },
+
+        async selectTownDoc(doc) {
+          if (this.selectedTownDocId === doc.doc_id) return;
+          this.selectedTownDocId = doc.doc_id;
+          this.townDocDetail     = null;
+          this.townPdfUrl        = null;
+          this.townOcrOpen       = false;
+          this.townDetailLoading = true;
+          this.pickerQuery          = '';
+          // encode each path segment individually so slashes are preserved in the URL
+          const encId = doc.doc_id.split('/').map(encodeURIComponent).join('/');
+          try {
+            const r = await fetch('/api/town-docs/'+encId);
+            if (!r.ok) throw new Error(r.status);
+            this.townDocDetail = await r.json();
+            this.townPdfUrl    = '/api/town-docs/'+encId+'/pdf';
+          } catch(e) { console.error('town doc:', e); }
+          finally { this.townDetailLoading = false; }
+        },
+
+        async updateLinkStatus(linkId, status) {
+          // Optimistic: mutate the reactive link object immediately so button highlights
+          if (this.townDocDetail) {
+            const lk = this.townDocDetail.links.find(l => l.link_id === linkId);
+            if (lk) lk.status = status;
+          }
+          this.townLinkPending = {...this.townLinkPending, [linkId]: true};
+          try {
+            const r = await fetch('/api/hygiene/links/'+linkId, {
+              method: 'PATCH',
+              headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({status}),
+            });
+            if (!r.ok) throw new Error(r.status);
+            await this._reloadTownDetail();
+          } catch(e) {
+            console.error('update link:', e);
+            await this._reloadTownDetail(); // revert optimistic on error
+          }
+          finally { this.townLinkPending = {...this.townLinkPending, [linkId]: false}; }
+        },
+
+        async _reloadTownDetail() {
+          if (!this.selectedTownDocId) return;
+          const encId = this.selectedTownDocId.split('/').map(encodeURIComponent).join('/');
+          const r = await fetch('/api/town-docs/'+encId);
+          if (!r.ok) return;
+          this.townDocDetail = await r.json();
+          // Sync left-panel count badges for this doc
+          const docId = this.selectedTownDocId;
+          const idx   = this.townDocList.findIndex(d => d.doc_id === docId);
+          if (idx >= 0 && this.townDocDetail) {
+            const links = this.townDocDetail.links;
+            const updated = {
+              ...this.townDocList[idx],
+              n_candidate: links.filter(l => l.status === 'candidate').length,
+              n_confirmed: links.filter(l => l.status === 'confirmed').length,
+              n_rejected:  links.filter(l => l.status === 'rejected').length,
+            };
+            const next = [...this.townDocList];
+            next[idx] = updated;
+            this.townDocList = next;
+          }
+        },
+
+        async addManualLink(parcel) {
+          if (!this.townDocDetail) return;
+          const doc = this.townDocDetail.doc;
+          this.pickerQuery = '';
+          try {
+            const r = await fetch('/api/hygiene/links', {
+              method: 'POST',
+              headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({doc_id: doc.doc_id, parcel_id: parcel.parcel_id, source_type: doc.source_type}),
+            });
+            if (!r.ok) throw new Error(r.status);
+            await this._reloadTownDetail();
+          } catch(e) { console.error('add link:', e); }
+        },
+
+        async deleteTownLink(linkId) {
+          this.townLinkPending = {...this.townLinkPending, [linkId]: true};
+          try {
+            const r = await fetch('/api/hygiene/links/'+linkId, {method:'DELETE'});
+            if (!r.ok) throw new Error(r.status);
+            await this._reloadTownDetail();
+          } catch(e) { console.error('delete link:', e); }
+          finally { this.townLinkPending = {...this.townLinkPending, [linkId]: false}; }
         },
 
         // ── Tags (user-facing) ────────────────────────────────────────────────

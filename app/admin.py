@@ -125,7 +125,7 @@ def admin_list_tags():
         return jsonify({"error": "Forbidden"}), 403
     db = get_db()
     tags = db.execute(
-        "SELECT tag_id, name, states_csv, display_order, deprecated_at"
+        "SELECT tag_id, name, tag_type, target_entity, states_csv, display_order, deprecated_at"
         " FROM tags ORDER BY deprecated_at IS NOT NULL, display_order, tag_id"
     ).fetchall()
     usage = _tag_usage(db)

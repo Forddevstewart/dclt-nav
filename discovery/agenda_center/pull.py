@@ -67,23 +67,27 @@ def main() -> None:
     parser.add_argument("--end-date",   type=date.fromisoformat, default=None, metavar="YYYY-MM-DD")
     args = parser.parse_args()
 
-    if args.full:
-        log.info("=== Full scrape (year-by-year %d→today) ===", FULL_START.year)
-        total_new = _scrape_full()
-        log.info("Full scrape complete: %d new document(s) total", total_new)
-    else:
-        log.info("=== Stage 1: Scrape ===")
-        csv_path = scrape.run(start_date=args.start_date, end_date=args.end_date)
-        if csv_path is None:
-            log.info("No new assets found — nothing to do.")
-            sys.exit(0)
-        log.info("=== Stage 2: Ingest ===")
-        total_new = ingest.run(csv_path=csv_path)
-        log.info("Ingested %d new document(s)", total_new)
+    try:
+        if args.full:
+            log.info("=== Full scrape (year-by-year %d→today) ===", FULL_START.year)
+            total_new = _scrape_full()
+            log.info("Full scrape complete: %d new document(s) total", total_new)
+        else:
+            log.info("=== Stage 1: Scrape ===")
+            csv_path = scrape.run(start_date=args.start_date, end_date=args.end_date)
+            if csv_path is None:
+                log.info("No new assets found — nothing to do.")
+                sys.exit(0)
+            log.info("=== Stage 2: Ingest ===")
+            total_new = ingest.run(csv_path=csv_path)
+            log.info("Ingested %d new document(s)", total_new)
 
-    log.info("=== Stage 3: Download ===")
-    dl_ok, dl_err = download.run(limit=args.limit, delay=args.delay)
-    log.info("Download complete: %d ok, %d errors", dl_ok, dl_err)
+        log.info("=== Stage 3: Download ===")
+        dl_ok, dl_err = download.run(limit=args.limit, delay=args.delay)
+        log.info("Download complete: %d ok, %d errors", dl_ok, dl_err)
+    except KeyboardInterrupt:
+        log.info("Interrupted.")
+        sys.exit(0)
 
 
 if __name__ == "__main__":

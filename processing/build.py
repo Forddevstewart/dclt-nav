@@ -583,6 +583,87 @@ def _norm_addr(addr: str) -> str:
     return a
 
 
+# ── Town documents (agendacenter + documentcenter OCR sidecars) ───────────────
+
+_TD_DATE_RE  = re.compile(r"_(\d{2})(\d{2})(\d{4})-")   # MMDDYYYY in filename
+_TD_SOURCES  = ("agendacenter", "documentcenter")
+
+
+def _parse_td_date(stem: str) -> str | None:
+    m = _TD_DATE_RE.search(stem)
+    if not m:
+        return None
+    month, day, year = m.group(1), m.group(2), m.group(3)
+    try:
+        from datetime import date
+        return date(int(year), int(month), int(day)).isoformat()
+    except ValueError:
+        return None
+
+
+def load_town_docs(engine, ma_dennis_dir: Path) -> int:
+    if not ma_dennis_dir.exists():
+        print("  SKIP — ma-dennis directory not found")
+        return 0
+
+    records = []
+    for source_type in _TD_SOURCES:
+        subdir = ma_dennis_dir / source_type
+        if not subdir.exists():
+            continue
+        for json_path in sorted(subdir.rglob("*.json")):
+            try:
+                data = json.loads(json_path.read_text(encoding="utf-8"))
+            except Exception as e:
+                print(f"  WARN {json_path}: {e}")
+                continue
+            if "error" in data:
+                continue
+
+            pages    = data.get("pages", [])
+            full_text = "\n\n".join(pg.get("text", "") for pg in pages).strip()
+            stem     = json_path.stem
+            # committee = immediate parent dir for agendacenter; source_type otherwise
+            committee = (
+                json_path.parent.name
+                if source_type == "agendacenter" and json_path.parent != subdir
+                else source_type
+            )
+            doc_type_raw = stem.split("_")[0] if "_" in stem else "unknown"
+
+            records.append({
+                "doc_id":       f"{source_type}/{json_path.parent.name}/{stem}",
+                "source_type":  source_type,
+                "committee":    committee,
+                "doc_type":     doc_type_raw,
+                "meeting_date": _parse_td_date(stem),
+                "source_path":  data.get("source_path", ""),
+                "page_count":   data.get("page_count", len(pages)),
+                "full_text":    full_text,
+                "processed_at": data.get("processed_at"),
+                "source_hash":  data.get("source_hash"),
+            })
+
+    if not records:
+        return 0
+
+    df = pd.DataFrame(records)
+    df["_loaded_at"] = now_utc()
+    df.to_sql("town_docs", engine, if_exists="replace", index=False)
+
+    with engine.begin() as con:
+        con.execute(text("DROP TABLE IF EXISTS town_docs_fts"))
+        con.execute(text("""
+            CREATE VIRTUAL TABLE town_docs_fts
+            USING fts5(doc_id, full_text, content=town_docs, content_rowid=rowid)
+        """))
+        con.execute(text("INSERT INTO town_docs_fts(town_docs_fts) VALUES('rebuild')"))
+
+    return len(records)
+
+
+# ── For-sale listings (manually pasted from Zillow) ──────────────────────────
+
 def load_for_sale(engine, path: Path) -> int:
     if not path.exists():
         print("  SKIP — HomeForSale.txt not found")
@@ -819,6 +900,7 @@ def main() -> None:
     massgis_path = gis_files[0]["abs_path"] if gis_files else root / "gis" / "dennis_parcels.geojson"
 
     warrants_path       = root / "ma-dennis" / "town_meeting_all_years.csv"
+    ma_dennis_dir       = root / "ma-dennis"
     soil_path           = root / "gis" / "dennis_soil.csv"
     gis_dir             = root / "gis"
     registry_index      = cfg.output_dir("registry") / "index"
@@ -835,6 +917,7 @@ def main() -> None:
 
     for label, path in [
         ("Warrants",       warrants_path),
+        ("Town docs dir",  ma_dennis_dir),
         ("Soil CSV",       soil_path),
         ("GIS layers dir", gis_dir),
         ("Registry index", registry_index),
@@ -871,6 +954,7 @@ def main() -> None:
         ("load_registry",  registry_index, lambda e: load_registry(e, registry_index)),
         ("load_ocr",       registry_docs,  lambda e: load_ocr(e, registry_docs)),
         ("load_for_sale",  for_sale_path,  lambda e: load_for_sale(e, for_sale_path)),
+        ("load_town_docs", ma_dennis_dir,  lambda e: load_town_docs(e, ma_dennis_dir)),
         ("schema_columns",  None,           lambda e: load_schema_columns(e)),
         ("gis_sources",     None,           lambda e: load_gis_sources(e)),
         ("ref_use_codes",   None,           lambda e: load_ref_use_codes(e)),

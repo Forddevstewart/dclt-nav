@@ -121,4 +121,64 @@ CREATE TRIGGER IF NOT EXISTS no_del_taggings
     BEFORE DELETE ON taggings
     BEGIN SELECT RAISE(FAIL,'taggings is append-only'); END;
 """),
+    (5, """
+ALTER TABLE tags ADD COLUMN tag_type TEXT NOT NULL DEFAULT 'user';
+
+ALTER TABLE taggings ADD COLUMN confidence REAL;
+ALTER TABLE taggings ADD COLUMN source TEXT;
+
+INSERT OR IGNORE INTO tags (name, tag_type, states_csv, display_order) VALUES
+    ('Conservation Restriction',           'system', 'system', 100),
+    ('Article 97',                         'system', 'system', 101),
+    ('Deed Restriction',                   'system', 'system', 102),
+    ('Chapter 61',                         'system', 'system', 103),
+    ('Ag. Preservation Restriction',       'system', 'system', 104),
+    ('Perpetual Restriction',              'system', 'system', 105),
+    ('CC&R',                               'system', 'system', 106);
+"""),
+    (6, """
+ALTER TABLE tags ADD COLUMN target_entity TEXT NOT NULL DEFAULT 'any';
+UPDATE tags SET target_entity = 'document' WHERE tag_type = 'system';
+"""),
+    (7, """
+INSERT OR IGNORE INTO tags (name, tag_type, target_entity, states_csv, display_order) VALUES
+    ('Zone 1 WHP',       'system', 'parcel', 'system', 200),
+    ('Zone 2 WHP',       'system', 'parcel', 'system', 201),
+    ('Priority Habitat', 'system', 'parcel', 'system', 202),
+    ('Est. Habitat',     'system', 'parcel', 'system', 203),
+    ('Nat. Community',   'system', 'parcel', 'system', 204),
+    ('BioMap3 VP',       'system', 'parcel', 'system', 205),
+    ('BioMap3 Wetland',  'system', 'parcel', 'system', 206),
+    ('BioMap3 Core',     'system', 'parcel', 'system', 207),
+    ('BioMap3 CNL',      'system', 'parcel', 'system', 208),
+    ('Open Space',       'system', 'parcel', 'system', 209),
+    ('Wetlands',         'system', 'parcel', 'system', 210),
+    ('Structures',       'system', 'parcel', 'system', 211),
+    ('Soil',             'system', 'parcel', 'system', 212);
+"""),
+    (8, """
+INSERT OR IGNORE INTO tags (name, tag_type, target_entity, states_csv, display_order) VALUES
+    ('For Sale', 'system', 'parcel', 'system', 213);
+"""),
+    (9, """
+CREATE TABLE IF NOT EXISTS parcel_links (
+    link_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_id       TEXT    NOT NULL,
+    source_type  TEXT    NOT NULL,
+    parcel_id    TEXT    NOT NULL,
+    match_type   TEXT,
+    match_text   TEXT,
+    confidence   REAL,
+    status       TEXT    NOT NULL DEFAULT 'candidate'
+                     CHECK(status IN ('candidate','confirmed','rejected')),
+    reviewed_by  INTEGER,
+    reviewed_at  TEXT,
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(doc_id, parcel_id)
+);
+CREATE INDEX IF NOT EXISTS idx_parcel_links_doc
+    ON parcel_links (doc_id);
+CREATE INDEX IF NOT EXISTS idx_parcel_links_parcel
+    ON parcel_links (parcel_id, status);
+"""),
 ]

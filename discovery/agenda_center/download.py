@@ -101,15 +101,18 @@ def run(limit: int | None = None, delay: float = 1.0) -> tuple[int, int]:
         assets_dir = _assets_dir()
         log.info("Downloading %d document(s) → %s (delay=%.1fs)", len(pending), assets_dir, delay)
         last_fetched = False
-        for doc in pending:
-            if last_fetched and delay > 0:
-                time.sleep(delay)
-            result, fetched = _download_one(doc)
-            last_fetched = fetched
-            if result:
-                ok += 1
-            else:
-                errors += 1
+        try:
+            for doc in pending:
+                if last_fetched and delay > 0:
+                    time.sleep(delay)
+                result, fetched = _download_one(doc)
+                last_fetched = fetched
+                if result:
+                    ok += 1
+                else:
+                    errors += 1
+        except KeyboardInterrupt:
+            log.info("Interrupted — committing progress (%d ok, %d errors so far)", ok, errors)
 
     log.info("Downloaded: %d  Errors: %d", ok, errors)
     return ok, errors

@@ -1,8 +1,9 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from flask import Blueprint, jsonify, send_file, redirect, abort
-from .models import get_all_items, get_reference_db
+from flask import Blueprint, jsonify, send_file, redirect, abort, request
+from flask_login import current_user, login_required
+from .models import get_all_items, get_reference_db, get_db
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -484,3 +485,264 @@ def document_pdf(book, page):
         return redirect(url)
 
     abort(404)
+
+
+# ── Town docs ─────────────────────────────────────────────────────────────────
+
+@bp.route("/town-docs/overview")
+def town_docs_overview():
+    db = get_reference_db()
+    if not _table_exists(db, "town_docs"):
+        db.close()
+        return jsonify({"total": 0, "by_committee": [], "by_doc_type": []})
+
+    total = db.execute("SELECT COUNT(*) FROM town_docs").fetchone()[0]
+    by_committee = [
+        dict(r) for r in db.execute(
+            "SELECT committee, COUNT(*) n FROM town_docs"
+            " GROUP BY committee ORDER BY n DESC"
+        ).fetchall()
+    ]
+    by_doc_type = [
+        dict(r) for r in db.execute(
+            "SELECT doc_type, COUNT(*) n FROM town_docs"
+            " GROUP BY doc_type ORDER BY n DESC"
+        ).fetchall()
+    ]
+    db.close()
+    return jsonify({"total": total, "by_committee": by_committee, "by_doc_type": by_doc_type})
+
+
+@bp.route("/town-docs")
+def town_docs_list():
+    """List town docs that have at least one candidate link, with candidate counts."""
+    ref  = get_reference_db()
+    dclt = get_db()
+
+    if not _table_exists(ref, "town_docs"):
+        ref.close(); dclt.close()
+        return jsonify([])
+
+    has_links = _table_exists(dclt, "parcel_links")
+    committee = request.args.get("committee", "")
+    status    = request.args.get("status", "")   # 'candidate','confirmed','rejected','' = all with candidates
+
+    where_td = "WHERE full_text IS NOT NULL AND full_text != ''"
+    params: list = []
+    if committee:
+        where_td += " AND committee = ?"
+        params.append(committee)
+
+    if has_links:
+        rows_td = ref.execute(
+            f"SELECT doc_id, source_type, committee, doc_type, meeting_date, page_count"
+            f" FROM town_docs {where_td} ORDER BY meeting_date DESC NULLS LAST, committee",
+            params[:1] if committee else [],
+        ).fetchall()
+
+        doc_ids = [r["doc_id"] for r in rows_td]
+        link_counts: dict[str, dict] = {}
+        if doc_ids:
+            placeholders = ",".join("?" * len(doc_ids))
+            link_rows = dclt.execute(
+                f"SELECT doc_id, status, COUNT(*) n FROM parcel_links"
+                f" WHERE doc_id IN ({placeholders}) GROUP BY doc_id, status",
+                doc_ids,
+            ).fetchall()
+            for lr in link_rows:
+                lc = link_counts.setdefault(lr["doc_id"], {"n_candidate": 0, "n_confirmed": 0, "n_rejected": 0})
+                lc[f"n_{lr['status']}"] = lr["n"]
+
+        # Deduplicate by (committee, meeting_date): prefer 'Updated' doc_type,
+        # summing link counts from both so no hygiene work is hidden.
+        seen_key: dict[tuple, int] = {}  # (committee, meeting_date) -> index in result
+        result = []
+        for r in rows_td:
+            lc     = link_counts.get(r["doc_id"], {})
+            n_cand = lc.get("n_candidate", 0)
+            n_conf = lc.get("n_confirmed", 0)
+            n_rej  = lc.get("n_rejected",  0)
+            n_total = n_cand + n_conf + n_rej
+            if n_total == 0:
+                continue   # skip docs with no links at all
+            if status and lc.get(f"n_{status}", 0) == 0:
+                continue   # status filter: skip docs without that bucket
+            key = (r["committee"], r["meeting_date"])
+            if key in seen_key:
+                idx = seen_key[key]
+                existing = result[idx]
+                existing["n_candidate"] += n_cand
+                existing["n_confirmed"] += n_conf
+                existing["n_rejected"]  += n_rej
+                if r["doc_type"] == "Updated":
+                    # promote to the Updated doc_id so detail view shows the right doc
+                    existing.update({k: r[k] for k in ("doc_id", "source_type", "doc_type", "page_count")})
+            else:
+                row = dict(r)
+                row.update({"n_candidate": n_cand, "n_confirmed": n_conf, "n_rejected": n_rej})
+                seen_key[key] = len(result)
+                result.append(row)
+    else:
+        rows_td = ref.execute(
+            f"SELECT doc_id, source_type, committee, doc_type, meeting_date, page_count"
+            f" FROM town_docs {where_td} ORDER BY meeting_date DESC NULLS LAST, committee",
+            params[:1] if committee else [],
+        ).fetchall()
+        result = [dict(r) | {"n_candidate": 0, "n_confirmed": 0, "n_rejected": 0}
+                  for r in rows_td]
+
+    ref.close(); dclt.close()
+    return jsonify(result)
+
+
+@bp.route("/town-docs/<path:doc_id>")
+def town_doc_detail(doc_id):
+    ref  = get_reference_db()
+    dclt = get_db()
+
+    doc = ref.execute(
+        "SELECT * FROM town_docs WHERE doc_id = ? LIMIT 1", (doc_id,)
+    ).fetchone()
+    if not doc:
+        ref.close(); dclt.close()
+        abort(404)
+
+    links = []
+    if _table_exists(dclt, "parcel_links"):
+        links = [dict(r) for r in dclt.execute(
+            "SELECT link_id, parcel_id, match_type, match_text, confidence, status,"
+            "       reviewed_by, reviewed_at, created_at"
+            " FROM parcel_links WHERE doc_id = ?"
+            " ORDER BY confidence DESC, parcel_id",
+            (doc_id,),
+        ).fetchall()]
+
+    ref.close(); dclt.close()
+    return jsonify({"doc": dict(doc), "links": links})
+
+
+# ── Data Hygiene — parcel link adjudication ───────────────────────────────────
+
+@bp.route("/hygiene/links/<int:link_id>", methods=["PATCH"])
+@login_required
+def hygiene_update_link(link_id):
+    data   = request.get_json() or {}
+    status = data.get("status", "")
+    if status not in ("candidate", "confirmed", "rejected"):
+        return jsonify({"error": "status must be candidate, confirmed, or rejected"}), 400
+
+    db = get_db()
+    row = db.execute("SELECT link_id FROM parcel_links WHERE link_id = ?", (link_id,)).fetchone()
+    if not row:
+        db.close()
+        return jsonify({"error": "not found"}), 404
+
+    db.execute(
+        "UPDATE parcel_links SET status=?, reviewed_by=?, reviewed_at=datetime('now') WHERE link_id=?",
+        (status, current_user.id, link_id),
+    )
+    db.commit()
+    db.close()
+    return jsonify({"ok": True})
+
+
+@bp.route("/hygiene/links", methods=["POST"])
+@login_required
+def hygiene_create_link():
+    """Create a manual confirmed link (user-picked parcel not detected by OCR)."""
+    data        = request.get_json() or {}
+    doc_id      = (data.get("doc_id") or "").strip()
+    parcel_id   = (data.get("parcel_id") or "").strip()
+    source_type = (data.get("source_type") or "agendacenter").strip()
+
+    if not doc_id or not parcel_id:
+        return jsonify({"error": "doc_id and parcel_id required"}), 400
+
+    db = get_db()
+    try:
+        cur = db.execute(
+            """INSERT INTO parcel_links (doc_id, source_type, parcel_id, match_type, confidence,
+                   status, reviewed_by, reviewed_at)
+               VALUES (?, ?, ?, 'user_manual', 1.0, 'confirmed', ?, datetime('now'))
+               ON CONFLICT(doc_id, parcel_id) DO UPDATE SET
+                   status='confirmed', match_type='user_manual',
+                   reviewed_by=excluded.reviewed_by, reviewed_at=excluded.reviewed_at""",
+            (doc_id, source_type, parcel_id, current_user.id),
+        )
+        db.commit()
+        link_id = cur.lastrowid
+    except Exception as e:
+        db.close()
+        return jsonify({"error": str(e)}), 500
+    db.close()
+    return jsonify({"ok": True, "link_id": link_id}), 201
+
+
+@bp.route("/hygiene/links/<int:link_id>", methods=["DELETE"])
+@login_required
+def hygiene_delete_link(link_id):
+    db = get_db()
+    row = db.execute("SELECT link_id, status FROM parcel_links WHERE link_id = ?", (link_id,)).fetchone()
+    if not row:
+        db.close()
+        return jsonify({"error": "not found"}), 404
+    db.execute("DELETE FROM parcel_links WHERE link_id = ?", (link_id,))
+    db.commit()
+    db.close()
+    return jsonify({"ok": True})
+
+
+@bp.route("/town-docs/<path:doc_id>/pdf")
+def town_doc_pdf(doc_id):
+    ref = get_reference_db()
+    doc = ref.execute(
+        "SELECT source_path FROM town_docs WHERE doc_id = ? LIMIT 1", (doc_id,)
+    ).fetchone()
+    ref.close()
+    if not doc or not doc["source_path"]:
+        abort(404)
+    from discovery.config import get_config
+    pdf_path = get_config().root / "ma-dennis" / doc["source_path"]
+    if not pdf_path.exists():
+        abort(404)
+    return send_file(pdf_path, mimetype="application/pdf")
+
+
+@bp.route("/parcels/<parcel_id>/town-docs")
+def parcel_town_docs(parcel_id):
+    """Confirmed town doc links for a parcel, with doc metadata from reference.db."""
+    dclt = get_db()
+    ref  = get_reference_db()
+
+    if not _table_exists(dclt, "parcel_links"):
+        dclt.close(); ref.close()
+        return jsonify([])
+
+    links = dclt.execute(
+        "SELECT link_id, doc_id, source_type, match_type, confidence, created_at"
+        " FROM parcel_links WHERE parcel_id = ? AND status = 'confirmed'"
+        " ORDER BY created_at DESC",
+        (parcel_id,),
+    ).fetchall()
+
+    result = []
+    seen = {}  # (committee, meeting_date) -> index in result; prefer 'Updated' doc_type
+    for lk in links:
+        doc = ref.execute(
+            "SELECT committee, doc_type, meeting_date, source_path, page_count"
+            " FROM town_docs WHERE doc_id = ? LIMIT 1",
+            (lk["doc_id"],),
+        ).fetchone()
+        row = dict(lk)
+        if doc:
+            row.update(dict(doc))
+        key = (row.get("committee"), row.get("meeting_date"))
+        if key in seen:
+            if row.get("doc_type") == "Updated":
+                result[seen[key]] = row
+        else:
+            seen[key] = len(result)
+            result.append(row)
+
+    dclt.close(); ref.close()
+    return jsonify(result)
