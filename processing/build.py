@@ -723,6 +723,13 @@ def load_for_sale(engine, path: Path) -> int:
     return len(df)
 
 
+# ── Town doc → parcel link candidates ────────────────────────────────────────
+
+def _load_link_candidates(engine) -> int:
+    from .town_doc_candidates import load_parcel_link_candidates
+    return load_parcel_link_candidates(engine)
+
+
 # ── Reference tables ──────────────────────────────────────────────────────────
 
 def load_schema_columns(engine) -> int:
@@ -955,6 +962,7 @@ def main() -> None:
         ("load_ocr",       registry_docs,  lambda e: load_ocr(e, registry_docs)),
         ("load_for_sale",  for_sale_path,  lambda e: load_for_sale(e, for_sale_path)),
         ("load_town_docs", ma_dennis_dir,  lambda e: load_town_docs(e, ma_dennis_dir)),
+        ("link_candidates", None,           lambda e: _load_link_candidates(e)),
         ("schema_columns",  None,           lambda e: load_schema_columns(e)),
         ("gis_sources",     None,           lambda e: load_gis_sources(e)),
         ("ref_use_codes",   None,           lambda e: load_ref_use_codes(e)),

@@ -513,9 +513,19 @@ def town_docs_overview():
     return jsonify({"total": total, "by_committee": by_committee, "by_doc_type": by_doc_type})
 
 
+def _link_counts(cand_parcel_ids: set, adj_map: dict) -> tuple[int, int, int]:
+    """Return (n_candidate, n_confirmed, n_rejected) for a single doc."""
+    n_confirmed = sum(1 for s in adj_map.values() if s in ("confirmed", "user_manual"))
+    n_rejected  = sum(1 for s in adj_map.values() if s == "rejected")
+    n_candidate = len(cand_parcel_ids - set(adj_map.keys()))
+    return n_candidate, n_confirmed, n_rejected
+
+
 @bp.route("/town-docs")
 def town_docs_list():
     """List town docs that have at least one candidate link, with candidate counts."""
+    from collections import defaultdict
+
     ref  = get_reference_db()
     dclt = get_db()
 
@@ -523,9 +533,9 @@ def town_docs_list():
         ref.close(); dclt.close()
         return jsonify([])
 
-    has_links = _table_exists(dclt, "parcel_links")
+    has_candidates = _table_exists(ref, "parcel_link_candidates")
     committee = request.args.get("committee", "")
-    status    = request.args.get("status", "")   # 'candidate','confirmed','rejected','' = all with candidates
+    status    = request.args.get("status", "")
 
     where_td = "WHERE full_text IS NOT NULL AND full_text != ''"
     params: list = []
@@ -533,63 +543,69 @@ def town_docs_list():
         where_td += " AND committee = ?"
         params.append(committee)
 
-    if has_links:
-        rows_td = ref.execute(
-            f"SELECT doc_id, source_type, committee, doc_type, meeting_date, page_count"
-            f" FROM town_docs {where_td} ORDER BY meeting_date DESC NULLS LAST, committee",
-            params[:1] if committee else [],
-        ).fetchall()
+    rows_td = ref.execute(
+        f"SELECT doc_id, source_type, committee, doc_type, meeting_date, page_count"
+        f" FROM town_docs {where_td} ORDER BY meeting_date DESC NULLS LAST, committee",
+        params,
+    ).fetchall()
 
-        doc_ids = [r["doc_id"] for r in rows_td]
-        link_counts: dict[str, dict] = {}
-        if doc_ids:
-            placeholders = ",".join("?" * len(doc_ids))
-            link_rows = dclt.execute(
-                f"SELECT doc_id, status, COUNT(*) n FROM parcel_links"
-                f" WHERE doc_id IN ({placeholders}) GROUP BY doc_id, status",
-                doc_ids,
-            ).fetchall()
-            for lr in link_rows:
-                lc = link_counts.setdefault(lr["doc_id"], {"n_candidate": 0, "n_confirmed": 0, "n_rejected": 0})
-                lc[f"n_{lr['status']}"] = lr["n"]
-
-        # Deduplicate by (committee, meeting_date): prefer 'Updated' doc_type,
-        # summing link counts from both so no hygiene work is hidden.
-        seen_key: dict[tuple, int] = {}  # (committee, meeting_date) -> index in result
-        result = []
-        for r in rows_td:
-            lc     = link_counts.get(r["doc_id"], {})
-            n_cand = lc.get("n_candidate", 0)
-            n_conf = lc.get("n_confirmed", 0)
-            n_rej  = lc.get("n_rejected",  0)
-            n_total = n_cand + n_conf + n_rej
-            if n_total == 0:
-                continue   # skip docs with no links at all
-            if status and lc.get(f"n_{status}", 0) == 0:
-                continue   # status filter: skip docs without that bucket
-            key = (r["committee"], r["meeting_date"])
-            if key in seen_key:
-                idx = seen_key[key]
-                existing = result[idx]
-                existing["n_candidate"] += n_cand
-                existing["n_confirmed"] += n_conf
-                existing["n_rejected"]  += n_rej
-                if r["doc_type"] == "Updated":
-                    # promote to the Updated doc_id so detail view shows the right doc
-                    existing.update({k: r[k] for k in ("doc_id", "source_type", "doc_type", "page_count")})
-            else:
-                row = dict(r)
-                row.update({"n_candidate": n_cand, "n_confirmed": n_conf, "n_rejected": n_rej})
-                seen_key[key] = len(result)
-                result.append(row)
-    else:
-        rows_td = ref.execute(
-            f"SELECT doc_id, source_type, committee, doc_type, meeting_date, page_count"
-            f" FROM town_docs {where_td} ORDER BY meeting_date DESC NULLS LAST, committee",
-            params[:1] if committee else [],
-        ).fetchall()
+    if not has_candidates:
+        ref.close(); dclt.close()
         result = [dict(r) | {"n_candidate": 0, "n_confirmed": 0, "n_rejected": 0}
                   for r in rows_td]
+        return jsonify(result)
+
+    doc_ids = [r["doc_id"] for r in rows_td]
+    if not doc_ids:
+        ref.close(); dclt.close()
+        return jsonify([])
+
+    placeholders = ",".join("?" * len(doc_ids))
+
+    # Candidates from reference.db: doc_id -> set of parcel_ids
+    cand_by_doc: dict[str, set] = defaultdict(set)
+    for r in ref.execute(
+        f"SELECT doc_id, parcel_id FROM parcel_link_candidates WHERE doc_id IN ({placeholders})",
+        doc_ids,
+    ).fetchall():
+        cand_by_doc[r["doc_id"]].add(r["parcel_id"])
+
+    # Adjudications from dclt.db: doc_id -> {parcel_id: status}
+    adj_by_doc: dict[str, dict] = defaultdict(dict)
+    if _table_exists(dclt, "parcel_link_adjudications"):
+        for r in dclt.execute(
+            f"SELECT doc_id, parcel_id, status FROM parcel_link_adjudications"
+            f" WHERE doc_id IN ({placeholders})",
+            doc_ids,
+        ).fetchall():
+            adj_by_doc[r["doc_id"]][r["parcel_id"]] = r["status"]
+
+    seen_key: dict[tuple, int] = {}
+    result = []
+    for r in rows_td:
+        did = r["doc_id"]
+        n_cand, n_conf, n_rej = _link_counts(cand_by_doc.get(did, set()), adj_by_doc.get(did, {}))
+        n_total = n_cand + n_conf + n_rej
+        if n_total == 0:
+            continue
+        if status == "candidate"  and n_cand == 0: continue
+        if status == "confirmed"  and n_conf == 0: continue
+        if status == "rejected"   and n_rej  == 0: continue
+
+        key = (r["committee"], r["meeting_date"])
+        if key in seen_key:
+            idx = seen_key[key]
+            existing = result[idx]
+            existing["n_candidate"] += n_cand
+            existing["n_confirmed"] += n_conf
+            existing["n_rejected"]  += n_rej
+            if r["doc_type"] == "Updated":
+                existing.update({k: r[k] for k in ("doc_id", "source_type", "doc_type", "page_count")})
+        else:
+            row = dict(r)
+            row.update({"n_candidate": n_cand, "n_confirmed": n_conf, "n_rejected": n_rej})
+            seen_key[key] = len(result)
+            result.append(row)
 
     ref.close(); dclt.close()
     return jsonify(result)
@@ -607,15 +623,57 @@ def town_doc_detail(doc_id):
         ref.close(); dclt.close()
         abort(404)
 
-    links = []
-    if _table_exists(dclt, "parcel_links"):
-        links = [dict(r) for r in dclt.execute(
-            "SELECT link_id, parcel_id, match_type, match_text, confidence, status,"
-            "       reviewed_by, reviewed_at, created_at"
-            " FROM parcel_links WHERE doc_id = ?"
+    # Candidates from reference.db
+    candidates = []
+    if _table_exists(ref, "parcel_link_candidates"):
+        candidates = ref.execute(
+            "SELECT parcel_id, source_type, match_type, match_text, confidence"
+            " FROM parcel_link_candidates WHERE doc_id = ?"
             " ORDER BY confidence DESC, parcel_id",
             (doc_id,),
-        ).fetchall()]
+        ).fetchall()
+
+    # Adjudications from dclt.db
+    adj_map: dict[str, dict] = {}
+    if _table_exists(dclt, "parcel_link_adjudications"):
+        for r in dclt.execute(
+            "SELECT parcel_id, status, reviewed_by, reviewed_at"
+            " FROM parcel_link_adjudications WHERE doc_id = ?",
+            (doc_id,),
+        ).fetchall():
+            adj_map[r["parcel_id"]] = dict(r)
+
+    cand_pids = {c["parcel_id"] for c in candidates}
+    links = []
+    for c in candidates:
+        pid = c["parcel_id"]
+        adj = adj_map.get(pid, {})
+        links.append({
+            "link_id":     doc_id + "|" + pid,
+            "parcel_id":   pid,
+            "source_type": c["source_type"],
+            "match_type":  c["match_type"],
+            "match_text":  c["match_text"],
+            "confidence":  c["confidence"],
+            "status":      adj.get("status", "candidate"),
+            "reviewed_by": adj.get("reviewed_by"),
+            "reviewed_at": adj.get("reviewed_at"),
+        })
+
+    # User-manual adjudications with no pipeline candidate
+    for pid, adj in adj_map.items():
+        if pid not in cand_pids and adj["status"] == "user_manual":
+            links.append({
+                "link_id":     doc_id + "|" + pid,
+                "parcel_id":   pid,
+                "source_type": adj.get("source_type"),
+                "match_type":  "user_manual",
+                "match_text":  None,
+                "confidence":  1.0,
+                "status":      "user_manual",
+                "reviewed_by": adj.get("reviewed_by"),
+                "reviewed_at": adj.get("reviewed_at"),
+            })
 
     ref.close(); dclt.close()
     return jsonify({"doc": dict(doc), "links": links})
@@ -623,7 +681,7 @@ def town_doc_detail(doc_id):
 
 # ── Data Hygiene — parcel link adjudication ───────────────────────────────────
 
-@bp.route("/hygiene/links/<int:link_id>", methods=["PATCH"])
+@bp.route("/hygiene/links/<path:link_id>", methods=["PATCH"])
 @login_required
 def hygiene_update_link(link_id):
     data   = request.get_json() or {}
@@ -631,16 +689,27 @@ def hygiene_update_link(link_id):
     if status not in ("candidate", "confirmed", "rejected"):
         return jsonify({"error": "status must be candidate, confirmed, or rejected"}), 400
 
-    db = get_db()
-    row = db.execute("SELECT link_id FROM parcel_links WHERE link_id = ?", (link_id,)).fetchone()
-    if not row:
-        db.close()
-        return jsonify({"error": "not found"}), 404
+    try:
+        doc_id, parcel_id = link_id.rsplit("|", 1)
+    except ValueError:
+        return jsonify({"error": "invalid link_id"}), 400
 
-    db.execute(
-        "UPDATE parcel_links SET status=?, reviewed_by=?, reviewed_at=datetime('now') WHERE link_id=?",
-        (status, current_user.id, link_id),
-    )
+    db = get_db()
+    if status == "candidate":
+        # Revert to unreviewed — delete the adjudication row
+        db.execute(
+            "DELETE FROM parcel_link_adjudications WHERE doc_id = ? AND parcel_id = ?",
+            (doc_id, parcel_id),
+        )
+    else:
+        db.execute(
+            """INSERT INTO parcel_link_adjudications (doc_id, parcel_id, status, reviewed_by, reviewed_at)
+               VALUES (?, ?, ?, ?, datetime('now'))
+               ON CONFLICT(doc_id, parcel_id) DO UPDATE SET
+                   status=excluded.status, reviewed_by=excluded.reviewed_by,
+                   reviewed_at=excluded.reviewed_at""",
+            (doc_id, parcel_id, status, current_user.id),
+        )
     db.commit()
     db.close()
     return jsonify({"ok": True})
@@ -660,35 +729,40 @@ def hygiene_create_link():
 
     db = get_db()
     try:
-        cur = db.execute(
-            """INSERT INTO parcel_links (doc_id, source_type, parcel_id, match_type, confidence,
-                   status, reviewed_by, reviewed_at)
-               VALUES (?, ?, ?, 'user_manual', 1.0, 'confirmed', ?, datetime('now'))
+        db.execute(
+            """INSERT INTO parcel_link_adjudications
+                   (doc_id, parcel_id, status, source_type, match_type, confidence, reviewed_by, reviewed_at)
+               VALUES (?, ?, 'user_manual', ?, 'user_manual', 1.0, ?, datetime('now'))
                ON CONFLICT(doc_id, parcel_id) DO UPDATE SET
-                   status='confirmed', match_type='user_manual',
+                   status='user_manual', match_type='user_manual',
                    reviewed_by=excluded.reviewed_by, reviewed_at=excluded.reviewed_at""",
-            (doc_id, source_type, parcel_id, current_user.id),
+            (doc_id, parcel_id, source_type, current_user.id),
         )
         db.commit()
-        link_id = cur.lastrowid
     except Exception as e:
         db.close()
         return jsonify({"error": str(e)}), 500
     db.close()
-    return jsonify({"ok": True, "link_id": link_id}), 201
+    return jsonify({"ok": True, "link_id": doc_id + "|" + parcel_id}), 201
 
 
-@bp.route("/hygiene/links/<int:link_id>", methods=["DELETE"])
+@bp.route("/hygiene/links/<path:link_id>", methods=["DELETE"])
 @login_required
 def hygiene_delete_link(link_id):
+    try:
+        doc_id, parcel_id = link_id.rsplit("|", 1)
+    except ValueError:
+        return jsonify({"error": "invalid link_id"}), 400
+
     db = get_db()
-    row = db.execute("SELECT link_id, status FROM parcel_links WHERE link_id = ?", (link_id,)).fetchone()
-    if not row:
-        db.close()
-        return jsonify({"error": "not found"}), 404
-    db.execute("DELETE FROM parcel_links WHERE link_id = ?", (link_id,))
+    rows_affected = db.execute(
+        "DELETE FROM parcel_link_adjudications WHERE doc_id = ? AND parcel_id = ?",
+        (doc_id, parcel_id),
+    ).rowcount
     db.commit()
     db.close()
+    if not rows_affected:
+        return jsonify({"error": "not found"}), 404
     return jsonify({"ok": True})
 
 
@@ -714,14 +788,15 @@ def parcel_town_docs(parcel_id):
     dclt = get_db()
     ref  = get_reference_db()
 
-    if not _table_exists(dclt, "parcel_links"):
+    if not _table_exists(dclt, "parcel_link_adjudications"):
         dclt.close(); ref.close()
         return jsonify([])
 
     links = dclt.execute(
-        "SELECT link_id, doc_id, source_type, match_type, confidence, created_at"
-        " FROM parcel_links WHERE parcel_id = ? AND status = 'confirmed'"
-        " ORDER BY created_at DESC",
+        "SELECT doc_id, source_type, match_type, confidence, reviewed_at"
+        " FROM parcel_link_adjudications"
+        " WHERE parcel_id = ? AND status IN ('confirmed', 'user_manual')"
+        " ORDER BY reviewed_at DESC",
         (parcel_id,),
     ).fetchall()
 
@@ -733,7 +808,8 @@ def parcel_town_docs(parcel_id):
             " FROM town_docs WHERE doc_id = ? LIMIT 1",
             (lk["doc_id"],),
         ).fetchone()
-        row = dict(lk)
+        row = {"link_id": lk["doc_id"] + "|" + parcel_id}
+        row.update(dict(lk))
         if doc:
             row.update(dict(doc))
         key = (row.get("committee"), row.get("meeting_date"))

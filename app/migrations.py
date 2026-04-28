@@ -185,4 +185,30 @@ CREATE INDEX IF NOT EXISTS idx_parcel_links_parcel
 ALTER TABLE users ADD COLUMN full_name TEXT;
 UPDATE users SET full_name = username WHERE full_name IS NULL OR full_name = '';
 """),
+    (11, """
+CREATE TABLE IF NOT EXISTS parcel_link_adjudications (
+    doc_id       TEXT NOT NULL,
+    parcel_id    TEXT NOT NULL,
+    status       TEXT NOT NULL CHECK(status IN ('confirmed','rejected','user_manual')),
+    source_type  TEXT,
+    match_type   TEXT,
+    confidence   REAL,
+    reviewed_by  INTEGER,
+    reviewed_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (doc_id, parcel_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pla_doc
+    ON parcel_link_adjudications (doc_id);
+CREATE INDEX IF NOT EXISTS idx_pla_parcel
+    ON parcel_link_adjudications (parcel_id, status);
+INSERT OR IGNORE INTO parcel_link_adjudications
+    (doc_id, parcel_id, status, source_type, match_type, confidence, reviewed_by, reviewed_at)
+    SELECT doc_id, parcel_id,
+           CASE WHEN match_type = 'user_manual' THEN 'user_manual' ELSE status END,
+           source_type, match_type, confidence, reviewed_by,
+           COALESCE(reviewed_at, created_at, datetime('now'))
+    FROM parcel_links
+    WHERE status IN ('confirmed', 'rejected') OR match_type = 'user_manual';
+DROP TABLE IF EXISTS parcel_links;
+"""),
 ]
