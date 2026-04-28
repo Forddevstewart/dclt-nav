@@ -584,31 +584,45 @@ def town_docs_list():
     result = []
     for r in rows_td:
         did = r["doc_id"]
-        n_cand, n_conf, n_rej = _link_counts(cand_by_doc.get(did, set()), adj_by_doc.get(did, {}))
-        n_total = n_cand + n_conf + n_rej
-        if n_total == 0:
+        cands = cand_by_doc.get(did, set())
+        adjs  = adj_by_doc.get(did, {})
+        n_cand, n_conf, n_rej = _link_counts(cands, adjs)
+        if n_cand + n_conf + n_rej == 0:
             continue
-        if status == "candidate"  and n_cand == 0: continue
-        if status == "confirmed"  and n_conf == 0: continue
-        if status == "rejected"   and n_rej  == 0: continue
 
         key = (r["committee"], r["meeting_date"])
         if key in seen_key:
             idx = seen_key[key]
             existing = result[idx]
-            existing["n_candidate"] += n_cand
-            existing["n_confirmed"] += n_conf
-            existing["n_rejected"]  += n_rej
+            # Union parcel sets to avoid double-counting parcels in both original and Updated
+            merged_cands = existing["_cands"] | cands
+            merged_adjs  = {**existing["_adjs"], **adjs}
+            m_cand, m_conf, m_rej = _link_counts(merged_cands, merged_adjs)
+            existing["_cands"]      = merged_cands
+            existing["_adjs"]       = merged_adjs
+            existing["n_candidate"] = m_cand
+            existing["n_confirmed"] = m_conf
+            existing["n_rejected"]  = m_rej
             if r["doc_type"] == "Updated":
                 existing.update({k: r[k] for k in ("doc_id", "source_type", "doc_type", "page_count")})
         else:
             row = dict(r)
-            row.update({"n_candidate": n_cand, "n_confirmed": n_conf, "n_rejected": n_rej})
+            row.update({"n_candidate": n_cand, "n_confirmed": n_conf, "n_rejected": n_rej,
+                        "_cands": cands, "_adjs": adjs})
             seen_key[key] = len(result)
             result.append(row)
 
+    # Apply status filter and strip internal tracking fields
+    out = []
+    for row in result:
+        row.pop("_cands"); row.pop("_adjs")
+        if status == "candidate" and row["n_candidate"] == 0: continue
+        if status == "confirmed" and row["n_confirmed"] == 0: continue
+        if status == "rejected"  and row["n_rejected"]  == 0: continue
+        out.append(row)
+
     ref.close(); dclt.close()
-    return jsonify(result)
+    return jsonify(out)
 
 
 @bp.route("/town-docs/<path:doc_id>")
