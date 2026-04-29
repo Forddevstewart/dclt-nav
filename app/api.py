@@ -55,6 +55,13 @@ def _table_exists(db, name: str) -> bool:
     ).fetchone()[0] > 0
 
 
+def _column_exists(db, table: str, column: str) -> bool:
+    return any(
+        row[1] == column
+        for row in db.execute(f"PRAGMA table_info({table})")
+    )
+
+
 def _registry_viewer_url(doc) -> str | None:
     imid = (doc.get("image_id") or "").strip()
     if not imid:
@@ -131,9 +138,33 @@ def overview():
             "documents":   cnt("SELECT COUNT(*) FROM registry_documents"),
             "scan_cached": cnt("SELECT COUNT(*) FROM registry_documents WHERE scan_cached=1"),
             "ocr":         cnt("SELECT COUNT(*) FROM registry_ocr") if has_ocr else 0,
-            "by_type":     brk(
-                "SELECT instrument_type, COUNT(*) n FROM registry_documents"
-                " GROUP BY instrument_type ORDER BY n DESC LIMIT 12"
+            "by_type": (
+                brk(
+                    "SELECT CASE"
+                    "  WHEN rd.instrument_type GLOB '[0-9]*'"
+                    "    OR UPPER(rd.instrument_type) LIKE 'LOT%'"
+                    "  THEN 'Parcel-specific'"
+                    "  ELSE rd.instrument_type END AS instrument_type,"
+                    " COUNT(*) AS enumerated,"
+                    " SUM(rd.scan_cached) AS downloaded,"
+                    " COUNT(ro.book) AS ocr"
+                    " FROM registry_documents rd"
+                    " LEFT JOIN registry_ocr ro ON rd.book = ro.book AND rd.page = ro.page"
+                    " GROUP BY 1"
+                    " ORDER BY enumerated DESC"
+                ) if has_ocr else brk(
+                    "SELECT CASE"
+                    "  WHEN instrument_type GLOB '[0-9]*'"
+                    "    OR UPPER(instrument_type) LIKE 'LOT%'"
+                    "  THEN 'Parcel-specific'"
+                    "  ELSE instrument_type END AS instrument_type,"
+                    " COUNT(*) AS enumerated,"
+                    " SUM(scan_cached) AS downloaded,"
+                    " 0 AS ocr"
+                    " FROM registry_documents"
+                    " GROUP BY 1"
+                    " ORDER BY enumerated DESC"
+                )
             ),
             "kw_hits": kw_hits,
         },
@@ -183,6 +214,7 @@ def parcels_list():
     has_gis      = _table_exists(db, "parcels_gis")
     has_ocr      = _table_exists(db, "registry_ocr") and _table_exists(db, "registry_documents")
     has_for_sale = _table_exists(db, "layer_for_sale")
+    has_coverage = _column_exists(db, "parcels", "coverage_ratio")
 
     if has_gis:
         gis_select = """,
@@ -221,22 +253,25 @@ def parcels_list():
         kw_join = ""
 
     if has_for_sale:
-        fs_select = ", CASE WHEN fs.norm_address IS NOT NULL THEN 1 ELSE 0 END for_sale"
-        fs_join = (
-            "LEFT JOIN layer_for_sale fs"
-            " ON p.locno IS NOT NULL AND p.locno != ''"
+        fs_select = (
+            ", CASE WHEN p.locno IS NOT NULL AND p.locno != ''"
             " AND p.locst IS NOT NULL AND p.locst != ''"
-            " AND UPPER(fs.norm_address) LIKE printf('%d', CAST(p.locno AS REAL))||' '||UPPER(p.locst)||'%'"
+            " AND EXISTS (SELECT 1 FROM layer_for_sale"
+            "  WHERE UPPER(norm_address) LIKE printf('%d', CAST(p.locno AS REAL))||' '||UPPER(p.locst)||'%')"
+            " THEN 1 ELSE 0 END for_sale"
         )
+        fs_join = ""
     else:
         fs_select = ", 0 for_sale"
         fs_join = ""
+
+    cov_select = ", p.coverage_ratio, p.coverage_status" if has_coverage else ", NULL coverage_ratio, NULL coverage_status"
 
     sql = f"""
         SELECT p.parcel_id, p.site_addr, p.owner_name, p.owner_category,
                p.property_class, p.use_code_norm, p.use_code_desc,
                p.totalapprvalue, p.billingacres, p.village, p.is_public, p.condo_units,
-               p.centroid_lat
+               p.centroid_lat{cov_select}
                {gis_select}{kw_select}{fs_select}
         FROM parcels p
         {gis_join}

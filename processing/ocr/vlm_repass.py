@@ -134,6 +134,7 @@ def enrich_page(
     # Step 1: VLM transcription — may recover text OCR missed
     vlm_text = run_vlm_transcription(img, vlm_model, ollama_url)
     if vlm_text:
+        page["vlm_transcription"] = vlm_text  # preserved for compare.py
         merged = union_texts(page.get("text", ""), vlm_text)
         if merged != page.get("text", ""):
             page["text"] = merged

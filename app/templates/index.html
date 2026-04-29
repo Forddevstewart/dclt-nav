@@ -684,47 +684,6 @@
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <!-- ── Documents ──────────────────────────────────────────────── -->
-              <div style="display:flex;flex-direction:column;gap:.75rem;">
-                <div class="overview-section-hdr" style="grid-column:unset;">Documents</div>
-                <div class="stat-card">
-                  <div class="stat-card-title">Registry of Deeds</div>
-                  <div class="stat-primary">
-                    <span class="stat-big" x-text="overviewData.registry.documents.toLocaleString()"></span>
-                    <span class="stat-unit">documents</span>
-                  </div>
-                  <div class="stat-subs">
-                    <div class="stat-sub">
-                      <span>Local scans</span>
-                      <span class="stat-sub-val"
-                        x-text="overviewData.registry.scan_cached.toLocaleString()
-                          + ' (' + Math.round(overviewData.registry.scan_cached/overviewData.registry.documents*100) + '%)'">
-                      </span>
-                    </div>
-                    <div class="stat-sub">
-                      <span>OCR processed</span>
-                      <span class="stat-sub-val" x-text="overviewData.registry.ocr.toLocaleString()"></span>
-                    </div>
-                  </div>
-                  <div>
-                    <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">By instrument type</div>
-                    <div class="brk-list">
-                      <template x-for="row in overviewData.registry.by_type.slice(0,10)" :key="row.instrument_type">
-                        <div>
-                          <div class="brk-row">
-                            <span class="brk-label" x-text="row.instrument_type || '(blank)'"></span>
-                            <span class="brk-count" x-text="row.n.toLocaleString()"></span>
-                          </div>
-                          <div class="brk-bar-wrap">
-                            <div class="brk-bar" :style="'width:'+Math.min(100,row.n/overviewData.registry.documents*100)+'%'"></div>
-                          </div>
-                        </div>
-                      </template>
-                    </div>
-                  </div>
-                </div>
                 <div class="stat-card">
                   <div class="stat-card-title">Town Meeting Warrants</div>
                   <div class="stat-primary">
@@ -782,6 +741,54 @@
                     </div>
                   </div>
                 </template>
+              </div>
+
+              <!-- ── Documents ──────────────────────────────────────────────── -->
+              <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <div class="overview-section-hdr" style="grid-column:unset;">Documents</div>
+                <div class="stat-card">
+                  <div class="stat-card-title">Registry of Deeds</div>
+                  <div class="stat-primary">
+                    <span class="stat-big" x-text="overviewData.registry.documents.toLocaleString()"></span>
+                    <span class="stat-unit">documents</span>
+                  </div>
+                  <div class="stat-subs">
+                    <div class="stat-sub">
+                      <span>Local scans</span>
+                      <span class="stat-sub-val"
+                        x-text="overviewData.registry.scan_cached.toLocaleString()
+                          + ' (' + Math.round(overviewData.registry.scan_cached/overviewData.registry.documents*100) + '%)'">
+                      </span>
+                    </div>
+                    <div class="stat-sub">
+                      <span>OCR processed</span>
+                      <span class="stat-sub-val" x-text="overviewData.registry.ocr.toLocaleString()"></span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">By instrument type</div>
+                    <table class="layer-table" style="font-size:11px;">
+                      <thead>
+                        <tr>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Type</td>
+                          <td style="text-align:right;color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Enumerated</td>
+                          <td style="text-align:right;color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Downloaded</td>
+                          <td style="text-align:right;color:#94a3b8;font-weight:600;padding-bottom:.3rem;">OCR'd</td>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="row in overviewData.registry.by_type" :key="row.instrument_type">
+                          <tr>
+                            <td style="color:#475569;" x-text="row.instrument_type || '(blank)'"></td>
+                            <td style="text-align:right;font-weight:600;" x-text="row.enumerated.toLocaleString()"></td>
+                            <td style="text-align:right;" x-text="row.downloaded ? row.downloaded.toLocaleString() : '—'"></td>
+                            <td style="text-align:right;" x-text="row.ocr ? row.ocr.toLocaleString() : '—'"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
 
               <!-- ── Layers ─────────────────────────────────────────────────── -->
@@ -909,6 +916,22 @@
               </div>
             </div>
           </template>
+          <div x-show="allParcels.some(p => p.coverage_status != null)">
+            <div class="filter-section">Coverage</div>
+            <div class="filter-chips">
+              <button class="filter-chip"
+                :class="{active: parcelCoverageStatusFilter.includes('no_structure')}"
+                @click="toggleCoverageStatus('no_structure')">No structure</button>
+              <button class="filter-chip"
+                :class="{active: parcelCoverageStatusFilter.includes('no_acreage')}"
+                @click="toggleCoverageStatus('no_acreage')">No acreage</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:.4rem;margin-top:.35rem;">
+              <span style="font-size:11px;color:#94a3b8;white-space:nowrap;">Coverage ≥</span>
+              <input type="range" min="0" max="100" step="1" x-model.number="parcelCoverageMin" style="flex:1;accent-color:#3b82f6;">
+              <span style="font-size:11px;color:#64748b;white-space:nowrap;min-width:2.5rem;" x-text="parcelCoverageMin+'%'"></span>
+            </div>
+          </div>
           <div class="sort-row">
             <span class="sort-label">Sort</span>
             <select class="ctrl-select" x-model="parcelSort">
@@ -1490,7 +1513,7 @@
       <div style="flex:1;overflow:hidden;display:flex;">
 
         <!-- ── User Admin ──────────────────────────────────────────────────── -->
-        <div x-show="adminSection==='users'" style="display:flex;width:100%;height:100%;overflow:hidden;">
+        <div x-show="adminSection==='users'" class="tab-section">
 
           <div class="col-left">
             <div class="col-left-controls">
@@ -1630,7 +1653,7 @@
         </div><!-- /users section -->
 
         <!-- ── Usage Log ───────────────────────────────────────────────────── -->
-        <div x-show="adminSection==='usage'" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+        <div x-show="adminSection==='usage'" class="tab-section" style="flex-direction:column;">
           <div class="col-right-header" style="display:flex;align-items:center;gap:.5rem;">
             <span>Usage Log</span>
             <span x-show="!usageLoading" style="font-size:10px;color:#94a3b8;font-weight:400;text-transform:none;letter-spacing:0;"
@@ -1689,7 +1712,7 @@
         </div><!-- /usage section -->
 
         <!-- ── Tag Maintenance ─────────────────────────────────────────────── -->
-        <div x-show="adminSection==='tags'" style="display:flex;width:100%;height:100%;overflow:hidden;">
+        <div x-show="adminSection==='tags'" class="tab-section">
 
           <div class="col-left">
             <div class="col-left-controls">
@@ -1728,83 +1751,77 @@
 
           <div class="col-mid">
             <div class="col-mid-inner">
-              <template x-if="!selectedTag && !tagEditForm.isNew">
-                <div class="empty-state" style="height:60vh;">
-                  <span class="empty-icon">🏷</span>
-                  <span>Select a tag</span>
-                </div>
-              </template>
-              <template x-if="tagEditForm.isNew">
-                <div>
-                  <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:1.25rem;">New Tag</div>
-                  <div style="display:flex;flex-direction:column;gap:.6rem;">
-                    <input class="search-input" type="text" placeholder="Tag name (e.g. status)"
-                      x-model="tagEditForm.name" autocomplete="off">
-                    <input class="search-input" type="text" placeholder="States, comma-separated (e.g. new,reviewed)"
-                      x-model="tagEditForm.statesRaw" autocomplete="off">
-                    <template x-if="tagEditForm.err">
-                      <div style="font-size:12px;color:#dc2626;" x-text="tagEditForm.err"></div>
-                    </template>
-                    <button class="rod-link" style="width:fit-content;font-size:13px;border:none;"
-                      @click="saveNewTag()" :disabled="tagEditForm.saving"
-                      x-text="tagEditForm.saving ? 'Saving…' : 'Create Tag'"></button>
-                  </div>
-                </div>
-              </template>
-              <template x-if="selectedTag && !tagEditForm.isNew">
-                <div>
-                  <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:.3rem;" x-text="selectedTag.name"></div>
-                  <div style="font-size:12px;color:#94a3b8;margin-bottom:1.25rem;" x-text="selectedTag.deprecated_at ? 'Deprecated' : 'Active'"></div>
-                  <div class="section">
-                    <div class="section-title">Name</div>
-                    <input class="search-input" type="text" x-model="tagEditForm.name" autocomplete="off">
-                  </div>
-                  <div class="section" style="margin-top:.75rem;">
-                    <div class="section-title">States <span style="font-weight:400;text-transform:none;font-size:10px;color:#94a3b8;">(first = default)</span></div>
-                    <template x-for="(s, i) in tagEditForm.states" :key="i">
-                      <div class="tag-state-row">
-                        <span class="tag-state-handle">☰</span>
-                        <span class="tag-state-name" x-text="s"></span>
-                        <template x-if="i===0"><span class="tag-state-default">default</span></template>
-                        <button style="padding:.1rem .3rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;"
-                          :disabled="i===0" @click="moveTagState(i,-1)">↑</button>
-                        <button style="padding:.1rem .3rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;"
-                          :disabled="i===tagEditForm.states.length-1" @click="moveTagState(i,1)">↓</button>
-                        <button style="padding:.1rem .3rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;color:#dc2626;"
-                          @click="removeTagState(i)">✕</button>
-                      </div>
-                    </template>
-                    <div style="display:flex;gap:.35rem;margin-top:.5rem;">
-                      <input class="search-input" type="text" placeholder="New state…"
-                        x-model="tagEditForm.newState" style="flex:1;" @keydown.enter="addTagState()">
-                      <button style="padding:.3rem .6rem;border:1px solid #cbd5e1;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;"
-                        @click="addTagState()">Add</button>
-                    </div>
-                  </div>
-                  <div class="section" style="margin-top:.75rem;">
-                    <label style="display:flex;align-items:center;gap:.4rem;font-size:12px;cursor:pointer;">
-                      <input type="checkbox" x-model="tagEditForm.deprecated">
-                      <span>Deprecated (hidden from picker)</span>
-                    </label>
-                  </div>
+              <div x-show="!selectedTag && !tagEditForm.isNew" class="empty-state" style="height:60vh;">
+                <span class="empty-icon">🏷</span>
+                <span>Select a tag</span>
+              </div>
+              <div x-show="tagEditForm.isNew">
+                <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:1.25rem;">New Tag</div>
+                <div style="display:flex;flex-direction:column;gap:.6rem;">
+                  <input class="search-input" type="text" placeholder="Tag name (e.g. status)"
+                    x-model="tagEditForm.name" autocomplete="off">
+                  <input class="search-input" type="text" placeholder="States, comma-separated (e.g. new,reviewed)"
+                    x-model="tagEditForm.statesRaw" autocomplete="off">
                   <template x-if="tagEditForm.err">
-                    <div style="font-size:12px;color:#dc2626;margin-top:.5rem;" x-text="tagEditForm.err"></div>
+                    <div style="font-size:12px;color:#dc2626;" x-text="tagEditForm.err"></div>
                   </template>
-                  <template x-if="tagEditForm.msg">
-                    <div style="font-size:12px;color:#16a34a;margin-top:.5rem;" x-text="tagEditForm.msg"></div>
+                  <button class="rod-link" style="width:fit-content;font-size:13px;border:none;"
+                    @click="saveNewTag()" :disabled="tagEditForm.saving"
+                    x-text="tagEditForm.saving ? 'Saving…' : 'Create Tag'"></button>
+                </div>
+              </div>
+              <div x-show="selectedTag && !tagEditForm.isNew">
+                <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:.3rem;" x-text="selectedTag?.name"></div>
+                <div style="font-size:12px;color:#94a3b8;margin-bottom:1.25rem;" x-text="selectedTag?.deprecated_at ? 'Deprecated' : 'Active'"></div>
+                <div class="section">
+                  <div class="section-title">Name</div>
+                  <input class="search-input" type="text" x-model="tagEditForm.name" autocomplete="off">
+                </div>
+                <div class="section" style="margin-top:.75rem;">
+                  <div class="section-title">States <span style="font-weight:400;text-transform:none;font-size:10px;color:#94a3b8;">(first = default)</span></div>
+                  <template x-for="(s, i) in tagEditForm.states" :key="i">
+                    <div class="tag-state-row">
+                      <span class="tag-state-handle">☰</span>
+                      <span class="tag-state-name" x-text="s"></span>
+                      <template x-if="i===0"><span class="tag-state-default">default</span></template>
+                      <button style="padding:.1rem .3rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;"
+                        :disabled="i===0" @click="moveTagState(i,-1)">↑</button>
+                      <button style="padding:.1rem .3rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;"
+                        :disabled="i===tagEditForm.states.length-1" @click="moveTagState(i,1)">↓</button>
+                      <button style="padding:.1rem .3rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;color:#dc2626;"
+                        @click="removeTagState(i)">✕</button>
+                    </div>
                   </template>
-                  <div style="display:flex;gap:.5rem;margin-top:1rem;flex-wrap:wrap;">
-                    <button class="rod-link" style="font-size:13px;border:none;"
-                      @click="saveTag()" :disabled="tagEditForm.saving"
-                      x-text="tagEditForm.saving ? 'Saving…' : 'Save'"></button>
-                    <template x-if="CURRENT_USER?.role==='admin'">
-                      <button style="padding:.3rem .7rem;border:1px solid #fca5a5;border-radius:4px;background:#fff;color:#dc2626;cursor:pointer;font-size:12px;"
-                        @click="confirmDeleteTag()" :disabled="tagEditForm.deleting"
-                        x-text="tagEditForm.deleting ? 'Deleting…' : 'Delete tag'"></button>
-                    </template>
+                  <div style="display:flex;gap:.35rem;margin-top:.5rem;">
+                    <input class="search-input" type="text" placeholder="New state…"
+                      x-model="tagEditForm.newState" style="flex:1;" @keydown.enter="addTagState()">
+                    <button style="padding:.3rem .6rem;border:1px solid #cbd5e1;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;"
+                      @click="addTagState()">Add</button>
                   </div>
                 </div>
-              </template>
+                <div class="section" style="margin-top:.75rem;">
+                  <label style="display:flex;align-items:center;gap:.4rem;font-size:12px;cursor:pointer;">
+                    <input type="checkbox" x-model="tagEditForm.deprecated">
+                    <span>Deprecated (hidden from picker)</span>
+                  </label>
+                </div>
+                <template x-if="tagEditForm.err">
+                  <div style="font-size:12px;color:#dc2626;margin-top:.5rem;" x-text="tagEditForm.err"></div>
+                </template>
+                <template x-if="tagEditForm.msg">
+                  <div style="font-size:12px;color:#16a34a;margin-top:.5rem;" x-text="tagEditForm.msg"></div>
+                </template>
+                <div style="display:flex;gap:.5rem;margin-top:1rem;flex-wrap:wrap;">
+                  <button class="rod-link" style="font-size:13px;border:none;"
+                    @click="saveTag()" :disabled="tagEditForm.saving"
+                    x-text="tagEditForm.saving ? 'Saving…' : 'Save'"></button>
+                  <template x-if="CURRENT_USER?.role==='admin'">
+                    <button style="padding:.3rem .7rem;border:1px solid #fca5a5;border-radius:4px;background:#fff;color:#dc2626;cursor:pointer;font-size:12px;"
+                      @click="confirmDeleteTag()" :disabled="tagEditForm.deleting"
+                      x-text="tagEditForm.deleting ? 'Deleting…' : 'Delete tag'"></button>
+                  </template>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2045,6 +2062,23 @@
       'CC&R':                               'kw_ccr',
     };
 
+    // Parcel system tags that can be filtered locally from the parcel list columns.
+    // Tags absent from this map (Structures, Soil) still route through the taggings API.
+    const _PARCEL_SYS_COL_MAP = {
+      'For Sale':         'for_sale',
+      'Zone 1 WHP':      'has_zone1',
+      'Zone 2 WHP':      'has_zone2',
+      'Priority Habitat': 'has_prihab',
+      'Est. Habitat':    'has_esthab',
+      'Nat. Community':  'has_natcomm',
+      'BioMap3 VP':      'has_bm3',
+      'BioMap3 Wetland': 'has_bm3',
+      'BioMap3 Core':    'has_bm3',
+      'BioMap3 CNL':     'has_bm3',
+      'Open Space':      'has_openspace',
+      'Wetlands':        'has_wetlands',
+    };
+
     // ── Keyword metadata (priority order, for detail view score bars) ─────────
     const KW_ORDER = [
       { key:'conservation_restriction',             label:'Conservation Restriction', abbr:'CR',  cls:'cr'  },
@@ -2062,6 +2096,12 @@
       const cur  = v => (v !== null && v !== undefined && v !== '') ? v : null;
       const usd  = v => v ? '$' + Number(v).toLocaleString() : null;
       const ac   = v => v ? Number(v).toFixed(3) + ' ac' : null;
+      const covLabel = s => ({ ok: 'ok', no_structure: 'no structure', no_acreage: 'no acreage' }[s] ?? s);
+      const cov  = p.coverage_status
+        ? (p.coverage_ratio !== null && p.coverage_ratio !== undefined
+            ? (p.coverage_ratio * 100).toFixed(1) + '% · ' + covLabel(p.coverage_status)
+            : covLabel(p.coverage_status))
+        : null;
       return [
         ['Owner',          cur(p.owner_name)],
         ['Owner Category', cur(p.owner_category)],
@@ -2070,6 +2110,7 @@
         ['Zone',           cur(p.zonedesc)],
         ['Appraised Value',usd(p.totalapprvalue)],
         ['Billing Acres',  ac(p.billingacres)],
+        ['Coverage',       cov],
         ['Condo Units',    (p.condo_units > 0) ? p.condo_units : null],
       ].filter(([,v]) => v !== null);
     }
@@ -2222,6 +2263,8 @@
         parcelGisOpen:       {},
         parcelTagFilter:     [],
         parcelTaggedIds:     null,
+        parcelCoverageMin:   100,
+        parcelCoverageStatusFilter: [],
 
         // registry
         allRegistry:       [],
@@ -2334,8 +2377,26 @@
           let list = this.parcelHideUnmappable
             ? this.allParcels.filter(p => p.centroid_lat != null)
             : this.allParcels;
-          if (this.parcelTagFilter.length && this.parcelTaggedIds !== null) {
-            list = list.filter(p => this.parcelTaggedIds.has(p.parcel_id));
+          if (this.parcelTagFilter.length) {
+            const tags = this.allParcelTagOptions;
+            list = list.filter(p => this.parcelTagFilter.every(tagId => {
+              const tag = tags.find(t => t.tag_id === tagId);
+              if (!tag) return false;
+              if (tag.tag_type === 'system') {
+                const col = _PARCEL_SYS_COL_MAP[tag.name];
+                return col != null && Boolean(p[col]);
+              }
+              // user tag: wait for API response; null means still loading — don't exclude
+              if (this.parcelTaggedIds === null) return true;
+              return this.parcelTaggedIds.has(p.parcel_id);
+            }));
+          }
+          if (this.parcelCoverageStatusFilter.length) {
+            list = list.filter(p => this.parcelCoverageStatusFilter.includes(p.coverage_status ?? 'no_structure'));
+          }
+          if (this.parcelCoverageMin > 0) {
+            const minRatio = this.parcelCoverageMin / 100;
+            list = list.filter(p => (p.coverage_ratio ?? 0) >= minRatio);
           }
           const q = this.parcelSearch.trim().toLowerCase();
           if (q) {
@@ -2455,10 +2516,11 @@
 
         // ── Init ────────────────────────────────────────────────────────────
         async init() {
-          this.$watch('parcelSearch',    ()=>{ this.parcelPage=1; });
+          this.$watch('parcelSearch',        ()=>{ this.parcelPage=1; });
+          this.$watch('parcelCoverageMin',            ()=>{ this.parcelPage=1; });
+          this.$watch('parcelCoverageStatusFilter',   ()=>{ this.parcelPage=1; });
           this.$watch('parcelSort',      ()=>{ this.parcelPage=1; });
           this.$watch('parcelSortDir',   ()=>{ this.parcelPage=1; });
-          this.$watch('parcelTagFilter', ()=>{ this.parcelPage=1; });
           this.$watch('docSearch',       ()=>{ this.regPage=1; });
           this.$watch('docTypeFilter',   ()=>{ this.regPage=1; });
           this.$watch('docTagFilter',    ()=>{ this.regPage=1; });
@@ -2673,7 +2735,14 @@
           } catch(e) { this.docTaggedIds = null; }
         },
 
+        toggleCoverageStatus(status) {
+          this.parcelCoverageStatusFilter = this.parcelCoverageStatusFilter.includes(status)
+            ? this.parcelCoverageStatusFilter.filter(s => s !== status)
+            : [...this.parcelCoverageStatusFilter, status];
+        },
+
         toggleParcelTag(tagId) {
+          this.parcelPage = 1;
           this.parcelTagFilter = this.parcelTagFilter.includes(tagId)
             ? this.parcelTagFilter.filter(id => id !== tagId)
             : [...this.parcelTagFilter, tagId];
@@ -2681,9 +2750,15 @@
         },
 
         async refreshParcelTagFilter() {
-          if (!this.parcelTagFilter.length) { this.parcelTaggedIds = null; return; }
+          // System tags are handled locally in filteredParcels; only fetch for user tags.
+          const tags = this.allParcelTagOptions;
+          const userTagIds = this.parcelTagFilter.filter(id => {
+            const tag = tags.find(t => t.tag_id === id);
+            return tag && tag.tag_type !== 'system';
+          });
+          if (!userTagIds.length) { this.parcelTaggedIds = null; return; }
           try {
-            const url = '/api/tagged/parcel?tag_ids=' + this.parcelTagFilter.join(',');
+            const url = '/api/tagged/parcel?tag_ids=' + userTagIds.join(',');
             const r = await fetch(url);
             this.parcelTaggedIds = r.ok ? new Set(await r.json()) : new Set();
           } catch(e) { this.parcelTaggedIds = new Set(); }

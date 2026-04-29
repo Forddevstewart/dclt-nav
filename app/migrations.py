@@ -211,4 +211,8 @@ INSERT OR IGNORE INTO parcel_link_adjudications
     WHERE status IN ('confirmed', 'rejected') OR match_type = 'user_manual';
 DROP TABLE IF EXISTS parcel_links;
 """),
+    (12, """
+INSERT OR IGNORE INTO tags (name, tag_type, target_entity, states_csv, display_order) VALUES
+    ('Development Status', 'user', 'parcel', 'undeveloped,underdeveloped', 300);
+"""),
 ]

@@ -159,12 +159,19 @@ def load_assessor(engine, path: Path) -> int:
     df = _norm_cols(df)
     df["_source_file"] = str(path)
     df["_loaded_at"] = now_utc()
-    # Normalize key fields that feed parcel_id construction
+    # Normalize key fields that feed parcel_id construction.
+    # String columns: strip and blank out "nan".
     for col in ("map", "block", "parcel", "extension",
-                "book_last", "page_last", "book_prev", "page_prev",
-                "state_class", "use_code", "gis_id"):
+                "booklast", "bookprev", "stateclass", "use", "gisid"):
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip().replace("nan", "")
+    # Page columns arrive as floats from Excel (e.g. 272.0) — convert to clean int strings.
+    for col in ("pagelast", "pageprev"):
+        if col in df.columns:
+            df[col] = (
+                pd.to_numeric(df[col], errors="coerce")
+                .apply(lambda v: str(int(v)) if pd.notna(v) else "")
+            )
     df.to_sql("assessor", engine, if_exists="replace", index=False)
     return len(df)
 
@@ -864,13 +871,17 @@ def build_parcels(engine) -> int:
         (~parcels["use_code_norm"].isin(EXEMPT_USE))
     ).astype(int)
 
+    # use_code mirrors use_code_norm so queue.py and other callers can use either name
+    parcels["use_code"] = parcels["use_code_norm"]
+
     # ── Lean backbone parcels (display fields only — no joins needed for list) ─
     display_cols = [
         "parcel_id", "join_status", "backbone_source", "condo_units",
         "owner_name", "owner_category",
         "locno", "locst", "village",
         "site_addr",
-        "use_code_norm", "use_code_desc", "property_class", "is_public",
+        "booklast", "pagelast",
+        "use_code", "use_code_norm", "use_code_desc", "property_class", "is_public",
         "billingacres", "totalapprvalue", "zonedesc",
         "centroid_lat", "centroid_lon",
     ]
@@ -889,6 +900,70 @@ def _table_exists(engine, name: str) -> bool:
             {"n": name},
         )
         return result.fetchone() is not None
+
+
+# ── Coverage ──────────────────────────────────────────────────────────────────
+
+def compute_coverage(engine) -> int:
+    """Write coverage_ratio and coverage_status to the parcels table.
+
+    Joins parcels (billingacres) with parcels_gis (struct_total_sqft).
+
+    coverage_status values:
+      'ok'           — both inputs present; ratio = sqft / (acres * 43560)
+      'no_structure' — acreage known but no structures in GIS; ratio = 0.0
+      'no_acreage'   — structures known but billingacres null/zero; ratio = NULL
+    """
+    if not _table_exists(engine, "parcels_gis"):
+        print("  SKIP — parcels_gis not found")
+        return 0
+
+    with engine.begin() as con:
+        con.execute(text("ALTER TABLE parcels ADD COLUMN coverage_ratio REAL"))
+        con.execute(text("ALTER TABLE parcels ADD COLUMN coverage_status TEXT"))
+
+        rows = con.execute(text("""
+            SELECT p.parcel_id, p.billingacres, g.struct_total_sqft
+            FROM parcels p
+            LEFT JOIN parcels_gis g ON g.parcel_id = p.parcel_id
+        """)).fetchall()
+
+    updates = []
+    for parcel_id, billing_acres, struct_sqft in rows:
+        try:
+            acres = float(billing_acres)
+            if acres <= 0:
+                acres = None
+        except (TypeError, ValueError):
+            acres = None
+
+        try:
+            sqft = float(struct_sqft)
+        except (TypeError, ValueError):
+            sqft = None
+
+        if acres is None:
+            ratio  = None
+            status = "no_structure" if sqft is None else "no_acreage"
+        elif sqft is None:
+            ratio  = 0.0
+            status = "no_structure"
+        else:
+            ratio  = sqft / (acres * 43560.0)
+            status = "ok"
+
+        updates.append({"r": ratio, "s": status, "pid": parcel_id})
+
+    with engine.begin() as con:
+        con.execute(
+            text("UPDATE parcels SET coverage_ratio = :r, coverage_status = :s WHERE parcel_id = :pid"),
+            updates,
+        )
+
+    n_computed = sum(1 for u in updates if u["s"] == "ok")
+    n_other    = len(updates) - n_computed
+    print(f"    coverage: {n_computed} computed, {n_other} indeterminate")
+    return len(updates)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -962,11 +1037,12 @@ def main() -> None:
         ("load_ocr",       registry_docs,  lambda e: load_ocr(e, registry_docs)),
         ("load_for_sale",  for_sale_path,  lambda e: load_for_sale(e, for_sale_path)),
         ("load_town_docs", ma_dennis_dir,  lambda e: load_town_docs(e, ma_dennis_dir)),
+        ("build_parcels",  None,           lambda e: build_parcels(e)),
+        ("coverage",       None,           lambda e: compute_coverage(e)),
         ("link_candidates", None,           lambda e: _load_link_candidates(e)),
         ("schema_columns",  None,           lambda e: load_schema_columns(e)),
         ("gis_sources",     None,           lambda e: load_gis_sources(e)),
         ("ref_use_codes",   None,           lambda e: load_ref_use_codes(e)),
-        ("build_parcels",  None,           lambda e: build_parcels(e)),
     ]
 
     for name, source, fn in stages:

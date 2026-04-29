@@ -6,7 +6,11 @@ Working directory for all commands: `/Users/fordstewart/Projects/dclt-nav`
 
 ## Discovery
 
-### Registry (monthly)
+### Registry pipeline (parent — monthly)
+
+Orchestrates internally: `enumerate` (Tier 1 → Tier 2 → xrefs → town sweep) → `processing.build` → download manifest → [PDF download]
+
+Run `queue` first if assessor data changed (see [Registry queue](#registry-queue-prerequisite) below).
 
 ```bash
 # Step 1: enumerate + rebuild raw.db + print download manifest (no PDFs yet)
@@ -18,21 +22,19 @@ python3 -m discovery.registry.pipeline --override-robots --confirm
 
 `--override-robots` is required every session. Never commit `override_robots: true` in `sources.yaml`.
 
-### Town agendas & minutes (AgendaCenter)
+#### Child: Enumerate (also standalone)
+
+Called automatically by the pipeline. Run standalone to enumerate without triggering a full pipeline build.
 
 ```bash
-# Daily (default) — scrapes last N days, downloads new PDFs
-python3 -m discovery.agenda_center.pull
-
-# Full history scrape (year-by-year from start to today)
-python3 -m discovery.agenda_center.pull --full
+python3 -m discovery.registry.enumerate --override-robots
 ```
 
-Optional flags: `--limit N` (cap downloads), `--delay SEC` (between PDFs, default 1.0), `--start-date YYYY-MM-DD`, `--end-date YYYY-MM-DD`.
+Optional flags: `--tier2` (name search only), `--limit N`, `--start-after PARCEL_ID`.
 
-### Registry scan download (after enumerate)
+#### Child: Download (also standalone)
 
-Selective download of scan PDFs filtered to approved instrument types. Run after the enumerate pass.
+Manifest-building and PDF download are called automatically by the pipeline with `--confirm`. Run standalone to selectively download PDFs after a separate enumerate pass.
 
 ```bash
 # Step 1: review what will be downloaded
@@ -45,13 +47,16 @@ python3 -m discovery.registry.download --override-robots --confirm
 python3 -m discovery.registry.download --override-robots --confirm --limit 200
 ```
 
-### Registry queue (after new assessor data)
+### Registry queue (prerequisite)
+
+Regenerate `target_queue.csv` from `raw.db`. Run before the pipeline after new assessor data.
+Not called by the pipeline — must be run manually when the parcel set changes.
 
 ```bash
-# Regenerate target_queue.csv from raw.db
+# Priority parcels only
 python3 -m discovery.registry.queue
 
-# Queue every parcel (not just priority ones)
+# Every parcel (not just priority ones)
 python3 -m discovery.registry.queue --full
 ```
 
@@ -65,17 +70,41 @@ print(f'{n} entries spread')
 "
 ```
 
+### AgendaCenter pull (parent — daily/full)
+
+Orchestrates internally: `scrape` → `ingest` → `download`
+
+```bash
+# Daily (default) — scrapes last N days, downloads new PDFs
+python3 -m discovery.agenda_center.pull
+
+# Full history scrape (year-by-year from start to today)
+python3 -m discovery.agenda_center.pull --full
+```
+
+Optional flags: `--limit N` (cap downloads), `--delay SEC` (between PDFs, default 1.0), `--start-date YYYY-MM-DD`, `--end-date YYYY-MM-DD`.
+
 ---
 
 ## Processing
 
 ### Build raw.db
 
+Orchestrates internally: loads all sources → `town_doc_candidates` (parcel link extraction)
+
 ```bash
 python3 -m processing.build
 ```
 
-Run after: new assessor data, GIS layer update, or registry pipeline completion.
+Run after: new assessor data, GIS layer update, or registry pipeline completion. Also called automatically by `discovery.registry.pipeline`.
+
+#### Child: Town doc candidates (also standalone)
+
+Called automatically at the end of `processing.build`. Run standalone to re-extract parcel references without rebuilding all of `raw.db`.
+
+```bash
+python3 -m processing.town_doc_candidates
+```
 
 ### Publish (raw.db → reference.db)
 
@@ -93,7 +122,11 @@ rsync ionos-vps:/var/www/dclt-nav/civictwin/db/transactional.db \
 python3 -m processing.publish
 ```
 
-### OCR — Tesseract pass (PDF → keyword-scored JSON)
+### OCR pipeline (sequential pair)
+
+Run the Tesseract pass first, then the VLM re-pass on the same input roots.
+
+#### Step 1: Tesseract pass (PDF → keyword-scored JSON)
 
 Runs Tesseract (+ PaddleOCR if available) on every PDF under an input root. Output JSON is written alongside each PDF.
 
@@ -113,7 +146,7 @@ python3 -m processing.ocr.ocr_pipeline \
 
 Optional flags: `--workers N` (parallel pages, default 4), `--force` (reprocess already-done PDFs), `--dry-run` (list without processing).
 
-### OCR — VLM re-pass (targeted enrichment)
+#### Step 2: VLM re-pass (targeted enrichment)
 
 Runs a vision-language model (via Ollama) on candidate pages — those with a composite score above the threshold but no confirmed exact match. Requires Ollama running locally with `qwen2.5vl:7b` pulled.
 
@@ -155,11 +188,11 @@ Monitor at github.com/Forddevstewart/dclt-nav/actions.
 
 ### Data (reference.db + PDFs) — preferred: deploy script
 
+Orchestrates internally: snapshot `dclt.db` → stop service → rsync `reference.db` → rsync PDFs → restart service
+
 ```bash
 ./deploy_reference.sh
 ```
-
-Snapshots `dclt.db` on the server, stops the service, rsyncs `reference.db` and PDFs, restarts.
 
 ### Data — manual rsync
 

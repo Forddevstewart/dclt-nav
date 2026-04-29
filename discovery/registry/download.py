@@ -27,6 +27,7 @@ from discovery.registry.cache import (
     ensure_cache_dirs,
     all_cached_indexes,
     scan_path, metadata_path, scan_exists,
+    image_id_scan_path, image_id_scan_exists,
     setup_logging,
 )
 from discovery.config import get_config as _get_config
@@ -127,7 +128,8 @@ def build_download_manifest() -> tuple[list[dict], dict]:
         if book and page:
             (already_cached if scan_exists(book, page) else to_download).append(doc)
         else:
-            to_download.append(doc)
+            image_id = (doc.get("image_id") or "").strip()
+            (already_cached if image_id_scan_exists(image_id) else to_download).append(doc)
 
     priority_order = ["CX", "TK", "VO", "MD", "RS", "CV"]
 
@@ -240,7 +242,7 @@ def download_queue(rl: RateLimiter, queue: list[dict], limit: int) -> dict:
         itype = doc.get("instrument_type") or doc.get("doc_type_code") or "?"
 
         dest = (scan_path(book, page) if book and page
-                else registry_dir / "documents" / "unknown" / doc.get("image_id", "") / "scan.pdf")
+                else image_id_scan_path(doc.get("image_id", "")))
 
         if dest.exists():
             log.info("[%d/%d] SKIP (exists): book=%s page=%s", i + 1, limit, book, page)

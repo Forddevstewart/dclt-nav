@@ -192,6 +192,17 @@ def scan_exists(book: str, page: str) -> bool:
     return scan_path(book, page).exists()
 
 
+def image_id_scan_path(image_id: str) -> Path:
+    safe = str(image_id).strip().replace("/", "_")
+    return _registry_dir() / "documents" / "unknown" / safe / "scan.pdf"
+
+
+def image_id_scan_exists(image_id: str) -> bool:
+    if not image_id:
+        return False
+    return image_id_scan_path(image_id).exists()
+
+
 # ── Land Court cache ──────────────────────────────────────────────────────────
 
 def _lc_dir(certificate: str) -> Path:

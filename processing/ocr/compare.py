@@ -84,13 +84,24 @@ def show_page(page: dict, threshold: float, show_text: bool) -> None:
               f"{marker}")
 
     if show_text and has_vlm:
-        text = page.get("text", "")
-        lines = text.splitlines()
-        # Lines after the halfway point are likely VLM additions
-        # (union_texts appends unique VLM lines after Tesseract lines)
-        print(f"\n    ── text ({len(lines)} lines) ──")
-        for line in lines:
-            print(f"    {line}")
+        merged_text    = page.get("text", "")
+        vlm_transcript = page.get("vlm_transcription")
+
+        if vlm_transcript:
+            merged_lines = set(merged_text.splitlines())
+            vlm_lines    = vlm_transcript.splitlines()
+            additions    = [l for l in vlm_lines if l.rstrip() and l.rstrip() not in merged_lines]
+
+            print(f"\n    ── VLM transcription ({len(vlm_lines)} lines raw, "
+                  f"{len(additions)} lines not already in Tesseract) ──")
+            for line in vlm_transcript.splitlines():
+                marker = "  NEW" if line.rstrip() in additions else ""
+                print(f"    {line}{marker}")
+        else:
+            print(f"\n    ── merged text ({len(merged_text.splitlines())} lines) ──")
+            print("    [re-run vlm_repass.py to capture VLM transcription separately]")
+            for line in merged_text.splitlines():
+                print(f"    {line}")
 
 
 def compare(path: Path, threshold: float, show_text: bool) -> None:

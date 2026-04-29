@@ -336,15 +336,17 @@ def process_page(
         engines.append("paddleocr")
         parts.append(paddle_text)
 
+    vlm_transcription: str | None = None
     if use_vlm:
         vlm_text = run_vlm_transcription(img, vlm_model, ollama_url)
         if vlm_text:
+            vlm_transcription = vlm_text
             engines.append("vlm")
             parts.append(vlm_text)
 
     unified = union_texts(*parts)
 
-    return {
+    page: dict = {
         "page_number": page_number,
         "text": unified,
         "engines_used": engines,
@@ -353,6 +355,9 @@ def process_page(
             for name, kw in keywords.items()
         },
     }
+    if vlm_transcription is not None:
+        page["vlm_transcription"] = vlm_transcription
+    return page
 
 
 # ── PDF processing ────────────────────────────────────────────────────────────
