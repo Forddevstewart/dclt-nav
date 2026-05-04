@@ -97,6 +97,18 @@ USE_CODES: dict[str, tuple[str, str]] = {
 
 EXEMPT_USE = {"9460", "9820"}
 
+# Farming / Crop Land, Cranberry Bog, Ch. 61A Agricultural — use-code signal for
+# ParcelFarmingSuitability. Ch. 61 Forest (6010) omitted intentionally.
+FARMING_AG_USE_CODES = {"2010", "2020", "6020"}
+
+# Roadmap workstream 2 — Undeveloped. 2010 included; flagged open for confirmation.
+UNDEVELOPED_STATE_CODES = {
+    "1300", "1320", "2010", "2020",
+    "3900", "3910", "3920",
+    "4400", "4420",
+    "9300", "9500",
+}
+
 _MUNICIPAL_OWNERS = re.compile(
     r"\b(TOWN OF|COMMONWEALTH|SELECTMEN|SELECTBOARD|BOARD OF|"
     r"DEPARTMENT OF|WATER DISTRICT|FIRE DISTRICT|HOUSING AUTHORITY|"
@@ -972,6 +984,88 @@ def compute_coverage(engine) -> int:
     return len(updates)
 
 
+def compute_undeveloped_state_code(engine) -> int:
+    """Write is_undeveloped_state_code to the parcels table.
+
+    1 if use_code_norm is in UNDEVELOPED_STATE_CODES; 0 otherwise.
+    """
+    in_list = ", ".join(f"'{c}'" for c in sorted(UNDEVELOPED_STATE_CODES))
+    with engine.begin() as con:
+        con.execute(text(
+            "ALTER TABLE parcels ADD COLUMN is_undeveloped_state_code INTEGER NOT NULL DEFAULT 0"
+        ))
+        con.execute(text(f"""
+            UPDATE parcels
+               SET is_undeveloped_state_code = CASE
+                     WHEN use_code_norm IN ({in_list}) THEN 1
+                     ELSE 0
+                   END
+        """))
+    with engine.connect() as con:
+        n = con.execute(text(
+            "SELECT COUNT(*) FROM parcels WHERE is_undeveloped_state_code = 1"
+        )).scalar()
+    print(f"    undeveloped_state_code: {n} parcels flagged")
+    return n
+
+
+# ── Derived Layer: ParcelFarmingSuitability ───────────────────────────────────
+
+def compute_farming_suitability(engine) -> int:
+    """Write farming_suitability to the parcels table.
+
+    Derived Layer state space: {Not suitable, Possible, Likely}
+
+    Signals: layer_soils flags (prime / statewide / unique) and use_code_norm.
+    False-negative discipline at the Not suitable / Possible boundary — a parcel
+    reaches 'Possible' on any single positive indicator; 'Not suitable' only when
+    no positive signals are present.
+
+      Likely       — prime = 1
+      Possible     — statewide = 1 OR unique = 1 OR use_code_norm in FARMING_AG_USE_CODES
+      Not suitable — no positive signals
+    """
+    if not _table_exists(engine, "layer_soils"):
+        print("  SKIP — layer_soils not found (farming_suitability not computed)")
+        return 0
+
+    with engine.begin() as con:
+        con.execute(text(
+            "ALTER TABLE parcels ADD COLUMN farming_suitability TEXT"
+        ))
+
+    with engine.connect() as con:
+        rows = con.execute(text("""
+            SELECT p.parcel_id, p.use_code_norm,
+                   s.prime, s.statewide, s."unique"
+            FROM parcels p
+            LEFT JOIN layer_soils s ON s.parcel_id = p.parcel_id
+        """)).fetchall()
+
+    updates = []
+    for parcel_id, use_code, prime, statewide, unique_ in rows:
+        if prime:
+            state = "Likely"
+        elif statewide or unique_ or use_code in FARMING_AG_USE_CODES:
+            state = "Possible"
+        else:
+            state = "Not suitable"
+        updates.append({"state": state, "pid": parcel_id})
+
+    with engine.begin() as con:
+        con.execute(
+            text("UPDATE parcels SET farming_suitability = :state WHERE parcel_id = :pid"),
+            updates,
+        )
+
+    counts: dict[str, int] = {}
+    for u in updates:
+        counts[u["state"]] = counts.get(u["state"], 0) + 1
+    summary = ", ".join(f"{counts[s]} {s}" for s in ["Likely", "Possible", "Not suitable"] if s in counts)
+    print(f"    farming_suitability: {summary}")
+    return len(updates)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -1045,6 +1139,8 @@ def main() -> None:
         ("load_town_docs", ma_dennis_dir,  lambda e: load_town_docs(e, ma_dennis_dir)),
         ("build_parcels",  None,           lambda e: build_parcels(e)),
         ("coverage",       None,           lambda e: compute_coverage(e)),
+        ("undeveloped_state_code", None,   lambda e: compute_undeveloped_state_code(e)),
+        ("farming_suitability",    None,   lambda e: compute_farming_suitability(e)),
         ("link_candidates", None,           lambda e: _load_link_candidates(e)),
         ("schema_columns",  None,           lambda e: load_schema_columns(e)),
         ("gis_sources",     None,           lambda e: load_gis_sources(e)),

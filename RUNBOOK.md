@@ -177,13 +177,13 @@ python3 -m processing.publish
 ```
 
 Copies `raw.db` to `reference.db`, then applies any `parcel_corrections` rows from
-`transactional.db` (server-side user edits synced down). If `transactional.db` is absent
+`transactions.db` (server-side user edits synced down). If `transactions.db` is absent
 the copy still completes. `reference.db` is the file deployed to the server.
 
-Sync `transactional.db` down before publishing if you want corrections included:
+Sync `transactions.db` down before publishing if you want corrections included:
 
 ```bash
-rsync ionos-vps:/var/www/dclt-nav/civictwin/db/transactional.db \
+rsync ionos-vps:/var/www/dclt-nav/civictwin/db/transactions.db \
   /Volumes/DigitalTwin/CivicTwin/db/
 python3 -m processing.publish
 ```
@@ -227,7 +227,7 @@ Uses the `ionos-vps` alias from `~/.ssh/config`. No restart needed after data sy
   civictwin/
     db/
       reference.db       ← rsynced from local volume
-      transactional.db   ← born on server, never overwritten
+      transactions.db    ← born on server, never overwritten
     registry/
       documents/         ← rsynced from local volume
 ```
@@ -294,7 +294,7 @@ CivicTwin/
   db/
     raw.db                   Built locally; source of truth
     reference.db             Deployed to server (built by publish)
-    transactional.db         Server-side user data; sync down before publish
+    transactions.db          Server-side user data; sync down before publish
 
 discovery/output/            Logs, reports, access log (gitignored)
   registry_access.log        Every HTTP request to the registry

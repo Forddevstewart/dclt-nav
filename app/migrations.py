@@ -215,4 +215,27 @@ DROP TABLE IF EXISTS parcel_links;
 INSERT OR IGNORE INTO tags (name, tag_type, target_entity, states_csv, display_order) VALUES
     ('Development Status', 'user', 'parcel', 'undeveloped,underdeveloped', 300);
 """),
+    (13, """
+-- Deprecate all system tags (OCR keyword, GIS presence, For Sale).
+-- Their attribute data lives in reference.db Layers (registry_ocr, parcels_gis,
+-- layer_for_sale). Existing system=1 rows in taggings are a historical archive;
+-- application code no longer reads them.
+UPDATE tags SET deprecated_at = datetime('now')
+    WHERE tag_type = 'system' AND deprecated_at IS NULL;
+
+-- Deprecate Development Status (superseded by CoverageDetermination below).
+-- Existing tagging events under Development Status are preserved in full history.
+UPDATE tags SET deprecated_at = datetime('now')
+    WHERE name = 'Development Status' AND deprecated_at IS NULL;
+
+-- Insert CA-aligned Tag dimensions.
+INSERT OR IGNORE INTO tags (name, tag_type, target_entity, states_csv, display_order) VALUES
+    ('CoverageDetermination',  'user', 'parcel',   'Unconfirmed,Undeveloped,Underdeveloped,Developed', 300),
+    ('IdentityResolution',     'user', 'parcel',   'Unconfirmed,ADB Add,ADB Remove,GIS Add,GIS Remove', 310),
+    ('Article97Determination', 'user', 'document', 'Unconfirmed,Confirmed,Denied', 320);
+"""),
+    (14, """
+INSERT OR IGNORE INTO tags (name, tag_type, target_entity, states_csv, display_order) VALUES
+    ('FarmingDetermination', 'user', 'parcel', 'Unconfirmed,Not Suitable,Possible,Suitable', 330);
+"""),
 ]

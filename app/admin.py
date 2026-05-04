@@ -254,8 +254,8 @@ def admin_update_tag(tag_id):
         for state in removed:
             for row in _affected_nodes(db, tag_id, state):
                 db.execute(
-                    "INSERT INTO taggings (tag_id, state, target_type, target_id, user_id, system)"
-                    " VALUES (?, ?, ?, ?, ?, 1)",
+                    "INSERT INTO taggings (tag_id, state, target_type, target_id, user_id)"
+                    " VALUES (?, ?, ?, ?, ?)",
                     (tag_id, new_states[0], row["target_type"], row["target_id"], current_user.id),
                 )
         if newly_deprecating:
@@ -319,8 +319,8 @@ def admin_delete_tag(tag_id):
             ).fetchall()
             for row in rows:
                 db.execute(
-                    "INSERT INTO taggings (tag_id, state, target_type, target_id, user_id, system)"
-                    " VALUES (?, NULL, ?, ?, ?, 1)",
+                    "INSERT INTO taggings (tag_id, state, target_type, target_id, user_id)"
+                    " VALUES (?, NULL, ?, ?, ?)",
                     (tag_id, row["target_type"], row["target_id"], current_user.id),
                 )
         db.execute("DELETE FROM tags WHERE tag_id = ?", (tag_id,))

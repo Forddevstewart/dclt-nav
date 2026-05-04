@@ -28,7 +28,8 @@ KW_LABELS = {
     "ccr":                                  "CC&R",
 }
 
-_PARCEL_SKIP = {"_loaded_at", "backbone_source", "join_status"}
+_PARCEL_SKIP = {"_loaded_at", "backbone_source"}
+_IDENTITY_STATE_MAP = {"BOTH": "OK", "ASSESSOR_ONLY": "ADB-only", "MASSGIS_ONLY": "GIS-only"}
 _DOC_SKIP    = {"_loaded_at"}
 _GIS_SKIP    = {"parcel_id", "_loaded_at"}
 _SOIL_SKIP   = {"parcel_id", "_loaded_at"}
@@ -214,7 +215,9 @@ def parcels_list():
     has_gis      = _table_exists(db, "parcels_gis")
     has_ocr      = _table_exists(db, "registry_ocr") and _table_exists(db, "registry_documents")
     has_for_sale = _table_exists(db, "layer_for_sale")
-    has_coverage = _column_exists(db, "parcels", "coverage_ratio")
+    has_coverage  = _column_exists(db, "parcels", "coverage_ratio")
+    has_usc       = _column_exists(db, "parcels", "is_undeveloped_state_code")
+    has_farming   = _column_exists(db, "parcels", "farming_suitability")
 
     if has_gis:
         gis_select = """,
@@ -265,13 +268,21 @@ def parcels_list():
         fs_select = ", 0 for_sale"
         fs_join = ""
 
-    cov_select = ", p.coverage_ratio, p.coverage_status" if has_coverage else ", NULL coverage_ratio, NULL coverage_status"
+    cov_select     = ", p.coverage_ratio, p.coverage_status" if has_coverage else ", NULL coverage_ratio, NULL coverage_status"
+    usc_select     = ", p.is_undeveloped_state_code" if has_usc else ", 0 is_undeveloped_state_code"
+    farming_select = ", p.farming_suitability" if has_farming else ", NULL farming_suitability"
 
     sql = f"""
         SELECT p.parcel_id, p.site_addr, p.owner_name, p.owner_category,
                p.property_class, p.use_code_norm, p.use_code_desc,
                p.totalapprvalue, p.billingacres, p.village, p.is_public, p.condo_units,
-               p.centroid_lat{cov_select}
+               p.centroid_lat,
+               CASE p.join_status
+                 WHEN 'BOTH'          THEN 'OK'
+                 WHEN 'ASSESSOR_ONLY' THEN 'ADB-only'
+                 WHEN 'MASSGIS_ONLY'  THEN 'GIS-only'
+                 ELSE 'OK'
+               END AS identity_state{cov_select}{usc_select}{farming_select}
                {gis_select}{kw_select}{fs_select}
         FROM parcels p
         {gis_join}
@@ -320,8 +331,13 @@ def parcel_detail(parcel_id):
         rec["alis_url"] = _registry_viewer_url(rec)
         doc_list.append(rec)
 
+    parcel_dict = _clean(dict(parcel), _PARCEL_SKIP)
+    parcel_dict["identity_state"] = _IDENTITY_STATE_MAP.get(
+        dict(parcel).get("join_status"), "OK"
+    )
+
     return jsonify({
-        "parcel":    _clean(dict(parcel), _PARCEL_SKIP),
+        "parcel":    parcel_dict,
         "documents": doc_list,
         "gis":       _clean(dict(gis), _GIS_SKIP) if gis else None,
         "soil":      _clean(dict(soil), _SOIL_SKIP) if soil else None,
@@ -815,7 +831,7 @@ def hygiene_delete_link(link_id):
     return jsonify({"ok": True})
 
 
-@bp.route("/town-docs/<path:doc_id>/pdf")
+@bp.route("/town-docs/pdf/<path:doc_id>")
 def town_doc_pdf(doc_id):
     ref = get_reference_db()
     doc = ref.execute(
@@ -871,3 +887,27 @@ def parcel_town_docs(parcel_id):
 
     dclt.close(); ref.close()
     return jsonify(result)
+
+
+# ── Dynamic Layers ────────────────────────────────────────────────────────────
+
+_DYNAMIC_LAYERS = {
+    "parcel-coverage-rollup":  "parcel_coverage_rollup",
+    "parcel-article97-rollup": "parcel_article97_rollup",
+}
+
+
+@bp.route("/layers/<layer_name>")
+def layer_eval(layer_name):
+    """Evaluate a Dynamic Layer by name and return its current value.
+
+    Dynamic Layers are formulas, not storage. Caching is acceptable if
+    performance requires it; materialization is not.
+
+    Supported: parcel-coverage-rollup, parcel-article97-rollup
+    """
+    if layer_name not in _DYNAMIC_LAYERS:
+        abort(404, f"layer '{layer_name}' not found")
+    from . import layers as _layers
+    fn = getattr(_layers, _DYNAMIC_LAYERS[layer_name])
+    return jsonify(fn())

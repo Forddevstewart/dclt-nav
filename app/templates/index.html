@@ -98,7 +98,7 @@
     }
     .filter-chip:hover { border-color:#94a3b8; background:#f8fafc; }
     .filter-chip.active.user-tag   { background:#dbeafe; border-color:#93c5fd; color:#1d4ed8; }
-    .filter-chip.active.system-tag { background:#ede9fe; border-color:#c4b5fd; color:#6d28d9; }
+    .filter-chip.active.layer-attr { background:#dcfce7; border-color:#86efac; color:#166534; }
     .filter-section { font-size:11px; color:#94a3b8; margin-bottom:.25rem; }
 
     /* ── Admin secondary tabs ───────────────────────────────────────────────── */
@@ -546,7 +546,7 @@
                   <div class="ov-badge ov-badge-l">L</div>
                   <div>
                     <div class="ov-card-title">Layers</div>
-                    <p class="ov-card-text">Geographic and assessor datasets that enrich individual parcel records in bulk. MassGIS environmental overlays identify wetlands, priority wildlife habitat, watershed protection zones, and BioMap core areas. Annual assessor data provides property valuations, acreage, and use classifications. Other layers track current real estate listings. Think of a layer as a map overlay that applies to many parcels at once — a single data source adding context across the entire town.</p>
+                    <p class="ov-card-text">Data assembled from external sources and computed from those sources — everything in the portal that isn't a human determination. External layers include MassGIS environmental overlays, Town of Dennis assessor records, deed OCR keyword scores from the Registry, and real estate listings. Derived layers join those sources together: the parcel backbone, GIS presence flags, identity status when assessor and GIS records disagree. Dynamic layers combine external data with staff determinations to produce up-to-date rollups: current development coverage inventory, Article 97 progress across the portfolio. If a value comes from a feed or a calculation, it's a Layer.</p>
                   </div>
                 </div>
 
@@ -554,7 +554,7 @@
                   <div class="ov-badge ov-badge-t">T</div>
                   <div>
                     <div class="ov-card-title">Tags</div>
-                    <p class="ov-card-text">Annotations on parcels and documents that flag records of interest. Some tags are applied automatically — when OCR finds conservation restriction language in a deed, or when a GIS layer confirms a parcel sits in a priority habitat or water protection zone. Others are applied by hand by DCLT staff: acquisition targets, items under review, and other working labels. Tags are the primary tool for triage and prioritization, and can be combined to build focused shortlists for action.</p>
+                    <p class="ov-card-text">Staff decisions recorded alongside the data. Each tag dimension is a question DCLT needs to answer about parcels or documents: How developed is this parcel? Does this deed restrict land under Article 97? A tag records a staff member's determination — with a full history of who decided what and when. Machine signals from OCR scores and GIS overlays surface candidate records; the tag is the verdict. Tags are always staff-authored: if a value comes from a feed or a calculation, it's a Layer, not a Tag. Combine tag dimensions to build focused shortlists: every underdeveloped parcel, every unconfirmed Article 97 document.</p>
                   </div>
                 </div>
 
@@ -850,37 +850,18 @@
               <div style="display:flex;flex-direction:column;gap:.75rem;">
                 <div class="overview-section-hdr" style="grid-column:unset;">Tags</div>
                 <div class="stat-card">
-                  <div class="stat-card-title">Tags</div>
+                  <div class="stat-card-title">Tag Dimensions</div>
                   <template x-if="allTags.length === 0">
-                    <div style="font-size:12px;color:#94a3b8;">No tags defined</div>
+                    <div style="font-size:12px;color:#94a3b8;">No dimensions defined</div>
                   </template>
-                  <template x-if="allTags.filter(t=>t.tag_type==='system').length > 0">
-                    <div>
-                      <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">
-                        System
-                        <span style="font-weight:400;" x-text="'— ' + allTags.filter(t=>t.tag_type==='system').length"></span>
-                      </div>
-                      <div style="display:flex;flex-wrap:wrap;gap:.3rem;">
-                        <template x-for="tag in allTags.filter(t=>t.tag_type==='system')" :key="tag.tag_id">
-                          <span style="display:inline-flex;align-items:center;gap:.25rem;padding:.18rem .55rem;border-radius:12px;font-size:11px;font-weight:500;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;">
-                            <span x-text="tag.name"></span>
-                            <span style="font-size:9px;opacity:.65;" x-text="tag.target_entity==='document'?'doc':tag.target_entity==='parcel'?'parcel':''"></span>
-                          </span>
-                        </template>
-                      </div>
-                    </div>
-                  </template>
-                  <template x-if="allTags.filter(t=>t.tag_type==='user').length > 0">
-                    <div>
-                      <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">
-                        User
-                        <span style="font-weight:400;" x-text="'— ' + allTags.filter(t=>t.tag_type==='user').length"></span>
-                      </div>
-                      <div style="display:flex;flex-wrap:wrap;gap:.3rem;">
-                        <template x-for="tag in allTags.filter(t=>t.tag_type==='user')" :key="tag.tag_id">
-                          <span style="padding:.18rem .55rem;border-radius:12px;font-size:11px;font-weight:500;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;" x-text="tag.name"></span>
-                        </template>
-                      </div>
+                  <template x-if="allTags.length > 0">
+                    <div style="display:flex;flex-wrap:wrap;gap:.3rem;">
+                      <template x-for="tag in allTags" :key="tag.tag_id">
+                        <span style="display:inline-flex;align-items:center;gap:.25rem;padding:.18rem .55rem;border-radius:12px;font-size:11px;font-weight:500;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;">
+                          <span x-text="tag.name"></span>
+                          <span style="font-size:9px;opacity:.65;" x-text="tag.target_entity==='document'?'doc':tag.target_entity==='parcel'?'parcel':''"></span>
+                        </span>
+                      </template>
                     </div>
                   </template>
                 </div>
@@ -902,13 +883,27 @@
           <input class="search-input" x-model.debounce.200ms="parcelSearch"
             placeholder="Name or address" type="search" autocomplete="off"
             @input="parcelPage=1">
+          <template x-if="allParcels.some(p => p.identity_state || p.has_zone1 || p.has_zone2 || p.has_prihab || p.has_esthab || p.has_natcomm || p.has_bm3 || p.has_openspace || p.has_wetlands || p.for_sale || (p.farming_suitability && p.farming_suitability !== 'Not suitable'))">
+            <div>
+              <div class="filter-section">Filter by attribute</div>
+              <div class="filter-chips">
+                <template x-for="chip in _PARCEL_LAYER_CHIPS" :key="chip.col">
+                  <button class="filter-chip"
+                    :class="{active: parcelLayerFilter.includes(chip.col), 'layer-attr': true}"
+                    @click="toggleParcelLayer(chip.col)"
+                    x-text="chip.label">
+                  </button>
+                </template>
+              </div>
+            </div>
+          </template>
           <template x-if="allParcelTagOptions.length">
             <div>
               <div class="filter-section">Filter by tag</div>
               <div class="filter-chips">
                 <template x-for="tag in allParcelTagOptions" :key="tag.tag_id">
                   <button class="filter-chip"
-                    :class="{active: parcelTagFilter.includes(tag.tag_id), 'user-tag': tag.tag_type==='user', 'system-tag': tag.tag_type==='system'}"
+                    :class="{active: parcelTagFilter.includes(tag.tag_id), 'user-tag': true}"
                     @click="toggleParcelTag(tag.tag_id)"
                     x-text="tag.name">
                   </button>
@@ -947,10 +942,6 @@
               <span x-text="parcelSortDir==='asc'?'↑':'↓'"></span>
             </button>
           </div>
-          <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:#64748b;cursor:pointer;padding-top:2px;">
-            <input type="checkbox" x-model="parcelHideUnmappable" @change="parcelPage=1">
-            Only mappable parcels
-          </label>
         </div>
 
         <div class="col-left-footer">
@@ -1009,6 +1000,7 @@
                 <div style="font-size:13px;color:#64748b;margin-top:2px;" x-text="parcelDetail.parcel.parcel_id"></div>
                 <div style="margin-top:.4rem;display:flex;flex-wrap:wrap;gap:.35rem;">
                   <span class="badge" :class="propClassBadge(parcelDetail.parcel.property_class)" x-text="parcelDetail.parcel.property_class||'Unknown'"></span>
+                  <span x-show="parcelDetail.parcel.is_undeveloped_state_code" class="badge badge-amber">Undeveloped SC</span>
                   <span x-show="parcelDetail.parcel.is_public" class="badge badge-teal">Public</span>
                   <span x-show="(parcelDetail.parcel.condo_units||0)>0" class="badge badge-purple" x-text="parcelDetail.parcel.condo_units+' condo units'"></span>
                 </div>
@@ -1137,7 +1129,7 @@
                     <div style="font-size:12px;color:#94a3b8;">Loading…</div>
                   </template>
                   <div class="tag-chips">
-                    <template x-for="tag in allTags.filter(t=>t.tag_type==='user')" :key="tag.tag_id">
+                    <template x-for="tag in allParcelTagOptions" :key="tag.tag_id">
                       <div class="tag-chip"
                         :class="{
                           applied:  parcelTagState[tag.tag_id] != null,
@@ -1147,7 +1139,7 @@
                         @click.stop="toggleTagPicker('parcel', tag.tag_id)">
                         <span x-text="parcelTagState[tag.tag_id] != null ? tag.name + ' : ' + parcelTagState[tag.tag_id] : tag.name"></span>
                         <div class="tag-dropdown" x-show="tagPickerOpen === 'parcel:'+tag.tag_id" @click.stop>
-                          <template x-for="(s, i) in tag.states_csv.split(',')" :key="s">
+                          <template x-for="(s, i) in parcelTagStates(tag, parcelDetail?.parcel)" :key="s">
                             <div class="tag-dd-item"
                               :class="{current: parcelTagState[tag.tag_id]===s, 'default-state': i===0 && parcelTagState[tag.tag_id]==null}"
                               @click="applyTag('parcel', selectedParcelId, tag.tag_id, s)">
@@ -1166,8 +1158,8 @@
                         </div>
                       </div>
                     </template>
-                    <template x-if="allTags.length === 0 && !tagsLoading">
-                      <span style="font-size:12px;color:#94a3b8;">No tags defined</span>
+                    <template x-if="allParcelTagOptions.length === 0 && !tagsLoading">
+                      <span style="font-size:12px;color:#94a3b8;">No dimensions defined</span>
                     </template>
                   </div>
                 </div>
@@ -1196,7 +1188,7 @@
             </button>
           </div>
           <iframe x-show="parcelSelectedDoc && parcelPdfUrl" :src="parcelPdfUrl || ''" style="flex:1;width:100%;height:100%;border:none;"></iframe>
-          <iframe x-show="parcelSelectedTownDoc" :src="parcelSelectedTownDoc ? '/api/town-docs/'+parcelSelectedTownDoc.doc_id+'/pdf' : ''" style="flex:1;width:100%;height:100%;border:none;"></iframe>
+          <iframe x-show="parcelSelectedTownDoc" :src="parcelSelectedTownDoc ? '/api/town-docs/pdf/'+parcelSelectedTownDoc.doc_id : ''" style="flex:1;width:100%;height:100%;border:none;"></iframe>
         </div>
       </div>
 
@@ -1214,25 +1206,37 @@
             <option value="">All instrument types</option>
             <template x-for="t in docTypes" :key="t"><option :value="t" x-text="t"></option></template>
           </select>
+          <div>
+            <div class="filter-section">Filter by attribute</div>
+            <div class="filter-chips">
+              <template x-for="chip in _DOC_LAYER_CHIPS" :key="chip.key">
+                <button class="filter-chip"
+                  :class="{active: docLayerFilter.includes(chip.key), 'layer-attr': true}"
+                  @click="toggleDocLayer(chip.key)"
+                  x-text="chip.label">
+                </button>
+              </template>
+            </div>
+            <template x-if="docLayerFilter.length > 0">
+              <div style="display:flex;align-items:center;gap:.4rem;margin-top:.35rem;">
+                <span style="font-size:11px;color:#94a3b8;white-space:nowrap;">Min score</span>
+                <input type="range" min="0" max="1" step="0.05" x-model.number="docLayerThreshold" style="flex:1;accent-color:#3b82f6;">
+                <span style="font-size:11px;color:#64748b;white-space:nowrap;min-width:2.5rem;" x-text="docLayerThreshold.toFixed(2)"></span>
+              </div>
+            </template>
+          </div>
           <template x-if="allDocTagOptions.length">
             <div>
               <div class="filter-section">Filter by tag</div>
               <div class="filter-chips">
                 <template x-for="tag in allDocTagOptions" :key="tag.tag_id">
                   <button class="filter-chip"
-                    :class="{active: docTagFilter.includes(tag.tag_id), 'system-tag': tag.tag_type==='system', 'user-tag': tag.tag_type==='user'}"
+                    :class="{active: docTagFilter.includes(tag.tag_id), 'user-tag': true}"
                     @click="toggleDocTag(tag.tag_id)"
                     x-text="tag.name">
                   </button>
                 </template>
               </div>
-              <template x-if="docTagFilter.some(id => allDocTagOptions.find(t=>t.tag_id===id)?.tag_type==='system')">
-                <div style="display:flex;align-items:center;gap:.4rem;margin-top:.35rem;">
-                  <span style="font-size:11px;color:#94a3b8;white-space:nowrap;">Min confidence</span>
-                  <input type="range" min="0" max="1" step="0.05" x-model.number="docTagThreshold" style="flex:1;accent-color:#3b82f6;">
-                  <span style="font-size:11px;color:#64748b;white-space:nowrap;min-width:2.5rem;" x-text="docTagThreshold.toFixed(2)"></span>
-                </div>
-              </template>
             </div>
           </template>
           <div class="sort-row">
@@ -1251,6 +1255,18 @@
               :title="docSortDir==='asc'?'Ascending':'Descending'">
               <span x-text="docSortDir==='asc'?'↑':'↓'"></span>
             </button>
+          </div>
+        </div>
+
+        <div class="col-left-footer">
+          <span x-text="regFilteredCount.toLocaleString()+' doc'+(regFilteredCount!==1?'s':'')"></span>
+          <a :href="docExportUrl" class="paging-btn" style="text-decoration:none;" download>↓ CSV</a>
+          <div class="paging-btns">
+            <button class="paging-btn" @click="regPage=1"            :disabled="regPage===1">«</button>
+            <button class="paging-btn" @click="regPage--"            :disabled="regPage===1">‹</button>
+            <span   class="paging-page" x-text="regPage+' / '+regTotalPages"></span>
+            <button class="paging-btn" @click="regPage++"            :disabled="regPage>=regTotalPages">›</button>
+            <button class="paging-btn" @click="regPage=regTotalPages" :disabled="regPage>=regTotalPages">»</button>
           </div>
         </div>
 
@@ -1286,18 +1302,6 @@
               </template>
             </div>
           </template>
-        </div>
-
-        <div class="col-left-footer">
-          <span x-text="regFilteredCount.toLocaleString()+' doc'+(regFilteredCount!==1?'s':'')"></span>
-          <a :href="docExportUrl" class="paging-btn" style="text-decoration:none;" download>↓ CSV</a>
-          <div class="paging-btns">
-            <button class="paging-btn" @click="regPage=1"            :disabled="regPage===1">«</button>
-            <button class="paging-btn" @click="regPage--"            :disabled="regPage===1">‹</button>
-            <span   class="paging-page" x-text="regPage+' / '+regTotalPages"></span>
-            <button class="paging-btn" @click="regPage++"            :disabled="regPage>=regTotalPages">›</button>
-            <button class="paging-btn" @click="regPage=regTotalPages" :disabled="regPage>=regTotalPages">»</button>
-          </div>
         </div>
       </div>
 
@@ -1432,7 +1436,7 @@
                     <div style="font-size:12px;color:#94a3b8;">Loading…</div>
                   </template>
                   <div class="tag-chips">
-                    <template x-for="tag in allTags.filter(t=>t.tag_type==='user')" :key="tag.tag_id">
+                    <template x-for="tag in allDocTagOptions" :key="tag.tag_id">
                       <div class="tag-chip"
                         :class="{
                           applied:  docTagState[tag.tag_id] != null,
@@ -1461,8 +1465,8 @@
                         </div>
                       </div>
                     </template>
-                    <template x-if="allTags.length === 0 && !tagsLoading">
-                      <span style="font-size:12px;color:#94a3b8;">No tags defined</span>
+                    <template x-if="allDocTagOptions.length === 0 && !tagsLoading">
+                      <span style="font-size:12px;color:#94a3b8;">No dimensions defined</span>
                     </template>
                   </div>
                 </div>
@@ -1859,6 +1863,14 @@
                 <option value="rejected">Has rejected</option>
               </select>
             </div>
+            <div class="col-left-footer">
+              <span x-text="filteredTownDocs.length.toLocaleString()+' docs'"></span>
+              <div style="display:flex;gap:.3rem;align-items:center;">
+                <button class="sort-dir-btn" :disabled="townDocPage<=1" @click="townDocPage--">&#8249;</button>
+                <span x-text="townDocPage+'/'+townDocTotalPages"></span>
+                <button class="sort-dir-btn" :disabled="townDocPage>=townDocTotalPages" @click="townDocPage++">&#8250;</button>
+              </div>
+            </div>
             <div class="col-left-list">
               <template x-if="townDocListLoading">
                 <div class="loading-msg">Loading…</div>
@@ -1880,14 +1892,6 @@
                   </div>
                 </div>
               </template>
-            </div>
-            <div class="col-left-footer">
-              <span x-text="filteredTownDocs.length.toLocaleString()+' docs'"></span>
-              <div style="display:flex;gap:.3rem;align-items:center;">
-                <button class="sort-dir-btn" :disabled="townDocPage<=1" @click="townDocPage--">&#8249;</button>
-                <span x-text="townDocPage+'/'+townDocTotalPages"></span>
-                <button class="sort-dir-btn" :disabled="townDocPage>=townDocTotalPages" @click="townDocPage++">&#8250;</button>
-              </div>
             </div>
           </div>
 
@@ -2051,33 +2055,31 @@
   </template>
 
   <script>
-    // ── System tag name → kw_* column (for client-side doc filtering) ────────
-    const _KW_COL_MAP = {
-      'Conservation Restriction':           'kw_conservation_restriction',
-      'Article 97':                         'kw_article_97',
-      'Deed Restriction':                   'kw_deed_restriction',
-      'Chapter 61':                         'kw_chapter_61',
-      'Ag. Preservation Restriction':       'kw_agricultural_preservation_restriction',
-      'Perpetual Restriction':              'kw_perpetual_restriction',
-      'CC&R':                               'kw_ccr',
-    };
+    // ── Layer attribute filter chips (read from External/Derived Layer columns) ─
+    const _PARCEL_LAYER_CHIPS = [
+      {label: 'IdentityState',    col: 'identity_state', neq: 'OK'},
+      {label: 'Zone 1 WHP',       col: 'has_zone1'},
+      {label: 'Zone 2 WHP',       col: 'has_zone2'},
+      {label: 'Priority Habitat', col: 'has_prihab'},
+      {label: 'Est. Habitat',     col: 'has_esthab'},
+      {label: 'Nat. Community',   col: 'has_natcomm'},
+      {label: 'BioMap3',          col: 'has_bm3'},
+      {label: 'Open Space',       col: 'has_openspace'},
+      {label: 'Wetlands',         col: 'has_wetlands'},
+      {label: 'For Sale',         col: 'for_sale'},
+      {label: 'Undeveloped SC',        col: 'is_undeveloped_state_code'},
+      {label: 'Farming Suitability',   col: 'farming_suitability', neq: 'Not suitable'},
+    ];
 
-    // Parcel system tags that can be filtered locally from the parcel list columns.
-    // Tags absent from this map (Structures, Soil) still route through the taggings API.
-    const _PARCEL_SYS_COL_MAP = {
-      'For Sale':         'for_sale',
-      'Zone 1 WHP':      'has_zone1',
-      'Zone 2 WHP':      'has_zone2',
-      'Priority Habitat': 'has_prihab',
-      'Est. Habitat':    'has_esthab',
-      'Nat. Community':  'has_natcomm',
-      'BioMap3 VP':      'has_bm3',
-      'BioMap3 Wetland': 'has_bm3',
-      'BioMap3 Core':    'has_bm3',
-      'BioMap3 CNL':     'has_bm3',
-      'Open Space':      'has_openspace',
-      'Wetlands':        'has_wetlands',
-    };
+    const _DOC_LAYER_CHIPS = [
+      {label: 'Conservation Restriction', key: 'kw_conservation_restriction'},
+      {label: 'Article 97',               key: 'kw_article_97'},
+      {label: 'Deed Restriction',         key: 'kw_deed_restriction'},
+      {label: 'Chapter 61',               key: 'kw_chapter_61'},
+      {label: 'Ag. Pres. Restriction',    key: 'kw_agricultural_preservation_restriction'},
+      {label: 'Perpetual Restriction',    key: 'kw_perpetual_restriction'},
+      {label: 'CC&R',                     key: 'kw_ccr'},
+    ];
 
     // ── Keyword metadata (priority order, for detail view score bars) ─────────
     const KW_ORDER = [
@@ -2108,11 +2110,22 @@
         ['Village',        cur(p.village)],
         ['Use Code',       p.use_code_norm ? p.use_code_norm + (p.use_code_desc ? ' — ' + p.use_code_desc : '') : null],
         ['Zone',           cur(p.zonedesc)],
+        ['IdentityState',  (p.identity_state && p.identity_state !== 'OK') ? p.identity_state : null],
         ['Appraised Value',usd(p.totalapprvalue)],
         ['Billing Acres',  ac(p.billingacres)],
-        ['Coverage',       cov],
-        ['Condo Units',    (p.condo_units > 0) ? p.condo_units : null],
+        ['Coverage',           cov],
+        ['Farming Suitability', (p.farming_suitability && p.farming_suitability !== 'Not suitable') ? p.farming_suitability : null],
+        ['Condo Units',        (p.condo_units > 0) ? p.condo_units : null],
       ].filter(([,v]) => v !== null);
+    }
+
+    function parcelTagStates(tag, parcel) {
+      if (tag.name === 'IdentityResolution' && parcel) {
+        const is = parcel.identity_state;
+        if (is === 'GIS-only') return ['Unconfirmed', 'ADB Add', 'GIS Remove'];
+        if (is === 'ADB-only') return ['Unconfirmed', 'GIS Add', 'ADB Remove'];
+      }
+      return tag.states_csv.split(',');
     }
 
     function gisGroups(gis, soil) {
@@ -2250,7 +2263,6 @@
         parcelSearch:        '',
         parcelSort:          'site_addr',
         parcelSortDir:       'asc',
-        parcelHideUnmappable: true,
         parcelPage:          1,
         parcelPageSize:      50,
         selectedParcelId:    null,
@@ -2263,7 +2275,8 @@
         parcelGisOpen:       {},
         parcelTagFilter:     [],
         parcelTaggedIds:     null,
-        parcelCoverageMin:   100,
+        parcelLayerFilter:   [],
+        parcelCoverageMin:   0,
         parcelCoverageStatusFilter: [],
 
         // registry
@@ -2272,8 +2285,9 @@
         docSearch:         '',
         docTypeFilter:     '',
         docTagFilter:      [],
-        docTagThreshold:   0.4,
         docTaggedIds:      null,
+        docLayerFilter:    [],
+        docLayerThreshold: 0.4,
         docSort:           'recorded_date',
         docSortDir:        'desc',
         regPage:           1,
@@ -2374,22 +2388,20 @@
 
         // ── Computed — parcels ──────────────────────────────────────────────
         get filteredParcels() {
-          let list = this.parcelHideUnmappable
-            ? this.allParcels.filter(p => p.centroid_lat != null)
-            : this.allParcels;
-          if (this.parcelTagFilter.length) {
-            const tags = this.allParcelTagOptions;
-            list = list.filter(p => this.parcelTagFilter.every(tagId => {
-              const tag = tags.find(t => t.tag_id === tagId);
-              if (!tag) return false;
-              if (tag.tag_type === 'system') {
-                const col = _PARCEL_SYS_COL_MAP[tag.name];
-                return col != null && Boolean(p[col]);
-              }
-              // user tag: wait for API response; null means still loading — don't exclude
-              if (this.parcelTaggedIds === null) return true;
-              return this.parcelTaggedIds.has(p.parcel_id);
+          let list = this.allParcels;
+          if (this.parcelLayerFilter.length) {
+            list = list.filter(p => this.parcelLayerFilter.every(col => {
+              const chip = _PARCEL_LAYER_CHIPS.find(c => c.col === col);
+              if (chip?.val != null) return p[col] === chip.val;
+              if (chip?.neq != null) return p[col] != null && p[col] !== chip.neq;
+              return Boolean(p[col]);
             }));
+          }
+          if (this.parcelTagFilter.length) {
+            // Wait for API response; null means loading — don't exclude during fetch
+            if (this.parcelTaggedIds !== null) {
+              list = list.filter(p => this.parcelTaggedIds.has(p.parcel_id));
+            }
           }
           if (this.parcelCoverageStatusFilter.length) {
             list = list.filter(p => this.parcelCoverageStatusFilter.includes(p.coverage_status ?? 'no_structure'));
@@ -2434,18 +2446,14 @@
             (d.book+'').includes(q) ||
             (d.page+'').includes(q));
           if (this.docTypeFilter) list = list.filter(d=>d.instrument_type===this.docTypeFilter);
+          if (this.docLayerFilter.length) {
+            const thr = this.docLayerThreshold;
+            list = list.filter(d => this.docLayerFilter.every(key => (d[key] || 0) >= thr));
+          }
           if (this.docTagFilter.length) {
-            const tags = this.allDocTagOptions;
-            const thr  = this.docTagThreshold;
-            list = list.filter(d => this.docTagFilter.every(tagId => {
-              const tag = tags.find(t => t.tag_id === tagId);
-              if (!tag) return false;
-              if (tag.tag_type === 'system') {
-                const col = _KW_COL_MAP[tag.name];
-                return col && (d[col] || 0) >= thr;
-              }
-              return this.docTaggedIds ? this.docTaggedIds.has(d.book + '/' + d.page) : false;
-            }));
+            if (this.docTaggedIds) {
+              list = list.filter(d => this.docTaggedIds.has(d.book + '/' + d.page));
+            }
           }
           const f=this.docSort, dir=this.docSortDir==='asc'?1:-1;
           return [...list].sort((a,b)=>{
@@ -2523,8 +2531,10 @@
           this.$watch('parcelSortDir',   ()=>{ this.parcelPage=1; });
           this.$watch('docSearch',       ()=>{ this.regPage=1; });
           this.$watch('docTypeFilter',   ()=>{ this.regPage=1; });
-          this.$watch('docTagFilter',    ()=>{ this.regPage=1; });
-          this.$watch('docTagThreshold', ()=>{ this.regPage=1; });
+          this.$watch('docTagFilter',      ()=>{ this.regPage=1; });
+          this.$watch('docLayerFilter',    ()=>{ this.regPage=1; });
+          this.$watch('docLayerThreshold', ()=>{ this.regPage=1; });
+          this.$watch('parcelLayerFilter', ()=>{ this.parcelPage=1; });
           this.$watch('docSort',         ()=>{ this.regPage=1; });
           this.$watch('docSortDir',      ()=>{ this.regPage=1; });
           // when user closes a doc, the map re-appears — tell Leaflet to recalculate size
@@ -2723,13 +2733,9 @@
         },
 
         async refreshDocTagFilter() {
-          const userTagIds = this.docTagFilter.filter(id => {
-            const tag = this.allDocTagOptions.find(t => t.tag_id === id);
-            return tag && tag.tag_type !== 'system';
-          });
-          if (!userTagIds.length) { this.docTaggedIds = null; return; }
+          if (!this.docTagFilter.length) { this.docTaggedIds = null; return; }
           try {
-            const url = '/api/tagged/document?tag_ids=' + userTagIds.join(',');
+            const url = '/api/tagged/document?tag_ids=' + this.docTagFilter.join(',');
             const r = await fetch(url);
             this.docTaggedIds = r.ok ? new Set(await r.json()) : null;
           } catch(e) { this.docTaggedIds = null; }
@@ -2750,18 +2756,26 @@
         },
 
         async refreshParcelTagFilter() {
-          // System tags are handled locally in filteredParcels; only fetch for user tags.
-          const tags = this.allParcelTagOptions;
-          const userTagIds = this.parcelTagFilter.filter(id => {
-            const tag = tags.find(t => t.tag_id === id);
-            return tag && tag.tag_type !== 'system';
-          });
-          if (!userTagIds.length) { this.parcelTaggedIds = null; return; }
+          if (!this.parcelTagFilter.length) { this.parcelTaggedIds = null; return; }
           try {
-            const url = '/api/tagged/parcel?tag_ids=' + userTagIds.join(',');
+            const url = '/api/tagged/parcel?tag_ids=' + this.parcelTagFilter.join(',');
             const r = await fetch(url);
             this.parcelTaggedIds = r.ok ? new Set(await r.json()) : new Set();
           } catch(e) { this.parcelTaggedIds = new Set(); }
+        },
+
+        toggleParcelLayer(col) {
+          this.parcelLayerFilter = this.parcelLayerFilter.includes(col)
+            ? this.parcelLayerFilter.filter(c => c !== col)
+            : [...this.parcelLayerFilter, col];
+          this.parcelPage = 1;
+        },
+
+        toggleDocLayer(key) {
+          this.docLayerFilter = this.docLayerFilter.includes(key)
+            ? this.docLayerFilter.filter(k => k !== key)
+            : [...this.docLayerFilter, key];
+          this.regPage = 1;
         },
 
         async adjudicate(kwKey, verdict) {
@@ -2829,7 +2843,7 @@
             const r = await fetch('/api/town-docs/'+encId);
             if (!r.ok) throw new Error(r.status);
             this.townDocDetail = await r.json();
-            this.townPdfUrl    = '/api/town-docs/'+encId+'/pdf';
+            this.townPdfUrl    = '/api/town-docs/pdf/'+encId;
           } catch(e) { console.error('town doc:', e); }
           finally { this.townDetailLoading = false; }
         },

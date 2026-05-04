@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, abort
 from flask_login import login_required, current_user
-from .models import get_db
+from .models import get_db, get_reference_db
 
 _VALID_ENTITIES = {"parcel", "document"}
 
@@ -20,8 +20,8 @@ _FOLD = """
 def list_tags():
     """All non-deprecated tags for the picker.
 
-    Optional ?entity=parcel|document filters to tags applicable to that
-    entity type (target_entity matches or is 'any').
+    Optional ?entity=parcel|document filters to tags whose target_entity
+    matches or is 'any'.
     """
     entity = request.args.get("entity")
     db = get_db()
@@ -48,7 +48,9 @@ def tagged_entities(entity_type):
     """Return target_ids where ALL specified tags are applied (AND logic).
 
     ?tag_ids=1,2,3  — comma-separated tag_ids (required)
-    ?threshold=0.4  — confidence floor for system tags (default 0.4)
+
+    Matches entities where the latest fold for each requested tag has a
+    non-null state (i.e. the dimension has been explicitly set).
     """
     if entity_type not in _VALID_ENTITIES:
         abort(400, "entity_type must be 'parcel' or 'document'")
@@ -61,40 +63,17 @@ def tagged_entities(entity_type):
     if not tag_ids:
         return jsonify([])
 
-    try:
-        threshold = float(request.args.get("threshold", 0.4))
-    except ValueError:
-        threshold = 0.4
-
     db = get_db()
-    placeholders = ",".join("?" for _ in tag_ids)
-    tag_rows = db.execute(
-        f"SELECT tag_id, tag_type FROM tags WHERE tag_id IN ({placeholders})",
-        tag_ids,
-    ).fetchall()
-    tag_type_map = {r["tag_id"]: r["tag_type"] for r in tag_rows}
-
     result_sets = []
     for tid in tag_ids:
-        tag_type = tag_type_map.get(tid, "user")
-        if tag_type == "system":
-            rows = db.execute(
-                f"SELECT DISTINCT t1.target_id FROM taggings t1"
-                f" WHERE t1.target_type = ? AND t1.tag_id = ?"
-                f"   AND t1.confidence >= ?"
-                f"   AND {_FOLD}",
-                (entity_type, tid, threshold),
-            ).fetchall()
-        else:
-            rows = db.execute(
-                f"SELECT DISTINCT t1.target_id FROM taggings t1"
-                f" WHERE t1.target_type = ? AND t1.tag_id = ?"
-                f"   AND t1.state IS NOT NULL"
-                f"   AND {_FOLD}",
-                (entity_type, tid),
-            ).fetchall()
+        rows = db.execute(
+            f"SELECT DISTINCT t1.target_id FROM taggings t1"
+            f" WHERE t1.target_type = ? AND t1.tag_id = ?"
+            f"   AND t1.state IS NOT NULL"
+            f"   AND {_FOLD}",
+            (entity_type, tid),
+        ).fetchall()
         result_sets.append({r["target_id"] for r in rows})
-
     db.close()
 
     if not result_sets:
@@ -107,7 +86,7 @@ def tagged_entities(entity_type):
 
 @bp.route("/tagging/<target_type>/<path:target_id>")
 def tagging_for_target(target_type, target_id):
-    """Non-deprecated tags plus current applied state and confidence for one node."""
+    """Non-deprecated tags plus current fold state and confidence for one node."""
     db = get_db()
     tags = db.execute(
         "SELECT tag_id, name, tag_type, target_entity, states_csv, display_order FROM tags"
@@ -119,7 +98,10 @@ def tagging_for_target(target_type, target_id):
         (target_type, target_id),
     ).fetchall()
     db.close()
-    current = {str(r["tag_id"]): {"state": r["state"], "confidence": r["confidence"]} for r in state_rows}
+    current = {
+        str(r["tag_id"]): {"state": r["state"], "confidence": r["confidence"]}
+        for r in state_rows
+    }
     return jsonify({"tags": [dict(t) for t in tags], "current": current})
 
 
@@ -146,16 +128,28 @@ def apply_tag():
     if tag["deprecated_at"] is not None:
         db.close()
         abort(400, "tag is deprecated")
-    if tag["tag_type"] == "system":
-        db.close()
-        abort(400, "system tags cannot be applied manually")
     if state is not None and state not in tag["states_csv"].split(","):
         db.close()
         abort(400, f"invalid state '{state}' for tag '{tag['name']}'")
 
+    # Applicability and transition checks for registered dimensions
+    from .dimensions import DIMENSIONS, check_applicability, check_transition
+    if tag["name"] in DIMENSIONS:
+        ref = get_reference_db()
+        ok, reason = check_applicability(tag["name"], target_type, target_id, ref)
+        if not ok:
+            ref.close(); db.close()
+            abort(422, reason)
+        if state is not None:
+            ok, reason = check_transition(tag["name"], target_type, target_id, state, ref)
+            if not ok:
+                ref.close(); db.close()
+                abort(422, reason)
+        ref.close()
+
     db.execute(
-        "INSERT INTO taggings (tag_id, state, target_type, target_id, user_id, system)"
-        " VALUES (?, ?, ?, ?, ?, 0)",
+        "INSERT INTO taggings (tag_id, state, target_type, target_id, user_id)"
+        " VALUES (?, ?, ?, ?, ?)",
         (tag_id, state, target_type, target_id, current_user.id),
     )
     db.commit()
