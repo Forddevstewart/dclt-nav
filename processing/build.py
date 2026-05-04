@@ -910,7 +910,8 @@ def compute_coverage(engine) -> int:
     Joins parcels (billingacres) with parcels_gis (struct_total_sqft).
 
     coverage_status values:
-      'ok'           — both inputs present; ratio = sqft / (acres * 43560)
+      'ok'           — both inputs present; ratio = sqft / (acres * 43560), capped at 1.0
+      'data_issue'   — computed ratio exceeded 1.0; ratio set to 1.0
       'no_structure' — acreage known but no structures in GIS; ratio = 0.0
       'no_acreage'   — structures known but billingacres null/zero; ratio = NULL
     """
@@ -949,8 +950,12 @@ def compute_coverage(engine) -> int:
             ratio  = 0.0
             status = "no_structure"
         else:
-            ratio  = sqft / (acres * 43560.0)
-            status = "ok"
+            ratio = sqft / (acres * 43560.0)
+            if ratio > 1.0:
+                ratio  = 1.0
+                status = "data_issue"
+            else:
+                status = "ok"
 
         updates.append({"r": ratio, "s": status, "pid": parcel_id})
 
@@ -960,9 +965,10 @@ def compute_coverage(engine) -> int:
             updates,
         )
 
-    n_computed = sum(1 for u in updates if u["s"] == "ok")
-    n_other    = len(updates) - n_computed
-    print(f"    coverage: {n_computed} computed, {n_other} indeterminate")
+    n_ok      = sum(1 for u in updates if u["s"] == "ok")
+    n_issue   = sum(1 for u in updates if u["s"] == "data_issue")
+    n_other   = len(updates) - n_ok - n_issue
+    print(f"    coverage: {n_ok} ok, {n_issue} data_issue, {n_other} indeterminate")
     return len(updates)
 
 

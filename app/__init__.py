@@ -8,7 +8,7 @@ def create_app():
     app = Flask(__name__, template_folder="templates", static_folder="static")
 
     app.config["DATABASE"] = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "data", "dclt.db"
+        os.path.dirname(os.path.dirname(__file__)), "data", "transactions.db"
     )
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-in-prod")
 

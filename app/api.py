@@ -605,7 +605,7 @@ def town_docs_list():
     ).fetchall():
         cand_by_doc[r["doc_id"]].add(r["parcel_id"])
 
-    # Adjudications from dclt.db: doc_id -> {parcel_id: status}
+    # Adjudications from transactions.db: doc_id -> {parcel_id: status}
     adj_by_doc: dict[str, dict] = defaultdict(dict)
     if _table_exists(dclt, "parcel_link_adjudications"):
         for r in dclt.execute(
@@ -682,7 +682,7 @@ def town_doc_detail(doc_id):
             (doc_id,),
         ).fetchall()
 
-    # Adjudications from dclt.db
+    # Adjudications from transactions.db
     adj_map: dict[str, dict] = {}
     if _table_exists(dclt, "parcel_link_adjudications"):
         for r in dclt.execute(

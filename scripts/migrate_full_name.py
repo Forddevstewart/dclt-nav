@@ -15,7 +15,7 @@ import os
 
 DB_PATH = os.environ.get(
     "DCLT_DB",
-    os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "dclt.db"),
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "transactions.db"),
 )
 
 

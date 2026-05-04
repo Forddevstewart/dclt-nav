@@ -1,9 +1,9 @@
 """
 One-off migration: copy registry_ocr keyword scores from reference.db
-into dclt.db taggings as system tags.
+into transactions.db taggings as system tags.
 
 Run once after migration 5 has been applied (i.e. after the app has
-started and auto-migrated dclt.db):
+started and auto-migrated transactions.db):
 
     python3 -m processing.migrate_keywords_to_tags
 
@@ -30,9 +30,9 @@ KW_COLS = {
 
 
 def run():
-    dclt_path = ROOT / "data" / "dclt.db"
+    dclt_path = ROOT / "data" / "transactions.db"
     if not dclt_path.exists():
-        print(f"dclt.db not found at {dclt_path} — start the app first to create it")
+        print(f"transactions.db not found at {dclt_path} — start the app first to create it")
         sys.exit(1)
 
     from discovery.config import get_config
@@ -46,7 +46,7 @@ def run():
     ref  = sqlite3.connect(ref_path)
     ref.row_factory = sqlite3.Row
 
-    # Resolve tag_ids from dclt.db
+    # Resolve tag_ids from transactions.db
     tag_ids = {}
     for col, name in KW_COLS.items():
         row = dclt.execute(

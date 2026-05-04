@@ -43,7 +43,7 @@ def run_migrations(db_path: str) -> None:
     if env == "production" and has_dev:
         conn.close()
         raise RuntimeError(
-            "dclt.db contains a dev sentinel — refusing to start. "
+            "transactions.db contains a dev sentinel — refusing to start. "
             "Restore the production database."
         )
 

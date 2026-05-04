@@ -1,5 +1,5 @@
 """
-One-off migration: write GIS layer presence as Parcel-level system tags in dclt.db.
+One-off migration: write GIS layer presence as Parcel-level system tags in transactions.db.
 
 Each GIS layer column in parcels_gis becomes a tagging row when the value
 indicates presence. Confidence is 1.0 — GIS data is authoritative, not scored.
@@ -48,9 +48,9 @@ def _present(val, is_numeric: bool) -> bool:
 
 
 def run():
-    dclt_path = ROOT / "data" / "dclt.db"
+    dclt_path = ROOT / "data" / "transactions.db"
     if not dclt_path.exists():
-        print(f"dclt.db not found at {dclt_path} — start the app first")
+        print(f"transactions.db not found at {dclt_path} — start the app first")
         sys.exit(1)
 
     from discovery.config import get_config
@@ -86,7 +86,7 @@ def run():
     if skipped:
         print(f"  Skipping (column not in parcels_gis): {', '.join(skipped)}")
 
-    # Resolve tag_ids from dclt.db
+    # Resolve tag_ids from transactions.db
     tag_ids: dict[str, int] = {}
     for name, _, _ in active_tags:
         row = dclt.execute(

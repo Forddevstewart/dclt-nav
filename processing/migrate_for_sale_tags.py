@@ -1,5 +1,5 @@
 """
-One-off migration: write For Sale layer presence as Parcel-level system tags in dclt.db.
+One-off migration: write For Sale layer presence as Parcel-level system tags in transactions.db.
 
 Parcels are matched to layer_for_sale using the same address join used at query time
 in api.py. Confidence is 1.0 — presence in the listing file is authoritative.
@@ -19,9 +19,9 @@ ROOT = Path(__file__).parent.parent
 
 
 def run():
-    dclt_path = ROOT / "data" / "dclt.db"
+    dclt_path = ROOT / "data" / "transactions.db"
     if not dclt_path.exists():
-        print(f"dclt.db not found at {dclt_path} — start the app first")
+        print(f"transactions.db not found at {dclt_path} — start the app first")
         sys.exit(1)
 
     from discovery.config import get_config

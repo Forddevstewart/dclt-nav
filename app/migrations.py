@@ -1,5 +1,5 @@
 """
-Forward-only migrations for dclt.db.
+Forward-only migrations for transactions.db.
 
 Each entry is (version: int, sql: str). Applied in order at startup
 if the current schema_version is behind. Never modify an applied migration;

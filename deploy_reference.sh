@@ -5,7 +5,7 @@
 # Usage: ./deploy_reference.sh
 #
 # Safety:
-#   - Snapshots dclt.db on the server before deploying.
+#   - Snapshots transactions.db on the server before deploying.
 #   - Stops the server before swapping reference.db and PDFs.
 #   - Restarts the server after the swap.
 #   - The server must have DCLT_ENV=production set (systemd service).
@@ -22,8 +22,8 @@ LOCAL_GIS="/Volumes/DigitalTwin/CivicTwin/gis/"
 
 STAMP=$(date -u +"%Y%m%dT%H%M%SZ")
 
-echo "==> Snapshot dclt.db on server"
-ssh "$VPS" "cp $APP/data/dclt.db $APP/data/dclt.db.bak.$STAMP"
+echo "==> Snapshot transactions.db on server"
+ssh "$VPS" "cp $APP/data/transactions.db $APP/data/transactions.db.bak.$STAMP"
 
 echo "==> Stop server"
 ssh "$VPS" "sudo systemctl stop dclt-nav"
@@ -43,4 +43,4 @@ rsync -avz --progress --include="*.geojson" --include="*.csv" --exclude="*" "$LO
 echo "==> Start server"
 ssh "$VPS" "sudo systemctl start dclt-nav"
 
-echo "==> Done. Backup at $APP/data/dclt.db.bak.$STAMP"
+echo "==> Done. Backup at $APP/data/transactions.db.bak.$STAMP"

@@ -324,8 +324,9 @@ def main() -> None:
               "no_pdf": 0, "unreadable": 0}
     total_pages_enriched = 0
 
+    total = len(candidates)
     try:
-        for json_path in candidates:
+        for i, json_path in enumerate(candidates, 1):
             rel = json_path
             for root in args.input_roots:
                 try:
@@ -342,9 +343,9 @@ def main() -> None:
             total_pages_enriched += pages_enriched
 
             if status == "enriched" or pages_enriched > 0:
-                log.info("%-70s  %d pages  %.1fs", rel, pages_enriched, elapsed)
+                log.info("[%d/%d] %-70s  %d pages  %.1fs", i, total, rel, pages_enriched, elapsed)
             elif status not in ("no_candidates",):
-                log.warning("%-70s  %s", rel, status)
+                log.warning("[%d/%d] %-70s  %s", i, total, rel, status)
     except KeyboardInterrupt:
         log.info("Interrupted.")
 
