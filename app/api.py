@@ -218,6 +218,7 @@ def parcels_list():
     has_coverage  = _column_exists(db, "parcels", "coverage_ratio")
     has_usc       = _column_exists(db, "parcels", "is_undeveloped_state_code")
     has_farming   = _column_exists(db, "parcels", "farming_suitability")
+    has_acq_suit  = _column_exists(db, "parcels", "acquisition_suitability")
 
     if has_gis:
         gis_select = """,
@@ -268,9 +269,10 @@ def parcels_list():
         fs_select = ", 0 for_sale"
         fs_join = ""
 
-    cov_select     = ", p.coverage_ratio, p.coverage_status" if has_coverage else ", NULL coverage_ratio, NULL coverage_status"
-    usc_select     = ", p.is_undeveloped_state_code" if has_usc else ", 0 is_undeveloped_state_code"
-    farming_select = ", p.farming_suitability" if has_farming else ", NULL farming_suitability"
+    cov_select      = ", p.coverage_ratio, p.coverage_status" if has_coverage else ", NULL coverage_ratio, NULL coverage_status"
+    usc_select      = ", p.is_undeveloped_state_code" if has_usc else ", 0 is_undeveloped_state_code"
+    farming_select  = ", p.farming_suitability" if has_farming else ", NULL farming_suitability"
+    acq_suit_select = ", p.acquisition_suitability" if has_acq_suit else ", NULL acquisition_suitability"
 
     sql = f"""
         SELECT p.parcel_id, p.site_addr, p.owner_name, p.owner_category,
@@ -282,7 +284,7 @@ def parcels_list():
                  WHEN 'ASSESSOR_ONLY' THEN 'ADB-only'
                  WHEN 'MASSGIS_ONLY'  THEN 'GIS-only'
                  ELSE 'OK'
-               END AS identity_state{cov_select}{usc_select}{farming_select}
+               END AS identity_state{cov_select}{usc_select}{farming_select}{acq_suit_select}
                {gis_select}{kw_select}{fs_select}
         FROM parcels p
         {gis_join}
@@ -895,6 +897,39 @@ _DYNAMIC_LAYERS = {
     "parcel-coverage-rollup":  "parcel_coverage_rollup",
     "parcel-article97-rollup": "parcel_article97_rollup",
 }
+
+
+@bp.route("/filter-entry-points")
+def filter_entry_points_list():
+    """Curated deep-link entry points for a node type.
+
+    ?node_type=parcel  — optional; returns all node types if omitted.
+    Only non-deprecated entries are returned, ordered by display_order.
+    """
+    node_type = request.args.get("node_type", "")
+    db = get_db()
+    if not _table_exists(db, "filter_entry_points"):
+        db.close()
+        return jsonify([])
+    if node_type:
+        rows = db.execute(
+            "SELECT entry_point_id, node_type, label, group_label,"
+            "       payload_json, display_order"
+            " FROM filter_entry_points"
+            " WHERE deprecated_at IS NULL AND node_type = ?"
+            " ORDER BY display_order, entry_point_id",
+            (node_type,),
+        ).fetchall()
+    else:
+        rows = db.execute(
+            "SELECT entry_point_id, node_type, label, group_label,"
+            "       payload_json, display_order"
+            " FROM filter_entry_points"
+            " WHERE deprecated_at IS NULL"
+            " ORDER BY node_type, display_order, entry_point_id",
+        ).fetchall()
+    db.close()
+    return jsonify([dict(r) for r in rows])
 
 
 @bp.route("/layers/<layer_name>")

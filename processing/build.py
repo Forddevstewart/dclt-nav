@@ -315,7 +315,6 @@ _LAYER_SPECS: list[dict] = [
             "VERSION":    "natcomm_version",
         },
     },
-    # cvp (dennis_cvp.csv) — not yet generated; add here when available
     {
         "name": "bm3_vern",
         "file": "dennis_bm3_wern.csv",  # typo in QGIS export
@@ -1009,6 +1008,195 @@ def compute_undeveloped_state_code(engine) -> int:
     return n
 
 
+# ── Derived Layer: ParcelAcquisitionSuitability ───────────────────────────────
+
+# Threshold constants — all band-boundary decisions are collected here so that
+# calibration changes (FY-27 rubric or later) are one-line edits. The composite
+# intermediate layers (ParcelConservationValue, ParcelDevelopmentPotential,
+# ParcelProtectionDurability) are anticipated; when each lands, the corresponding
+# helper below becomes a thin wrapper that reads the pre-computed value instead
+# of re-deriving it. That substitution is mechanical.
+
+_AS_COVERAGE_LIKELY   = 0.25   # ratio < this  → low development pressure (Likely threshold)
+_AS_COVERAGE_POSSIBLE = 0.60   # ratio < this  → moderate pressure (still Possible)
+_AS_ACRES_LARGE       = 2.0    # billingacres ≥ this + low coverage → size signal
+
+
+def _as_present(v) -> bool:
+    """True when a GIS column carries a meaningful value (not null/empty)."""
+    return v is not None and str(v).strip() not in ("", "0", "nan")
+
+
+def _as_conservation_value(row: dict) -> int:
+    """Proxy for ParcelConservationValue (future Derived Layer).
+
+    Returns:
+      2 — BioMap3 Core Habitat or Critical Natural Landscape present (highest CA priority)
+      1 — any other positive conservation signal
+      0 — no signals detected
+
+    When ParcelConservationValue is materialized, replace the body of this function
+    with:  return 2 if row["conservation_value"] == "High" else (1 if ... else 0)
+
+    Inputs used:
+      bm3_ch_id   — BioMap3 Core Habitat (presence; area available in bm3_ch_acres)
+      bm3_cnl_id  — BioMap3 Critical Natural Landscape (presence; area in bm3_cnl_acres)
+      bm3_wc_id   — BioMap3 Wetland Corridor / Local Landscapes (presence; area in bm3_wc_acres)
+      bm3_vp_id   — BioMap3 Local Vernal Pools (LOC_VP_ID from dennis_bm3_wern.csv)
+      prihab_id   — Priority Habitat of Rare Species (presence; acreage not in current export)
+      zone2_id    — Zone II WHP (presence; acreage in zone2_acres)
+      os_site_name— Protected open space adjacency (presence; site acreage in os_acres)
+      billingacres, coverage_ratio — size + low-coverage signal
+    """
+    # Tier 2: highest-priority BioMap layers
+    if _as_present(row.get("bm3_ch_id")) or _as_present(row.get("bm3_cnl_id")):
+        return 2
+
+    # Tier 1: any remaining conservation signal
+    if (
+        _as_present(row.get("prihab_id"))        # Priority Habitat of Rare Species
+        or _as_present(row.get("bm3_wc_id"))     # BioMap3 Wetland Corridor (Local Landscapes)
+        or _as_present(row.get("bm3_vp_id"))     # BioMap3 Vernal Pool (potential VP proxy)
+        or _as_present(row.get("zone2_id"))      # Zone II WHP
+        or _as_present(row.get("os_site_name"))  # Protected open space adjacency
+    ):
+        return 1
+
+    # Tier 1: large parcel with very low coverage — size × undevelopment signal
+    try:
+        acres = float(row.get("billingacres") or 0)
+        ratio = float(row["coverage_ratio"]) if row.get("coverage_ratio") is not None else 1.0
+        if acres >= _AS_ACRES_LARGE and ratio < _AS_COVERAGE_LIKELY:
+            return 1
+    except (TypeError, ValueError):
+        pass
+
+    return 0
+
+
+def _as_development_pressure(row: dict) -> int:
+    """Proxy for ParcelDevelopmentPotential (future Derived Layer).
+
+    Returns:
+      0 — low pressure  (coverage_ratio < _AS_COVERAGE_LIKELY, or no GIS data)
+      1 — moderate      (coverage_ratio < _AS_COVERAGE_POSSIBLE)
+      2 — high pressure (coverage_ratio ≥ _AS_COVERAGE_POSSIBLE)
+
+    When ParcelDevelopmentPotential is materialized, replace the body with:
+      return int(row["development_potential_score"])  # or equivalent mapping
+
+    coverage_status == 'no_structure' (ratio = 0) always returns 0.
+    Null coverage_ratio (no GIS / ASSESSOR_ONLY) is treated conservatively as 0
+    — we have no evidence of development, so assume low pressure.
+    """
+    try:
+        ratio = row.get("coverage_ratio")
+        if ratio is None:
+            return 0
+        ratio = float(ratio)
+        if ratio < _AS_COVERAGE_LIKELY:
+            return 0
+        if ratio < _AS_COVERAGE_POSSIBLE:
+            return 1
+        return 2
+    except (TypeError, ValueError):
+        return 0
+
+
+def compute_acquisition_suitability(engine) -> int:
+    """Write acquisition_suitability to the parcels table.
+
+    Derived Layer — Source type: Derived. Materialized on ingest.
+    State space: {Not suitable, Possible, Likely}
+
+    Band logic:
+      Likely       — conservation_value = 2 AND development_pressure = 0
+                     AND IdentityState = OK (data confidence gate)
+      Possible     — conservation_value ≥ 1  (false-negative discipline: any signal lifts)
+      Not suitable — conservation_value = 0
+
+    Intermediate composites anticipated:
+      ParcelConservationValue     → _as_conservation_value()
+      ParcelDevelopmentPotential  → _as_development_pressure()
+      ParcelProtectionDurability  → (future; IdentityState + open-space durability signals)
+
+    See _AS_* constants above for calibration points.
+
+    Inputs from parcels (External / Derived Layers):
+      coverage_ratio, coverage_status  ParcelFootprintRatio
+      join_status                      IdentityState (BOTH → OK)
+      billingacres                     parcel size
+
+    Inputs from parcels_gis (External Layers):
+      bm3_ch_id, bm3_ch_acres          BioMap3 Core Habitat
+      bm3_cnl_id, bm3_cnl_acres        BioMap3 Critical Natural Landscape
+      bm3_wc_id, bm3_wc_acres          BioMap3 Wetland Corridor (Local Landscapes)
+      bm3_vp_id, bm3_vp_acres          BioMap3 Vernal Pool (potential VP proxy)
+      prihab_id                        Priority Habitat of Rare Species (presence only)
+      zone2_id, zone2_acres            Zone II WHP
+      os_site_name, os_acres           Protected open space adjacency
+
+    """
+    if not _table_exists(engine, "parcels_gis"):
+        print("  SKIP — parcels_gis not found (acquisition_suitability not computed)")
+        return 0
+
+    with engine.begin() as con:
+        con.execute(text(
+            "ALTER TABLE parcels ADD COLUMN acquisition_suitability TEXT"
+        ))
+
+    with engine.connect() as con:
+        rows = con.execute(text("""
+            SELECT
+                p.parcel_id,
+                p.billingacres,
+                p.coverage_ratio,
+                p.coverage_status,
+                p.join_status,
+                g.bm3_ch_id,    g.bm3_ch_acres,
+                g.bm3_cnl_id,   g.bm3_cnl_acres,
+                g.bm3_wc_id,    g.bm3_wc_acres,
+                g.bm3_vp_id,    g.bm3_vp_acres,
+                g.prihab_id,
+                g.zone2_id,     g.zone2_acres,
+                g.os_site_name, g.os_acres
+            FROM parcels p
+            LEFT JOIN parcels_gis g ON g.parcel_id = p.parcel_id
+        """)).fetchall()
+
+    updates = []
+    for row in rows:
+        r = row._mapping
+        cv = _as_conservation_value(r)
+        dp = _as_development_pressure(r)
+        identity_ok = r.get("join_status") == "BOTH"
+
+        if cv == 2 and dp == 0 and identity_ok:
+            state = "Likely"
+        elif cv >= 1:
+            state = "Possible"
+        else:
+            state = "Not suitable"
+
+        updates.append({"state": state, "pid": r["parcel_id"]})
+
+    with engine.begin() as con:
+        con.execute(
+            text("UPDATE parcels SET acquisition_suitability = :state WHERE parcel_id = :pid"),
+            updates,
+        )
+
+    counts: dict[str, int] = {}
+    for u in updates:
+        counts[u["state"]] = counts.get(u["state"], 0) + 1
+    summary = ", ".join(
+        f"{counts[s]} {s}" for s in ["Likely", "Possible", "Not suitable"] if s in counts
+    )
+    print(f"    acquisition_suitability: {summary}")
+    return len(updates)
+
+
 # ── Derived Layer: ParcelFarmingSuitability ───────────────────────────────────
 
 def compute_farming_suitability(engine) -> int:
@@ -1064,6 +1252,89 @@ def compute_farming_suitability(engine) -> int:
     summary = ", ".join(f"{counts[s]} {s}" for s in ["Likely", "Possible", "Not suitable"] if s in counts)
     print(f"    farming_suitability: {summary}")
     return len(updates)
+
+
+# ── Derived Layers: ParcelAcquisitionSuitability inputs ──────────────────────
+
+def compute_parcel_acq_layers(engine) -> int:
+    """Write CA-named columns that surface ParcelAcquisitionSuitability inputs.
+
+    These are informational Derived Layers for expert review in the parcel detail
+    panel. They are NOT inputs to compute_acquisition_suitability(), which reads
+    parcels_gis directly. Materializing them here gives them CA Layer names and
+    makes them available via SELECT * FROM parcels in the detail endpoint.
+
+    CA Layer                        Column          Source
+    ─────────────────────────────────────────────────────────────────────────────
+    ParcelAbuttingProtectedAcreage  os_acres        parcels_gis.os_acres (site ac)
+    ParcelBioMapCoreArea            bm3_core_acres  parcels_gis.bm3_ch_acres
+    ParcelBioMapCNLArea             bm3_cnl_acres   parcels_gis.bm3_cnl_acres
+    ParcelBioMapLocalArea           bm3_local_acres parcels_gis.bm3_wc_acres
+    ParcelPHRSArea                  phrs_present    parcels_gis.prihab_id (presence only;
+                                                    area awaits QGIS intersection export)
+    ParcelZoneIIAcreage             zone2_acres     parcels_gis.zone2_acres (polygon ac)
+    (VP companion)                  vp_present      parcels_gis.bm3_vp_id presence
+
+    Acreage values reflect source-polygon area from the QGIS join, not intersection
+    area. This is a known limitation of the current export; values are directionally
+    useful but not precise overlap measurements.
+    """
+    if not _table_exists(engine, "parcels_gis"):
+        print("  SKIP — parcels_gis not found (parcel_acq_layers not computed)")
+        return 0
+
+    with engine.begin() as con:
+        for col, dtype in [
+            ("os_acres",        "REAL"),
+            ("bm3_core_acres",  "REAL"),
+            ("bm3_cnl_acres",   "REAL"),
+            ("bm3_local_acres", "REAL"),
+            ("phrs_present",    "INTEGER"),
+            ("zone2_acres",     "REAL"),
+            ("vp_present",      "INTEGER"),
+        ]:
+            con.execute(text(f"ALTER TABLE parcels ADD COLUMN {col} {dtype}"))
+
+        def _ac(col: str) -> str:
+            return f"CAST(NULLIF(TRIM(g.{col}), '') AS REAL)"
+
+        con.execute(text(f"""
+            UPDATE parcels SET
+                os_acres        = (SELECT {_ac('os_acres')}
+                                   FROM parcels_gis g WHERE g.parcel_id = parcels.parcel_id),
+                bm3_core_acres  = (SELECT {_ac('bm3_ch_acres')}
+                                   FROM parcels_gis g WHERE g.parcel_id = parcels.parcel_id),
+                bm3_cnl_acres   = (SELECT {_ac('bm3_cnl_acres')}
+                                   FROM parcels_gis g WHERE g.parcel_id = parcels.parcel_id),
+                bm3_local_acres = (SELECT {_ac('bm3_wc_acres')}
+                                   FROM parcels_gis g WHERE g.parcel_id = parcels.parcel_id),
+                zone2_acres     = (SELECT {_ac('zone2_acres')}
+                                   FROM parcels_gis g WHERE g.parcel_id = parcels.parcel_id),
+                phrs_present    = (SELECT CASE WHEN g.prihab_id IS NOT NULL AND g.prihab_id != ''
+                                               THEN 1 ELSE 0 END
+                                   FROM parcels_gis g WHERE g.parcel_id = parcels.parcel_id),
+                vp_present      = (SELECT CASE WHEN g.bm3_vp_id IS NOT NULL AND g.bm3_vp_id != ''
+                                               THEN 1 ELSE 0 END
+                                   FROM parcels_gis g WHERE g.parcel_id = parcels.parcel_id)
+        """))
+
+    counts: dict[str, int] = {}
+    with engine.connect() as con:
+        for col, pred in [
+            ("os_acres",        "IS NOT NULL"),
+            ("bm3_core_acres",  "IS NOT NULL"),
+            ("bm3_cnl_acres",   "IS NOT NULL"),
+            ("bm3_local_acres", "IS NOT NULL"),
+            ("zone2_acres",     "IS NOT NULL"),
+            ("phrs_present",    "= 1"),
+            ("vp_present",      "= 1"),
+        ]:
+            n = con.execute(text(f"SELECT COUNT(*) FROM parcels WHERE {col} {pred}")).scalar()
+            counts[col] = n
+
+    summary = ", ".join(f"{n} {col}" for col, n in counts.items() if n)
+    print(f"    parcel_acq_layers: {summary or '(no overlaps found)'}")
+    return sum(counts.values())
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -1140,7 +1411,9 @@ def main() -> None:
         ("build_parcels",  None,           lambda e: build_parcels(e)),
         ("coverage",       None,           lambda e: compute_coverage(e)),
         ("undeveloped_state_code", None,   lambda e: compute_undeveloped_state_code(e)),
-        ("farming_suitability",    None,   lambda e: compute_farming_suitability(e)),
+        ("farming_suitability",       None,   lambda e: compute_farming_suitability(e)),
+        ("acquisition_suitability",   None,   lambda e: compute_acquisition_suitability(e)),
+        ("parcel_acq_layers",         None,   lambda e: compute_parcel_acq_layers(e)),
         ("link_candidates", None,           lambda e: _load_link_candidates(e)),
         ("schema_columns",  None,           lambda e: load_schema_columns(e)),
         ("gis_sources",     None,           lambda e: load_gis_sources(e)),

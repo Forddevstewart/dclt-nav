@@ -89,8 +89,9 @@
     .tag-dd-remove { color:#dc2626; }
     .tag-dd-remove:hover { background:#fee2e2; }
 
-    /* ── Filter chips (list-level tag picker, toggleable) ───────────────────── */
+    /* ── Filter chips (list-level handle-then-picker) ───────────────────────── */
     .filter-chips { display:flex; flex-wrap:wrap; gap:.3rem; margin-top:.25rem; }
+    .filter-chip-wrap { position:relative; display:inline-flex; }
     .filter-chip {
       padding:.18rem .55rem; border-radius:12px; font-size:11px; font-weight:500;
       cursor:pointer; user-select:none; white-space:nowrap; border:1px solid #cbd5e1;
@@ -99,6 +100,29 @@
     .filter-chip:hover { border-color:#94a3b8; background:#f8fafc; }
     .filter-chip.active.user-tag   { background:#dbeafe; border-color:#93c5fd; color:#1d4ed8; }
     .filter-chip.active.layer-attr { background:#dcfce7; border-color:#86efac; color:#166534; }
+    .filter-chip.entry-point       { background:#f0fdf4; border-color:#86efac; color:#166534; }
+    .filter-chip.entry-point:hover { background:#dcfce7; }
+    .filter-chip.entry-point.active { background:#dcfce7; border-color:#4ade80; font-weight:700; }
+    .filter-chip-picker {
+      position:absolute; top:calc(100% + 4px); left:0; z-index:30;
+      background:#fff; border:1px solid #e2e8f0; border-radius:6px;
+      box-shadow:0 4px 12px rgba(0,0,0,.12); min-width:150px; overflow:hidden;
+      padding:.25rem 0;
+    }
+    .filter-chip-opt {
+      display:flex; align-items:center; gap:.5rem;
+      padding:.3rem .65rem; font-size:12px; cursor:pointer; color:#334155;
+      user-select:none;
+    }
+    .filter-chip-opt:hover { background:#f1f5f9; }
+    .filter-chip-opt input[type=checkbox] { cursor:pointer; }
+    .filter-chip-slider { padding:.4rem .65rem; }
+    .filter-chip-slider-row { display:flex; align-items:center; gap:.5rem; }
+    .filter-chip-clear {
+      padding:.3rem .65rem; font-size:11px; cursor:pointer; color:#dc2626;
+      border-top:1px solid #e2e8f0; margin-top:.2rem;
+    }
+    .filter-chip-clear:hover { background:#fee2e2; }
     .filter-section { font-size:11px; color:#94a3b8; margin-bottom:.25rem; }
 
     /* ── Admin secondary tabs ───────────────────────────────────────────────── */
@@ -618,6 +642,12 @@
             </div>
 
             <div class="ov-sb-card">
+              <div class="ov-sb-title">Navigator conversation</div>
+              <p class="ov-sb-text">Background discussion doc for working sessions — covers goals, scope, and open questions.</p>
+              <a href="/docs/navigator-conversation" target="_blank" rel="noopener" class="ov-sb-btn ov-sb-btn-light">Open PDF ↗</a>
+            </div>
+
+            <div class="ov-sb-card">
               <div class="ov-sb-title">About DCLT</div>
               <p class="ov-sb-text">The Dennis Conservation Land Trust is a 501(c)(3) nonprofit dedicated to protecting and stewarding natural lands in Dennis, Massachusetts for the benefit of present and future generations.</p>
               <a href="https://dennisconservationlandtrust.org" target="_blank" rel="noopener"
@@ -883,16 +913,31 @@
           <input class="search-input" x-model.debounce.200ms="parcelSearch"
             placeholder="Name or address" type="search" autocomplete="off"
             @input="parcelPage=1">
-          <template x-if="allParcels.some(p => p.identity_state || p.has_zone1 || p.has_zone2 || p.has_prihab || p.has_esthab || p.has_natcomm || p.has_bm3 || p.has_openspace || p.has_wetlands || p.for_sale || (p.farming_suitability && p.farming_suitability !== 'Not suitable'))">
+          <template x-if="allParcels.some(p => p.identity_state || p.has_zone1 || p.has_zone2 || p.has_prihab || p.has_esthab || p.has_natcomm || p.has_bm3 || p.has_openspace || p.has_wetlands || p.for_sale || (p.farming_suitability && p.farming_suitability !== 'Not suitable') || (p.acquisition_suitability && p.acquisition_suitability !== 'Not suitable') || (p.coverage_estimate != null && p.coverage_estimate !== 'Developed'))">
             <div>
               <div class="filter-section">Filter by attribute</div>
               <div class="filter-chips">
                 <template x-for="chip in _PARCEL_LAYER_CHIPS" :key="chip.col">
-                  <button class="filter-chip"
-                    :class="{active: parcelLayerFilter.includes(chip.col), 'layer-attr': true}"
-                    @click="toggleParcelLayer(chip.col)"
-                    x-text="chip.label">
-                  </button>
+                  <div class="filter-chip-wrap">
+                    <button class="filter-chip"
+                      :class="{active: parcelLayerFilters[chip.col]?.length > 0, 'layer-attr': true}"
+                      @click.stop="toggleFilterChipPicker('pl:' + chip.col)"
+                      x-text="parcelLayerChipLabel(chip)">
+                    </button>
+                    <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'pl:' + chip.col" @click.stop>
+                      <template x-for="v in chip.values" :key="v">
+                        <label class="filter-chip-opt">
+                          <input type="checkbox"
+                            :checked="parcelLayerFilters[chip.col]?.includes(v)"
+                            @change="toggleParcelLayerValue(chip.col, v)">
+                          <span x-text="v === 1 ? 'Present' : String(v)"></span>
+                        </label>
+                      </template>
+                      <template x-if="parcelLayerFilters[chip.col]?.length > 0">
+                        <div class="filter-chip-clear" @click="clearParcelLayerFilter(chip.col)">Clear</div>
+                      </template>
+                    </div>
+                  </div>
                 </template>
               </div>
             </div>
@@ -902,46 +947,38 @@
               <div class="filter-section">Filter by tag</div>
               <div class="filter-chips">
                 <template x-for="tag in allParcelTagOptions" :key="tag.tag_id">
-                  <button class="filter-chip"
-                    :class="{active: parcelTagFilter.includes(tag.tag_id), 'user-tag': true}"
-                    @click="toggleParcelTag(tag.tag_id)"
-                    x-text="tag.name">
-                  </button>
+                  <div class="filter-chip-wrap">
+                    <button class="filter-chip"
+                      :class="{active: parcelTagFilters[tag.tag_id]?.length > 0, 'user-tag': true}"
+                      @click.stop="toggleFilterChipPicker('pt:' + tag.tag_id)"
+                      x-text="parcelTagChipLabel(tag)">
+                    </button>
+                    <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'pt:' + tag.tag_id" @click.stop>
+                      <template x-for="s in tag.states_csv.split(',')" :key="s">
+                        <label class="filter-chip-opt">
+                          <input type="checkbox"
+                            :checked="parcelTagFilters[tag.tag_id]?.includes(s)"
+                            @change="toggleParcelTagState(tag.tag_id, s)">
+                          <span x-text="s"></span>
+                        </label>
+                      </template>
+                      <template x-if="parcelTagFilters[tag.tag_id]?.length > 0">
+                        <div class="filter-chip-clear" @click="clearParcelTagFilter(tag.tag_id)">Clear</div>
+                      </template>
+                    </div>
+                  </div>
                 </template>
               </div>
             </div>
           </template>
-          <div x-show="allParcels.some(p => p.coverage_status != null)">
-            <div class="filter-section">Coverage</div>
-            <div class="filter-chips">
-              <button class="filter-chip"
-                :class="{active: parcelCoverageStatusFilter.includes('no_structure')}"
-                @click="toggleCoverageStatus('no_structure')">No structure</button>
-              <button class="filter-chip"
-                :class="{active: parcelCoverageStatusFilter.includes('no_acreage')}"
-                @click="toggleCoverageStatus('no_acreage')">No acreage</button>
-            </div>
-            <div style="display:flex;align-items:center;gap:.4rem;margin-top:.35rem;">
-              <span style="font-size:11px;color:#94a3b8;white-space:nowrap;">Coverage ≥</span>
-              <input type="range" min="0" max="100" step="1" x-model.number="parcelCoverageMin" style="flex:1;accent-color:#3b82f6;">
-              <span style="font-size:11px;color:#64748b;white-space:nowrap;min-width:2.5rem;" x-text="parcelCoverageMin+'%'"></span>
-            </div>
-          </div>
-          <div class="sort-row">
-            <span class="sort-label">Sort</span>
-            <select class="ctrl-select" x-model="parcelSort">
-              <option value="site_addr">Address</option>
-              <option value="owner_name">Owner</option>
-              <option value="parcel_id">Parcel ID</option>
-              <option value="totalapprvalue">Value</option>
-              <option value="property_class">Class</option>
-              <option value="billingacres">Acres</option>
-            </select>
-            <button class="sort-dir-btn" @click="parcelSortDir = parcelSortDir==='asc'?'desc':'asc'"
-              :title="parcelSortDir==='asc'?'Ascending':'Descending'">
-              <span x-text="parcelSortDir==='asc'?'↑':'↓'"></span>
+          <template x-if="Object.values(parcelLayerFilters).some(v=>v.length>0) || Object.values(parcelTagFilters).some(v=>v.length>0)">
+            <button style="font-size:11px;color:#dc2626;background:none;border:none;padding:0;cursor:pointer;text-align:left;"
+              @click="parcelLayerFilters={}; parcelTagFilters={}; parcelTagFoldMaps={}; parcelPage=1;">
+              Clear filters
             </button>
-          </div>
+          </template>
+          <!-- sort row hidden -->
+
         </div>
 
         <div class="col-left-footer">
@@ -1016,6 +1053,19 @@
                   </tbody>
                 </table>
               </div>
+
+              <template x-if="conservationLayers(parcelDetail.parcel)">
+                <div class="section">
+                  <div class="section-title">Conservation Layers</div>
+                  <table class="attr-table">
+                    <tbody>
+                      <template x-for="[lbl,val] in conservationLayers(parcelDetail.parcel)" :key="lbl">
+                        <tr><td class="attr-label" x-text="lbl"></td><td class="attr-value" x-text="val"></td></tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
 
               <div class="section">
                 <div class="section-title">Registry of Deeds
@@ -1131,6 +1181,7 @@
                   <div class="tag-chips">
                     <template x-for="tag in allParcelTagOptions" :key="tag.tag_id">
                       <div class="tag-chip"
+                        x-show="(tag.name !== 'CoverageDetermination' || coverageEstimate(parcelDetail?.parcel) !== 'Developed') && (tag.name !== 'AcquisitionDetermination' || ['Possible','Likely'].includes(parcelDetail?.parcel?.acquisition_suitability))"
                         :class="{
                           applied:  parcelTagState[tag.tag_id] != null,
                           pending:  tagPending[tag.tag_id],
@@ -1210,31 +1261,54 @@
             <div class="filter-section">Filter by attribute</div>
             <div class="filter-chips">
               <template x-for="chip in _DOC_LAYER_CHIPS" :key="chip.key">
-                <button class="filter-chip"
-                  :class="{active: docLayerFilter.includes(chip.key), 'layer-attr': true}"
-                  @click="toggleDocLayer(chip.key)"
-                  x-text="chip.label">
-                </button>
+                <div class="filter-chip-wrap">
+                  <button class="filter-chip"
+                    :class="{active: docLayerFilters[chip.key] != null, 'layer-attr': true}"
+                    @click.stop="toggleFilterChipPicker('dl:' + chip.key)"
+                    x-text="docLayerChipLabel(chip)">
+                  </button>
+                  <div class="filter-chip-picker filter-chip-slider" style="min-width:190px;"
+                       x-show="filterChipPickerOpen === 'dl:' + chip.key" @click.stop>
+                    <div style="font-size:11px;color:#64748b;margin-bottom:.35rem;">Min score</div>
+                    <div class="filter-chip-slider-row">
+                      <input type="range" min="0" max="1" step="0.05"
+                        :value="docLayerFilters[chip.key] ?? 0.4"
+                        @input="setDocLayerFilter(chip.key, parseFloat($event.target.value))"
+                        style="flex:1;accent-color:#3b82f6;">
+                      <span style="font-size:11px;min-width:2.5rem;text-align:right;"
+                        x-text="(docLayerFilters[chip.key] ?? 0.4).toFixed(2)"></span>
+                    </div>
+                    <div class="filter-chip-clear" @click="clearDocLayerFilter(chip.key)">Clear</div>
+                  </div>
+                </div>
               </template>
             </div>
-            <template x-if="docLayerFilter.length > 0">
-              <div style="display:flex;align-items:center;gap:.4rem;margin-top:.35rem;">
-                <span style="font-size:11px;color:#94a3b8;white-space:nowrap;">Min score</span>
-                <input type="range" min="0" max="1" step="0.05" x-model.number="docLayerThreshold" style="flex:1;accent-color:#3b82f6;">
-                <span style="font-size:11px;color:#64748b;white-space:nowrap;min-width:2.5rem;" x-text="docLayerThreshold.toFixed(2)"></span>
-              </div>
-            </template>
           </div>
           <template x-if="allDocTagOptions.length">
             <div>
               <div class="filter-section">Filter by tag</div>
               <div class="filter-chips">
                 <template x-for="tag in allDocTagOptions" :key="tag.tag_id">
-                  <button class="filter-chip"
-                    :class="{active: docTagFilter.includes(tag.tag_id), 'user-tag': true}"
-                    @click="toggleDocTag(tag.tag_id)"
-                    x-text="tag.name">
-                  </button>
+                  <div class="filter-chip-wrap">
+                    <button class="filter-chip"
+                      :class="{active: docTagFilters[tag.tag_id]?.length > 0, 'user-tag': true}"
+                      @click.stop="toggleFilterChipPicker('dt:' + tag.tag_id)"
+                      x-text="docTagChipLabel(tag)">
+                    </button>
+                    <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'dt:' + tag.tag_id" @click.stop>
+                      <template x-for="s in tag.states_csv.split(',')" :key="s">
+                        <label class="filter-chip-opt">
+                          <input type="checkbox"
+                            :checked="docTagFilters[tag.tag_id]?.includes(s)"
+                            @change="toggleDocTagState(tag.tag_id, s)">
+                          <span x-text="s"></span>
+                        </label>
+                      </template>
+                      <template x-if="docTagFilters[tag.tag_id]?.length > 0">
+                        <div class="filter-chip-clear" @click="clearDocTagFilter(tag.tag_id)">Clear</div>
+                      </template>
+                    </div>
+                  </div>
                 </template>
               </div>
             </div>
@@ -2033,9 +2107,9 @@
 
   </div><!-- /main -->
 
-  <!-- Tag picker close overlay (closes any open dropdown when clicking outside) -->
-  <div x-show="tagPickerOpen !== null"
-       @click="tagPickerOpen = null"
+  <!-- Overlay: closes any open tag picker or filter chip picker when clicking outside -->
+  <div x-show="tagPickerOpen !== null || filterChipPickerOpen !== null"
+       @click="tagPickerOpen = null; filterChipPickerOpen = null"
        style="position:fixed;inset:0;z-index:15;"></div>
 
   <!-- Tag confirmation dialog -->
@@ -2056,20 +2130,24 @@
 
   <script>
     // ── Layer attribute filter chips (read from External/Derived Layer columns) ─
+    // values: available picker options. 1 = boolean "Present"; otherwise exact column values.
     const _PARCEL_LAYER_CHIPS = [
-      {label: 'IdentityState',    col: 'identity_state', neq: 'OK'},
-      {label: 'Zone 1 WHP',       col: 'has_zone1'},
-      {label: 'Zone 2 WHP',       col: 'has_zone2'},
-      {label: 'Priority Habitat', col: 'has_prihab'},
-      {label: 'Est. Habitat',     col: 'has_esthab'},
-      {label: 'Nat. Community',   col: 'has_natcomm'},
-      {label: 'BioMap3',          col: 'has_bm3'},
-      {label: 'Open Space',       col: 'has_openspace'},
-      {label: 'Wetlands',         col: 'has_wetlands'},
-      {label: 'For Sale',         col: 'for_sale'},
-      {label: 'Undeveloped SC',        col: 'is_undeveloped_state_code'},
-      {label: 'Farming Suitability',   col: 'farming_suitability', neq: 'Not suitable'},
+      {label: 'Identity State',         col: 'identity_state',         values: ['OK','ADB-only','GIS-only']},
+      {label: 'Zone 1 WHP',             col: 'has_zone1',              values: [1]},
+      {label: 'Zone 2 WHP',             col: 'has_zone2',              values: [1]},
+      {label: 'Priority Habitat',       col: 'has_prihab',             values: [1]},
+      {label: 'Est. Habitat',           col: 'has_esthab',             values: [1]},
+      {label: 'Nat. Community',         col: 'has_natcomm',            values: [1]},
+      {label: 'BioMap3',                col: 'has_bm3',                values: [1]},
+      {label: 'Open Space',             col: 'has_openspace',          values: [1]},
+      {label: 'Wetlands',               col: 'has_wetlands',           values: [1]},
+      {label: 'For Sale',               col: 'for_sale',               values: [1]},
+      {label: 'Undeveloped SC',         col: 'is_undeveloped_state_code', values: [1]},
+      {label: 'Farming Suitability',    col: 'farming_suitability',    values: ['Not suitable','Possible','Suitable']},
+      {label: 'Acquisition Suitability',col: 'acquisition_suitability',values: ['Not suitable','Possible','Likely']},
+      {label: 'Coverage Estimate',      col: 'coverage_estimate',      values: ['Missing values','Out of range','Underdeveloped','Developed']},
     ];
+
 
     const _DOC_LAYER_CHIPS = [
       {label: 'Conservation Restriction', key: 'kw_conservation_restriction'},
@@ -2094,16 +2172,19 @@
     const KW_THRESHOLD = 0.4;
 
     // ── Pure helpers (no `this`) ──────────────────────────────────────────────
+    function coverageEstimate(p) {
+      if (!p || p.coverage_status == null) return null;
+      if (p.coverage_status === 'no_acreage' || p.coverage_status === 'no_structure') return 'Missing values';
+      if (p.coverage_ratio != null && p.coverage_ratio > 0.9) return 'Out of range';
+      if (p.coverage_ratio != null && p.coverage_ratio < 0.1) return 'Underdeveloped';
+      return 'Developed';
+    }
+
     function parcelAttrs(p) {
       const cur  = v => (v !== null && v !== undefined && v !== '') ? v : null;
       const usd  = v => v ? '$' + Number(v).toLocaleString() : null;
       const ac   = v => v ? Number(v).toFixed(3) + ' ac' : null;
-      const covLabel = s => ({ ok: 'ok', no_structure: 'no structure', no_acreage: 'no acreage' }[s] ?? s);
-      const cov  = p.coverage_status
-        ? (p.coverage_ratio !== null && p.coverage_ratio !== undefined
-            ? (p.coverage_ratio * 100).toFixed(1) + '% · ' + covLabel(p.coverage_status)
-            : covLabel(p.coverage_status))
-        : null;
+      const covPct = p.coverage_ratio != null ? (p.coverage_ratio * 100).toFixed(1) + '%' : null;
       return [
         ['Owner',          cur(p.owner_name)],
         ['Owner Category', cur(p.owner_category)],
@@ -2113,10 +2194,27 @@
         ['IdentityState',  (p.identity_state && p.identity_state !== 'OK') ? p.identity_state : null],
         ['Appraised Value',usd(p.totalapprvalue)],
         ['Billing Acres',  ac(p.billingacres)],
-        ['Coverage',           cov],
-        ['Farming Suitability', (p.farming_suitability && p.farming_suitability !== 'Not suitable') ? p.farming_suitability : null],
+        ['CoverageEstimate', coverageEstimate(p)],
+        ['Coverage',         covPct],
+        ['Farming Suitability',     (p.farming_suitability     && p.farming_suitability     !== 'Not suitable') ? p.farming_suitability     : null],
+        ['Acq. Suitability',        (p.acquisition_suitability && p.acquisition_suitability !== 'Not suitable') ? p.acquisition_suitability : null],
         ['Condo Units',        (p.condo_units > 0) ? p.condo_units : null],
       ].filter(([,v]) => v !== null);
+    }
+
+    function conservationLayers(p) {
+      if (!p || p.acquisition_suitability == null) return null;
+      const ac   = v => v != null ? Number(v).toFixed(1) + ' ac' : '—';
+      const pres = v => v == null  ? '—' : v ? 'Present' : 'Not detected';
+      return [
+        ['Protected Open Space', ac(p.os_acres)],
+        ['BioMap Core Habitat',  ac(p.bm3_core_acres)],
+        ['BioMap CNL',           ac(p.bm3_cnl_acres)],
+        ['BioMap Local',         ac(p.bm3_local_acres)],
+        ['Priority Habitat',     pres(p.phrs_present)],
+        ['Zone II WHP',          ac(p.zone2_acres)],
+        ['Vernal Pool',          pres(p.vp_present)],
+      ];
     }
 
     function parcelTagStates(tag, parcel) {
@@ -2273,21 +2371,19 @@
         parcelPdfUrl:          null,
         parcelSelectedTownDoc: null,
         parcelGisOpen:       {},
-        parcelTagFilter:     [],
-        parcelTaggedIds:     null,
-        parcelLayerFilter:   [],
-        parcelCoverageMin:   0,
-        parcelCoverageStatusFilter: [],
+        parcelTagFilters:    {},   // tagId → [selectedStates]
+        parcelTagFoldMaps:   {},   // tagId → {parcelId: state}
+        parcelLayerFilters:  {},   // col   → [selectedValues]
+        filterChipPickerOpen: null,
 
         // registry
         allRegistry:       [],
         regLoading:        false,
         docSearch:         '',
         docTypeFilter:     '',
-        docTagFilter:      [],
-        docTaggedIds:      null,
-        docLayerFilter:    [],
-        docLayerThreshold: 0.4,
+        docTagFilters:     {},   // tagId → [selectedStates]
+        docTagFoldMaps:    {},   // tagId → {docId: state}
+        docLayerFilters:   {},   // key   → threshold (number)
         docSort:           'recorded_date',
         docSortDir:        'desc',
         regPage:           1,
@@ -2389,26 +2485,23 @@
         // ── Computed — parcels ──────────────────────────────────────────────
         get filteredParcels() {
           let list = this.allParcels;
-          if (this.parcelLayerFilter.length) {
-            list = list.filter(p => this.parcelLayerFilter.every(col => {
-              const chip = _PARCEL_LAYER_CHIPS.find(c => c.col === col);
-              if (chip?.val != null) return p[col] === chip.val;
-              if (chip?.neq != null) return p[col] != null && p[col] !== chip.neq;
-              return Boolean(p[col]);
-            }));
+          // Layer attribute filters: col → [selectedValues]
+          for (const [col, selected] of Object.entries(this.parcelLayerFilters)) {
+            if (!selected || !selected.length) continue;
+            list = list.filter(p => selected.some(s => s === 1 ? p[col] : p[col] === s));
           }
-          if (this.parcelTagFilter.length) {
-            // Wait for API response; null means loading — don't exclude during fetch
-            if (this.parcelTaggedIds !== null) {
-              list = list.filter(p => this.parcelTaggedIds.has(p.parcel_id));
-            }
-          }
-          if (this.parcelCoverageStatusFilter.length) {
-            list = list.filter(p => this.parcelCoverageStatusFilter.includes(p.coverage_status ?? 'no_structure'));
-          }
-          if (this.parcelCoverageMin > 0) {
-            const minRatio = this.parcelCoverageMin / 100;
-            list = list.filter(p => (p.coverage_ratio ?? 0) >= minRatio);
+          // Tag state filters: tagId → [selectedStates]
+          for (const [tagId, states] of Object.entries(this.parcelTagFilters)) {
+            if (!states || !states.length) continue;
+            const foldMap = this.parcelTagFoldMaps[tagId] || {};
+            const tag = this.allTags.find(t => t.tag_id == tagId);
+            const defaultState = tag ? tag.states_csv.split(',')[0] : 'Unconfirmed';
+            list = list.filter(p => {
+              const fold = Object.prototype.hasOwnProperty.call(foldMap, p.parcel_id)
+                ? foldMap[p.parcel_id]
+                : defaultState;
+              return states.includes(fold);
+            });
           }
           const q = this.parcelSearch.trim().toLowerCase();
           if (q) {
@@ -2446,14 +2539,24 @@
             (d.book+'').includes(q) ||
             (d.page+'').includes(q));
           if (this.docTypeFilter) list = list.filter(d=>d.instrument_type===this.docTypeFilter);
-          if (this.docLayerFilter.length) {
-            const thr = this.docLayerThreshold;
-            list = list.filter(d => this.docLayerFilter.every(key => (d[key] || 0) >= thr));
+          // Layer attribute filters: key → threshold
+          for (const [key, thr] of Object.entries(this.docLayerFilters)) {
+            if (thr == null) continue;
+            list = list.filter(d => (d[key] || 0) >= thr);
           }
-          if (this.docTagFilter.length) {
-            if (this.docTaggedIds) {
-              list = list.filter(d => this.docTaggedIds.has(d.book + '/' + d.page));
-            }
+          // Tag state filters: tagId → [selectedStates]
+          for (const [tagId, states] of Object.entries(this.docTagFilters)) {
+            if (!states || !states.length) continue;
+            const foldMap = this.docTagFoldMaps[tagId] || {};
+            const tag = this.allTags.find(t => t.tag_id == tagId);
+            const defaultState = tag ? tag.states_csv.split(',')[0] : 'Unconfirmed';
+            list = list.filter(d => {
+              const id = d.book + '/' + d.page;
+              const fold = Object.prototype.hasOwnProperty.call(foldMap, id)
+                ? foldMap[id]
+                : defaultState;
+              return states.includes(fold);
+            });
           }
           const f=this.docSort, dir=this.docSortDir==='asc'?1:-1;
           return [...list].sort((a,b)=>{
@@ -2525,16 +2628,10 @@
         // ── Init ────────────────────────────────────────────────────────────
         async init() {
           this.$watch('parcelSearch',        ()=>{ this.parcelPage=1; });
-          this.$watch('parcelCoverageMin',            ()=>{ this.parcelPage=1; });
-          this.$watch('parcelCoverageStatusFilter',   ()=>{ this.parcelPage=1; });
           this.$watch('parcelSort',      ()=>{ this.parcelPage=1; });
           this.$watch('parcelSortDir',   ()=>{ this.parcelPage=1; });
           this.$watch('docSearch',       ()=>{ this.regPage=1; });
           this.$watch('docTypeFilter',   ()=>{ this.regPage=1; });
-          this.$watch('docTagFilter',      ()=>{ this.regPage=1; });
-          this.$watch('docLayerFilter',    ()=>{ this.regPage=1; });
-          this.$watch('docLayerThreshold', ()=>{ this.regPage=1; });
-          this.$watch('parcelLayerFilter', ()=>{ this.parcelPage=1; });
           this.$watch('docSort',         ()=>{ this.regPage=1; });
           this.$watch('docSortDir',      ()=>{ this.regPage=1; });
           // when user closes a doc, the map re-appears — tell Leaflet to recalculate size
@@ -2606,7 +2703,7 @@
           try {
             const r = await fetch('/api/parcels');
             if (!r.ok) throw new Error(r.status);
-            this.allParcels = await r.json();
+            this.allParcels = (await r.json()).map(p => ({ ...p, coverage_estimate: coverageEstimate(p) }));
             const def = this.allParcels.find(p => p.parcel_id === '392-8');
             if (def) this.selectParcel(def);
           } finally { this.parcelsLoading = false; }
@@ -2725,57 +2822,115 @@
           finally    { this.docDetailLoading = false; }
         },
 
-        toggleDocTag(tagId) {
-          this.docTagFilter = this.docTagFilter.includes(tagId)
-            ? this.docTagFilter.filter(id => id !== tagId)
-            : [...this.docTagFilter, tagId];
-          this.refreshDocTagFilter();
+        // ── Filter chip picker ───────────────────────────────────────────────
+
+        toggleFilterChipPicker(key) {
+          this.filterChipPickerOpen = this.filterChipPickerOpen === key ? null : key;
         },
 
-        async refreshDocTagFilter() {
-          if (!this.docTagFilter.length) { this.docTaggedIds = null; return; }
-          try {
-            const url = '/api/tagged/document?tag_ids=' + this.docTagFilter.join(',');
-            const r = await fetch(url);
-            this.docTaggedIds = r.ok ? new Set(await r.json()) : null;
-          } catch(e) { this.docTaggedIds = null; }
+        // Parcel layer attribute filter
+        parcelLayerChipLabel(chip) {
+          const sel = this.parcelLayerFilters[chip.col];
+          if (sel && sel.length) {
+            const labels = sel.map(v => v === 1 ? 'Present' : String(v));
+            return chip.label + ': ' + labels.join(', ');
+          }
+          return chip.label;
         },
 
-        toggleCoverageStatus(status) {
-          this.parcelCoverageStatusFilter = this.parcelCoverageStatusFilter.includes(status)
-            ? this.parcelCoverageStatusFilter.filter(s => s !== status)
-            : [...this.parcelCoverageStatusFilter, status];
-        },
-
-        toggleParcelTag(tagId) {
-          this.parcelPage = 1;
-          this.parcelTagFilter = this.parcelTagFilter.includes(tagId)
-            ? this.parcelTagFilter.filter(id => id !== tagId)
-            : [...this.parcelTagFilter, tagId];
-          this.refreshParcelTagFilter();
-        },
-
-        async refreshParcelTagFilter() {
-          if (!this.parcelTagFilter.length) { this.parcelTaggedIds = null; return; }
-          try {
-            const url = '/api/tagged/parcel?tag_ids=' + this.parcelTagFilter.join(',');
-            const r = await fetch(url);
-            this.parcelTaggedIds = r.ok ? new Set(await r.json()) : new Set();
-          } catch(e) { this.parcelTaggedIds = new Set(); }
-        },
-
-        toggleParcelLayer(col) {
-          this.parcelLayerFilter = this.parcelLayerFilter.includes(col)
-            ? this.parcelLayerFilter.filter(c => c !== col)
-            : [...this.parcelLayerFilter, col];
+        toggleParcelLayerValue(col, val) {
+          const cur = this.parcelLayerFilters[col] || [];
+          const next = cur.includes(val) ? cur.filter(v => v !== val) : [...cur, val];
+          this.parcelLayerFilters = {...this.parcelLayerFilters, [col]: next};
           this.parcelPage = 1;
         },
 
-        toggleDocLayer(key) {
-          this.docLayerFilter = this.docLayerFilter.includes(key)
-            ? this.docLayerFilter.filter(k => k !== key)
-            : [...this.docLayerFilter, key];
+        clearParcelLayerFilter(col) {
+          const f = {...this.parcelLayerFilters};
+          delete f[col];
+          this.parcelLayerFilters = f;
+          this.parcelPage = 1;
+        },
+
+        // Parcel tag state filter
+        parcelTagChipLabel(tag) {
+          const sel = this.parcelTagFilters[tag.tag_id];
+          if (sel && sel.length) return tag.name + ': ' + sel.join(', ');
+          return tag.name;
+        },
+
+        async toggleParcelTagState(tagId, state) {
+          const cur = this.parcelTagFilters[tagId] || [];
+          const next = cur.includes(state) ? cur.filter(s => s !== state) : [...cur, state];
+          this.parcelTagFilters = {...this.parcelTagFilters, [tagId]: next};
+          this.parcelPage = 1;
+          if (next.length > 0 && !this.parcelTagFoldMaps[tagId]) {
+            await this.fetchParcelTagFoldMap(tagId);
+          }
+        },
+
+        clearParcelTagFilter(tagId) {
+          const f = {...this.parcelTagFilters};
+          delete f[tagId];
+          this.parcelTagFilters = f;
+          this.parcelPage = 1;
+        },
+
+        async fetchParcelTagFoldMap(tagId) {
+          try {
+            const r = await fetch('/api/folds/parcel?tag_id=' + tagId);
+            if (r.ok) this.parcelTagFoldMaps = {...this.parcelTagFoldMaps, [tagId]: await r.json()};
+          } catch(e) {}
+        },
+
+        // Doc layer attribute filter (numeric — threshold per chip)
+        docLayerChipLabel(chip) {
+          const thr = this.docLayerFilters[chip.key];
+          if (thr != null) return chip.label + ' ≥' + thr.toFixed(2);
+          return chip.label;
+        },
+
+        setDocLayerFilter(key, threshold) {
+          this.docLayerFilters = {...this.docLayerFilters, [key]: threshold};
           this.regPage = 1;
+        },
+
+        clearDocLayerFilter(key) {
+          const f = {...this.docLayerFilters};
+          delete f[key];
+          this.docLayerFilters = f;
+          this.regPage = 1;
+        },
+
+        // Doc tag state filter
+        docTagChipLabel(tag) {
+          const sel = this.docTagFilters[tag.tag_id];
+          if (sel && sel.length) return tag.name + ': ' + sel.join(', ');
+          return tag.name;
+        },
+
+        async toggleDocTagState(tagId, state) {
+          const cur = this.docTagFilters[tagId] || [];
+          const next = cur.includes(state) ? cur.filter(s => s !== state) : [...cur, state];
+          this.docTagFilters = {...this.docTagFilters, [tagId]: next};
+          this.regPage = 1;
+          if (next.length > 0 && !this.docTagFoldMaps[tagId]) {
+            await this.fetchDocTagFoldMap(tagId);
+          }
+        },
+
+        clearDocTagFilter(tagId) {
+          const f = {...this.docTagFilters};
+          delete f[tagId];
+          this.docTagFilters = f;
+          this.regPage = 1;
+        },
+
+        async fetchDocTagFoldMap(tagId) {
+          try {
+            const r = await fetch('/api/folds/document?tag_id=' + tagId);
+            if (r.ok) this.docTagFoldMaps = {...this.docTagFoldMaps, [tagId]: await r.json()};
+          } catch(e) {}
         },
 
         async adjudicate(kwKey, verdict) {
@@ -2927,6 +3082,7 @@
           } catch(e) { this.allTags = []; }
           finally { this.tagsLoading = false; }
         },
+
 
         toggleTagPicker(ns, tagId) {
           const key = ns + ':' + tagId;

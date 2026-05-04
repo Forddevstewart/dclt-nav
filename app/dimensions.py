@@ -52,6 +52,14 @@ DIMENSIONS: dict[str, dict] = {
         "transitions":   None,          # any-to-any
         "display_order": 330,
     },
+    "AcquisitionDetermination": {
+        "node_type":     "parcel",
+        "states":        ["Unconfirmed", "Pursue", "Watch", "Pass"],
+        "default":       "Unconfirmed",
+        "applicability": "acquisition_suitability_active",
+        "transitions":   None,          # any-to-any
+        "display_order": 340,
+    },
 }
 
 
@@ -101,6 +109,31 @@ def check_applicability(
                 False,
                 f"Article97Determination not applicable — keyword score {score:.2f} "
                 f"is below threshold {ARTICLE97_THRESHOLD}",
+            )
+        return True, ""
+
+    if rule == "acquisition_suitability_active":
+        if target_type != "parcel":
+            return False, "AcquisitionDetermination applies to parcels only"
+        try:
+            row = ref_db.execute(
+                "SELECT acquisition_suitability FROM parcels WHERE parcel_id = ? LIMIT 1",
+                (target_id,),
+            ).fetchone()
+        except Exception:
+            return (
+                False,
+                "AcquisitionDetermination requires ParcelAcquisitionSuitability "
+                "(rebuild reference.db to materialise the layer)",
+            )
+        if not row:
+            return False, "parcel not found in reference data"
+        suitability = row["acquisition_suitability"]
+        if suitability not in ("Possible", "Likely"):
+            return (
+                False,
+                f"AcquisitionDetermination not applicable — ParcelAcquisitionSuitability "
+                f"is '{suitability}' (requires Possible or Likely)",
             )
         return True, ""
 

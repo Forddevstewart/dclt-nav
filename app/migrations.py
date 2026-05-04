@@ -238,4 +238,57 @@ INSERT OR IGNORE INTO tags (name, tag_type, target_entity, states_csv, display_o
 INSERT OR IGNORE INTO tags (name, tag_type, target_entity, states_csv, display_order) VALUES
     ('FarmingDetermination', 'user', 'parcel', 'Unconfirmed,Not Suitable,Possible,Suitable', 330);
 """),
+    (15, """
+-- Deprecate informal 'Acquisition' tag superseded by AcquisitionDetermination.
+UPDATE tags SET deprecated_at = datetime('now')
+    WHERE name = 'Acquisition' AND deprecated_at IS NULL;
+
+-- Register AcquisitionDetermination dimension.
+-- Applicability: ParcelAcquisitionSuitability ∈ {Possible, Likely} (gate enforced in dimensions.py).
+-- Default: Unconfirmed (applicable parcels only). Transitions: any-to-any.
+INSERT OR IGNORE INTO tags (name, tag_type, target_entity, states_csv, display_order) VALUES
+    ('AcquisitionDetermination', 'user', 'parcel', 'Unconfirmed,Pursue,Watch,Pass', 340);
+"""),
+    (16, """
+-- Filter entry points: curated deep-link payloads for node-type entry points
+-- (e.g. left-nav Suitability category clicks). Each entry point carries an
+-- ordered list of (dimension, selection) pairs that pre-populate filter chips
+-- when the user arrives via that entry point.
+CREATE TABLE IF NOT EXISTS filter_entry_points (
+    entry_point_id TEXT PRIMARY KEY,
+    node_type      TEXT NOT NULL,
+    label          TEXT NOT NULL,
+    group_label    TEXT,
+    payload_json   TEXT NOT NULL,
+    display_order  INTEGER NOT NULL DEFAULT 0,
+    created_by     INTEGER,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    deprecated_at  TEXT
+);
+
+-- Append-only audit log for entry point changes.
+CREATE TABLE IF NOT EXISTS filter_entry_point_log (
+    log_id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_point_id TEXT NOT NULL,
+    change_type    TEXT NOT NULL,
+    old_payload    TEXT,
+    new_payload    TEXT,
+    changed_by     INTEGER,
+    changed_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ParcelAcquisitionSuitability entry points.
+-- Each lands on the parcel list with Suitability pre-set and
+-- AcquisitionDetermination = Unconfirmed so the user enters the work queue.
+INSERT OR IGNORE INTO filter_entry_points
+    (entry_point_id, node_type, label, group_label, payload_json, display_order) VALUES
+    ('parcel.acq_suitability.likely',
+     'parcel', 'Likely', 'Acquisition Suitability',
+     '[{"dimension":"ParcelAcquisitionSuitability","selection":"Likely"},{"dimension":"AcquisitionDetermination","selection":"Unconfirmed"}]',
+     10),
+    ('parcel.acq_suitability.possible',
+     'parcel', 'Possible', 'Acquisition Suitability',
+     '[{"dimension":"ParcelAcquisitionSuitability","selection":"Possible"},{"dimension":"AcquisitionDetermination","selection":"Unconfirmed"}]',
+     20);
+"""),
 ]

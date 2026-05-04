@@ -84,6 +84,35 @@ def tagged_entities(entity_type):
     return jsonify(sorted(combined))
 
 
+@bp.route("/folds/<entity_type>")
+def tag_folds(entity_type):
+    """Return {target_id: state} for the latest fold of a given tag dimension.
+
+    ?tag_id=<id>  Required integer tag_id.
+
+    Only entities with at least one tagging event are returned.
+    Callers should treat missing keys as the dimension's default state (typically
+    the first value in states_csv, usually 'Unconfirmed').
+    """
+    if entity_type not in _VALID_ENTITIES:
+        abort(400, "entity_type must be 'parcel' or 'document'")
+    try:
+        tag_id = int(request.args.get("tag_id", ""))
+    except (ValueError, TypeError):
+        abort(400, "tag_id must be an integer")
+
+    db = get_db()
+    rows = db.execute(
+        f"SELECT t1.target_id, t1.state FROM taggings t1"
+        f" WHERE t1.target_type = ? AND t1.tag_id = ?"
+        f"   AND t1.state IS NOT NULL"
+        f"   AND {_FOLD}",
+        (entity_type, tag_id),
+    ).fetchall()
+    db.close()
+    return jsonify({r["target_id"]: r["state"] for r in rows})
+
+
 @bp.route("/tagging/<target_type>/<path:target_id>")
 def tagging_for_target(target_type, target_id):
     """Non-deprecated tags plus current fold state and confidence for one node."""
