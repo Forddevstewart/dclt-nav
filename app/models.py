@@ -10,7 +10,8 @@ def get_db():
 
 
 def get_reference_db():
-    conn = sqlite3.connect(current_app.config["REFERENCE_DATABASE"])
+    path = current_app.config["REFERENCE_DATABASE"]
+    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     return conn
 

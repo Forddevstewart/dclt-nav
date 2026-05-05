@@ -1253,32 +1253,48 @@
         <div class="col-left-controls">
           <input class="search-input" x-model.debounce.300ms="docSearch"
             placeholder="Grantor, grantee, address, parcel…" type="search" autocomplete="off">
-          <select class="ctrl-select" x-model="docTypeFilter">
-            <option value="">All instrument types</option>
-            <template x-for="t in docTypes" :key="t"><option :value="t" x-text="t"></option></template>
-          </select>
           <div>
             <div class="filter-section">Filter by attribute</div>
             <div class="filter-chips">
+              <!-- Instrument type chip -->
+              <div class="filter-chip-wrap">
+                <button class="filter-chip layer-attr"
+                  :class="{active: docTypeFilters.length > 0}"
+                  @click.stop="toggleFilterChipPicker('doc:type')"
+                  x-text="docTypeChipLabel()">
+                </button>
+                <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'doc:type'" @click.stop>
+                  <template x-for="t in docTypes" :key="t">
+                    <label class="filter-chip-opt">
+                      <input type="checkbox" :checked="docTypeFilters.includes(t)" @change="toggleDocType(t)">
+                      <span x-text="t"></span>
+                    </label>
+                  </template>
+                  <template x-if="docTypeFilters.length > 0">
+                    <div class="filter-chip-clear" @click="clearDocTypeFilter()">Clear</div>
+                  </template>
+                </div>
+              </div>
+              <!-- Keyword score chips (bucket multi-select) -->
               <template x-for="chip in _DOC_LAYER_CHIPS" :key="chip.key">
                 <div class="filter-chip-wrap">
                   <button class="filter-chip"
-                    :class="{active: docLayerFilters[chip.key] != null, 'layer-attr': true}"
+                    :class="{active: (docLayerFilters[chip.key]||[]).length > 0, 'layer-attr': true}"
                     @click.stop="toggleFilterChipPicker('dl:' + chip.key)"
                     x-text="docLayerChipLabel(chip)">
                   </button>
-                  <div class="filter-chip-picker filter-chip-slider" style="min-width:190px;"
-                       x-show="filterChipPickerOpen === 'dl:' + chip.key" @click.stop>
-                    <div style="font-size:11px;color:#64748b;margin-bottom:.35rem;">Min score</div>
-                    <div class="filter-chip-slider-row">
-                      <input type="range" min="0" max="1" step="0.05"
-                        :value="docLayerFilters[chip.key] ?? 0.4"
-                        @input="setDocLayerFilter(chip.key, parseFloat($event.target.value))"
-                        style="flex:1;accent-color:#3b82f6;">
-                      <span style="font-size:11px;min-width:2.5rem;text-align:right;"
-                        x-text="(docLayerFilters[chip.key] ?? 0.4).toFixed(2)"></span>
-                    </div>
-                    <div class="filter-chip-clear" @click="clearDocLayerFilter(chip.key)">Clear</div>
+                  <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'dl:' + chip.key" @click.stop>
+                    <template x-for="b in ['0%','0–20%','20–40%','40–60%','60–80%','80–100%']" :key="b">
+                      <label class="filter-chip-opt">
+                        <input type="checkbox"
+                          :checked="(docLayerFilters[chip.key]||[]).includes(b)"
+                          @change="toggleDocLayerBucket(chip.key, b)">
+                        <span x-text="b"></span>
+                      </label>
+                    </template>
+                    <template x-if="(docLayerFilters[chip.key]||[]).length > 0">
+                      <div class="filter-chip-clear" @click="clearDocLayerFilter(chip.key)">Clear</div>
+                    </template>
                   </div>
                 </div>
               </template>
@@ -2380,10 +2396,10 @@
         allRegistry:       [],
         regLoading:        false,
         docSearch:         '',
-        docTypeFilter:     '',
+        docTypeFilters:    [],   // [instrumentType, …]
         docTagFilters:     {},   // tagId → [selectedStates]
         docTagFoldMaps:    {},   // tagId → {docId: state}
-        docLayerFilters:   {},   // key   → threshold (number)
+        docLayerFilters:   {},   // key   → [bucket label, …]
         docSort:           'recorded_date',
         docSortDir:        'desc',
         regPage:           1,
@@ -2538,11 +2554,15 @@
             (d.parcel_id||'').toLowerCase().includes(q) ||
             (d.book+'').includes(q) ||
             (d.page+'').includes(q));
-          if (this.docTypeFilter) list = list.filter(d=>d.instrument_type===this.docTypeFilter);
-          // Layer attribute filters: key → threshold
-          for (const [key, thr] of Object.entries(this.docLayerFilters)) {
-            if (thr == null) continue;
-            list = list.filter(d => (d[key] || 0) >= thr);
+          if (this.docTypeFilters.length) list = list.filter(d=>this.docTypeFilters.includes(d.instrument_type||''));
+          // Layer attribute filters: key → [selected buckets]
+          for (const [key, buckets] of Object.entries(this.docLayerFilters)) {
+            if (!buckets || !buckets.length) continue;
+            list = list.filter(d => {
+              const s = d[key] || 0;
+              const b = s === 0 ? '0%' : s < 0.2 ? '0–20%' : s < 0.4 ? '20–40%' : s < 0.6 ? '40–60%' : s < 0.8 ? '60–80%' : '80–100%';
+              return buckets.includes(b);
+            });
           }
           // Tag state filters: tagId → [selectedStates]
           for (const [tagId, states] of Object.entries(this.docTagFilters)) {
@@ -2616,7 +2636,7 @@
         get docExportUrl() {
           const p = new URLSearchParams();
           if (this.docSearch.trim()) p.set('q', this.docSearch.trim());
-          if (this.docTypeFilter) p.set('type', this.docTypeFilter);
+          if (this.docTypeFilters.length) p.set('type', this.docTypeFilters.join(','));
           return '/exports/documents.csv' + (p.size ? '?' + p : '');
         },
         get usageExportUrl() {
@@ -2630,9 +2650,8 @@
           this.$watch('parcelSearch',        ()=>{ this.parcelPage=1; });
           this.$watch('parcelSort',      ()=>{ this.parcelPage=1; });
           this.$watch('parcelSortDir',   ()=>{ this.parcelPage=1; });
-          this.$watch('docSearch',       ()=>{ this.regPage=1; });
-          this.$watch('docTypeFilter',   ()=>{ this.regPage=1; });
-          this.$watch('docSort',         ()=>{ this.regPage=1; });
+          this.$watch('docSearch',   ()=>{ this.regPage=1; });
+          this.$watch('docSort',     ()=>{ this.regPage=1; });
           this.$watch('docSortDir',      ()=>{ this.regPage=1; });
           // when user closes a doc, the map re-appears — tell Leaflet to recalculate size
           this.$watch('parcelSelectedDoc', (val) => {
@@ -2883,18 +2902,34 @@
           } catch(e) {}
         },
 
-        // Doc layer attribute filter (numeric — threshold per chip)
-        docLayerChipLabel(chip) {
-          const thr = this.docLayerFilters[chip.key];
-          if (thr != null) return chip.label + ' ≥' + thr.toFixed(2);
-          return chip.label;
+        // Instrument type chip
+        docTypeChipLabel() {
+          if (!this.docTypeFilters.length) return 'Instrument Type';
+          if (this.docTypeFilters.length === 1) return this.docTypeFilters[0];
+          return 'Type: ' + this.docTypeFilters.length + ' selected';
         },
-
-        setDocLayerFilter(key, threshold) {
-          this.docLayerFilters = {...this.docLayerFilters, [key]: threshold};
+        toggleDocType(type) {
+          const cur = this.docTypeFilters;
+          this.docTypeFilters = cur.includes(type) ? cur.filter(t => t !== type) : [...cur, type];
+          this.regPage = 1;
+        },
+        clearDocTypeFilter() {
+          this.docTypeFilters = [];
           this.regPage = 1;
         },
 
+        // Doc layer attribute filter (bucket multi-select)
+        docLayerChipLabel(chip) {
+          const sel = this.docLayerFilters[chip.key];
+          if (sel && sel.length) return chip.label + ': ' + sel.join(', ');
+          return chip.label;
+        },
+        toggleDocLayerBucket(key, bucket) {
+          const cur = this.docLayerFilters[key] || [];
+          const next = cur.includes(bucket) ? cur.filter(b => b !== bucket) : [...cur, bucket];
+          this.docLayerFilters = {...this.docLayerFilters, [key]: next};
+          this.regPage = 1;
+        },
         clearDocLayerFilter(key) {
           const f = {...this.docLayerFilters};
           delete f[key];

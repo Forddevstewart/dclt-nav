@@ -291,4 +291,39 @@ INSERT OR IGNORE INTO filter_entry_points
      '[{"dimension":"ParcelAcquisitionSuitability","selection":"Possible"},{"dimension":"AcquisitionDetermination","selection":"Unconfirmed"}]',
      20);
 """),
+    (17, """
+-- Rebuild parcel_link_adjudications as append-only (seq PK, WORM triggers).
+-- Existing rows are preserved as the initial history fold; latest seq per
+-- (doc_id, parcel_id) is the current adjudication. 'candidate' added to the
+-- status space so a revert-to-unreviewed can be expressed as a new event.
+ALTER TABLE parcel_link_adjudications RENAME TO _pla_old;
+CREATE TABLE parcel_link_adjudications (
+    seq          INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_id       TEXT    NOT NULL,
+    parcel_id    TEXT    NOT NULL,
+    status       TEXT    NOT NULL CHECK(status IN ('confirmed','rejected','user_manual','candidate')),
+    source_type  TEXT,
+    match_type   TEXT,
+    confidence   REAL,
+    reviewed_by  INTEGER,
+    reviewed_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+INSERT INTO parcel_link_adjudications
+    (doc_id, parcel_id, status, source_type, match_type, confidence, reviewed_by, reviewed_at)
+SELECT doc_id, parcel_id, status, source_type, match_type, confidence, reviewed_by, reviewed_at
+FROM _pla_old;
+DROP TABLE _pla_old;
+CREATE INDEX IF NOT EXISTS idx_pla_doc
+    ON parcel_link_adjudications (doc_id);
+CREATE INDEX IF NOT EXISTS idx_pla_parcel
+    ON parcel_link_adjudications (parcel_id, status);
+CREATE INDEX IF NOT EXISTS idx_pla_fold
+    ON parcel_link_adjudications (doc_id, parcel_id, seq DESC);
+CREATE TRIGGER IF NOT EXISTS no_upd_parcel_link_adjudications
+    BEFORE UPDATE ON parcel_link_adjudications
+    BEGIN SELECT RAISE(FAIL,'parcel_link_adjudications is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS no_del_parcel_link_adjudications
+    BEFORE DELETE ON parcel_link_adjudications
+    BEGIN SELECT RAISE(FAIL,'parcel_link_adjudications is append-only'); END;
+"""),
 ]

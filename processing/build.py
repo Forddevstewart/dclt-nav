@@ -619,10 +619,46 @@ def _parse_td_date(stem: str) -> str | None:
         return None
 
 
+def _build_ac_url_index(ma_dennis_dir: Path) -> dict[str, str]:
+    """Return {absolute_pdf_path: original_url} from dennis_civic.db, if available."""
+    from discovery.config import get_config
+    civic_db = get_config().db_path("dennis_civic")
+    if not civic_db.exists():
+        return {}
+    try:
+        import sqlite3 as _sq
+        conn = _sq.connect(str(civic_db))
+        rows = conn.execute(
+            "SELECT local_path, url FROM documents WHERE local_path IS NOT NULL AND url IS NOT NULL"
+        ).fetchall()
+        conn.close()
+        return {r[0]: r[1] for r in rows if r[0] and r[1]}
+    except Exception:
+        return {}
+
+
+def _dc_source_url(stem: str, base_url: str) -> str:
+    """Reconstruct a DocumentCenter URL from a filename stem like '12345_slug-name'.
+
+    The downloader names files as '{doc_id}_{slug}.pdf'; the canonical view URL
+    is base_url/DocumentCenter/View/{doc_id} which the server resolves to the PDF.
+    Returns '' if the stem doesn't match the expected pattern.
+    """
+    parts = stem.split("_", 1)
+    if len(parts) == 2 and parts[0].isdigit():
+        return f"{base_url}/DocumentCenter/View/{parts[0]}"
+    return ""
+
+
 def load_town_docs(engine, ma_dennis_dir: Path) -> int:
     if not ma_dennis_dir.exists():
         print("  SKIP — ma-dennis directory not found")
         return 0
+
+    from discovery.config import get_config
+    cfg = get_config()
+    ac_url_index = _build_ac_url_index(ma_dennis_dir)
+    dc_base = cfg.source("document_center").get("base_url", "") if cfg.enabled("document_center") else ""
 
     records = []
     for source_type in _TD_SOURCES:
@@ -649,6 +685,13 @@ def load_town_docs(engine, ma_dennis_dir: Path) -> int:
             )
             doc_type_raw = stem.split("_")[0] if "_" in stem else "unknown"
 
+            # Resolve original download URL for fallback when local file is unavailable.
+            pdf_path = str(json_path.with_suffix(".pdf"))
+            if source_type == "agendacenter":
+                source_url = ac_url_index.get(pdf_path, "")
+            else:
+                source_url = _dc_source_url(stem, dc_base)
+
             records.append({
                 "doc_id":       f"{source_type}/{json_path.parent.name}/{stem}",
                 "source_type":  source_type,
@@ -656,6 +699,7 @@ def load_town_docs(engine, ma_dennis_dir: Path) -> int:
                 "doc_type":     doc_type_raw,
                 "meeting_date": _parse_td_date(stem),
                 "source_path":  data.get("source_path", ""),
+                "source_url":   source_url,
                 "page_count":   data.get("page_count", len(pages)),
                 "full_text":    full_text,
                 "processed_at": data.get("processed_at"),

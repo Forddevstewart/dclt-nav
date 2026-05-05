@@ -469,17 +469,36 @@ def document_detail(book, page):
 
 # ── Registry of Deeds direct PDF redirect ────────────────────────────────────
 
+import re as _re
+import urllib.request as _urlreq
+
+
+def _fetch_rod_redirect(viewer_url: str):
+    """Fetch the ALIS viewer page and return a redirect to the embedded PDF.
+
+    The ALIS HTML viewer embeds the document as a /WwwImg/ path.  Redirecting
+    to that path serves a bare PDF that browsers (and iframes) can display
+    without hitting X-Frame-Options restrictions on the viewer wrapper page.
+    Falls back to the viewer URL itself if extraction fails.
+    """
+    try:
+        req = _urlreq.Request(viewer_url, headers={"User-Agent": "Mozilla/5.0"})
+        with _urlreq.urlopen(req, timeout=10) as resp:
+            html = resp.read().decode("latin-1", errors="replace")
+        paths = _re.findall(r'/WwwImg/[^\s"\'<>#]+\.PDF', html, _re.IGNORECASE)
+        if paths:
+            page_suffix = _re.compile(r'\d{4}\.PDF$', _re.IGNORECASE)
+            base_paths = [p for p in paths if not page_suffix.search(p)]
+            chosen = base_paths[0] if base_paths else paths[0]
+            return redirect(REGISTRY_BASE + chosen)
+    except Exception:
+        pass
+    return redirect(viewer_url)
+
+
 @bp.route("/documents/<book>/<page>/rod")
 def document_rod(book, page):
-    """Redirect to the raw PDF on the Registry of Deeds server.
-
-    Fetches the ALIS HTML viewer, extracts the /WwwImg/ PDF path, and
-    redirects the browser directly to the file. Falls back to the viewer
-    URL if the path can't be extracted (e.g. doc requires cart payment).
-    """
-    import re
-    import urllib.request as _urlreq
-
+    """Redirect to the raw PDF on the Registry of Deeds server."""
     db = get_reference_db()
     doc = db.execute(
         "SELECT * FROM registry_documents WHERE book = ? AND page = ? LIMIT 1",
@@ -494,21 +513,7 @@ def document_rod(book, page):
     if not viewer_url:
         abort(404)
 
-    try:
-        req = _urlreq.Request(viewer_url, headers={"User-Agent": "Mozilla/5.0"})
-        with _urlreq.urlopen(req, timeout=10) as resp:
-            html = resp.read().decode("latin-1", errors="replace")
-
-        paths = re.findall(r'/WwwImg/[^\s"\'<>#]+\.PDF', html, re.IGNORECASE)
-        if paths:
-            page_suffix = re.compile(r'\d{4}\.PDF$', re.IGNORECASE)
-            base_paths = [p for p in paths if not page_suffix.search(p)]
-            chosen = base_paths[0] if base_paths else paths[0]
-            return redirect(REGISTRY_BASE + chosen)
-    except Exception:
-        pass
-
-    return redirect(viewer_url)
+    return _fetch_rod_redirect(viewer_url)
 
 
 # ── Document PDF ──────────────────────────────────────────────────────────────
@@ -533,11 +538,15 @@ def document_pdf(book, page):
         if path.exists():
             return send_file(path, mimetype="application/pdf")
 
-    url = _registry_viewer_url(doc)
-    if url:
-        return redirect(url)
+    # Local scan not available — fall back to live registry fetch.
+    # Must use _fetch_rod_redirect (not a plain redirect to viewer_url) because
+    # the ALIS HTML viewer page sends X-Frame-Options headers that block iframe
+    # embedding; the embedded /WwwImg/ PDF path does not have that restriction.
+    viewer_url = _registry_viewer_url(doc)
+    if not viewer_url:
+        abort(404)
 
-    abort(404)
+    return _fetch_rod_redirect(viewer_url)
 
 
 # ── Town docs ─────────────────────────────────────────────────────────────────
@@ -628,7 +637,10 @@ def town_docs_list():
     if _table_exists(dclt, "parcel_link_adjudications"):
         for r in dclt.execute(
             f"SELECT doc_id, parcel_id, status FROM parcel_link_adjudications"
-            f" WHERE doc_id IN ({placeholders})",
+            f" WHERE seq IN ("
+            f"  SELECT MAX(seq) FROM parcel_link_adjudications"
+            f"  WHERE doc_id IN ({placeholders}) GROUP BY doc_id, parcel_id"
+            f")",
             doc_ids,
         ).fetchall():
             adj_by_doc[r["doc_id"]][r["parcel_id"]] = r["status"]
@@ -705,7 +717,11 @@ def town_doc_detail(doc_id):
     if _table_exists(dclt, "parcel_link_adjudications"):
         for r in dclt.execute(
             "SELECT parcel_id, status, reviewed_by, reviewed_at"
-            " FROM parcel_link_adjudications WHERE doc_id = ?",
+            " FROM parcel_link_adjudications"
+            " WHERE seq IN ("
+            "  SELECT MAX(seq) FROM parcel_link_adjudications"
+            "  WHERE doc_id = ? GROUP BY doc_id, parcel_id"
+            ")",
             (doc_id,),
         ).fetchall():
             adj_map[r["parcel_id"]] = dict(r)
@@ -762,21 +778,11 @@ def hygiene_update_link(link_id):
         return jsonify({"error": "invalid link_id"}), 400
 
     db = get_db()
-    if status == "candidate":
-        # Revert to unreviewed — delete the adjudication row
-        db.execute(
-            "DELETE FROM parcel_link_adjudications WHERE doc_id = ? AND parcel_id = ?",
-            (doc_id, parcel_id),
-        )
-    else:
-        db.execute(
-            """INSERT INTO parcel_link_adjudications (doc_id, parcel_id, status, reviewed_by, reviewed_at)
-               VALUES (?, ?, ?, ?, datetime('now'))
-               ON CONFLICT(doc_id, parcel_id) DO UPDATE SET
-                   status=excluded.status, reviewed_by=excluded.reviewed_by,
-                   reviewed_at=excluded.reviewed_at""",
-            (doc_id, parcel_id, status, current_user.id),
-        )
+    db.execute(
+        "INSERT INTO parcel_link_adjudications (doc_id, parcel_id, status, reviewed_by)"
+        " VALUES (?, ?, ?, ?)",
+        (doc_id, parcel_id, status, current_user.id),
+    )
     db.commit()
     db.close()
     return jsonify({"ok": True})
@@ -797,12 +803,9 @@ def hygiene_create_link():
     db = get_db()
     try:
         db.execute(
-            """INSERT INTO parcel_link_adjudications
-                   (doc_id, parcel_id, status, source_type, match_type, confidence, reviewed_by, reviewed_at)
-               VALUES (?, ?, 'user_manual', ?, 'user_manual', 1.0, ?, datetime('now'))
-               ON CONFLICT(doc_id, parcel_id) DO UPDATE SET
-                   status='user_manual', match_type='user_manual',
-                   reviewed_by=excluded.reviewed_by, reviewed_at=excluded.reviewed_at""",
+            "INSERT INTO parcel_link_adjudications"
+            " (doc_id, parcel_id, status, source_type, match_type, confidence, reviewed_by)"
+            " VALUES (?, ?, 'user_manual', ?, 'user_manual', 1.0, ?)",
             (doc_id, parcel_id, source_type, current_user.id),
         )
         db.commit()
@@ -822,31 +825,47 @@ def hygiene_delete_link(link_id):
         return jsonify({"error": "invalid link_id"}), 400
 
     db = get_db()
-    rows_affected = db.execute(
-        "DELETE FROM parcel_link_adjudications WHERE doc_id = ? AND parcel_id = ?",
+    latest = db.execute(
+        "SELECT status FROM parcel_link_adjudications"
+        " WHERE doc_id = ? AND parcel_id = ? ORDER BY seq DESC LIMIT 1",
         (doc_id, parcel_id),
-    ).rowcount
+    ).fetchone()
+    if not latest or latest["status"] == "candidate":
+        db.close()
+        return jsonify({"error": "not found"}), 404
+    db.execute(
+        "INSERT INTO parcel_link_adjudications (doc_id, parcel_id, status, reviewed_by)"
+        " VALUES (?, ?, 'candidate', ?)",
+        (doc_id, parcel_id, current_user.id),
+    )
     db.commit()
     db.close()
-    if not rows_affected:
-        return jsonify({"error": "not found"}), 404
     return jsonify({"ok": True})
 
 
 @bp.route("/town-docs/pdf/<path:doc_id>")
 def town_doc_pdf(doc_id):
     ref = get_reference_db()
-    doc = ref.execute(
-        "SELECT source_path FROM town_docs WHERE doc_id = ? LIMIT 1", (doc_id,)
-    ).fetchone()
+    try:
+        row = ref.execute(
+            "SELECT source_path, source_url FROM town_docs WHERE doc_id = ? LIMIT 1", (doc_id,)
+        ).fetchone()
+    except Exception:
+        # source_url column absent in older reference.db builds.
+        row = ref.execute(
+            "SELECT source_path FROM town_docs WHERE doc_id = ? LIMIT 1", (doc_id,)
+        ).fetchone()
     ref.close()
-    if not doc or not doc["source_path"]:
+    if not row or not row["source_path"]:
         abort(404)
     from discovery.config import get_config
-    pdf_path = get_config().root / "ma-dennis" / doc["source_path"]
-    if not pdf_path.exists():
-        abort(404)
-    return send_file(pdf_path, mimetype="application/pdf")
+    pdf_path = get_config().root / "ma-dennis" / row["source_path"]
+    if pdf_path.exists():
+        return send_file(pdf_path, mimetype="application/pdf")
+    source_url = (dict(row).get("source_url") or "").strip()
+    if source_url:
+        return redirect(source_url)
+    abort(404)
 
 
 @bp.route("/parcels/<parcel_id>/town-docs")
@@ -862,9 +881,14 @@ def parcel_town_docs(parcel_id):
     links = dclt.execute(
         "SELECT doc_id, source_type, match_type, confidence, reviewed_at"
         " FROM parcel_link_adjudications"
-        " WHERE parcel_id = ? AND status IN ('confirmed', 'user_manual')"
+        " WHERE parcel_id = ?"
+        " AND seq IN ("
+        "  SELECT MAX(seq) FROM parcel_link_adjudications"
+        "  WHERE parcel_id = ? GROUP BY doc_id, parcel_id"
+        " )"
+        " AND status IN ('confirmed', 'user_manual')"
         " ORDER BY reviewed_at DESC",
-        (parcel_id,),
+        (parcel_id, parcel_id),
     ).fetchall()
 
     result = []
