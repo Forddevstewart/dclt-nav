@@ -50,6 +50,12 @@ rsync -az --progress -e "$RSYNC_SSH" \
   "$LOCAL_DB_BACKUPS/transactions.$STAMP"
 echo "    Saved to $LOCAL_DB_BACKUPS/transactions.$STAMP"
 
+echo "==> Pull reference.db from server to local backup"
+rsync -az --progress -e "$RSYNC_SSH" \
+  "$VPS:$CIVICTWIN/db/reference.db" \
+  "$LOCAL_DB_BACKUPS/reference.$STAMP"
+echo "    Saved to $LOCAL_DB_BACKUPS/reference.$STAMP"
+
 echo "==> Stop server"
 $SSH "$VPS" "systemctl stop dclt-nav"
 
@@ -69,4 +75,5 @@ echo "==> Start server"
 $SSH "$VPS" "systemctl start dclt-nav"
 
 echo "==> Done. Server backup: $APP/data/transactions.db.bak.$STAMP"
-echo "    Local backup:  $LOCAL_DB_BACKUPS/transactions.$STAMP"
+echo "    Local backups: $LOCAL_DB_BACKUPS/transactions.$STAMP"
+echo "                   $LOCAL_DB_BACKUPS/reference.$STAMP"
