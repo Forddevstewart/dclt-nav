@@ -1,4 +1,4 @@
-data/transactions.db
+*.db
 .DS_Store
 __pycache__/
 *.pyc
