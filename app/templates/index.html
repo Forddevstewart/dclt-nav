@@ -1739,6 +1739,49 @@
                       You do not have permission to change this user's password.
                     </div>
                   </template>
+                  <template x-if="CURRENT_USER?.role === 'admin' && adminSelected.id !== CURRENT_USER.id">
+                    <div class="section">
+                      <div class="section-title">Change Role</div>
+                      <div style="display:flex;flex-direction:column;gap:.6rem;max-width:320px;">
+                        <select class="ctrl-select" x-model="adminRole.role">
+                          <option value="guest">Guest — view only</option>
+                          <option value="user">User — can change own password</option>
+                          <option value="admin">Admin — full access</option>
+                        </select>
+                        <template x-if="adminRole.err">
+                          <div style="font-size:12px;color:#dc2626;" x-text="adminRole.err"></div>
+                        </template>
+                        <template x-if="adminRole.msg">
+                          <div style="font-size:12px;color:#16a34a;" x-text="adminRole.msg"></div>
+                        </template>
+                        <button class="rod-link" style="width:fit-content;font-size:13px;border:none;"
+                          @click="changeAdminRole()" :disabled="adminRole.saving"
+                          x-text="adminRole.saving ? 'Saving…' : 'Update Role'"></button>
+                      </div>
+                    </div>
+                  </template>
+                  <template x-if="CURRENT_USER?.role === 'admin' && adminSelected.id !== CURRENT_USER.id">
+                    <div class="section" style="margin-top:1.5rem;border-top:1px solid #fee2e2;padding-top:1rem;">
+                      <div class="section-title" style="color:#dc2626;">Delete User</div>
+                      <div style="display:flex;flex-direction:column;gap:.6rem;max-width:320px;">
+                        <template x-if="!adminDeleteConfirm">
+                          <button class="rod-link" style="width:fit-content;font-size:13px;border:none;color:#dc2626;"
+                            @click="adminDeleteConfirm = true">Delete User</button>
+                        </template>
+                        <template x-if="adminDeleteConfirm">
+                          <div style="display:flex;flex-direction:column;gap:.5rem;">
+                            <div style="font-size:13px;color:#dc2626;">Delete <strong x-text="adminSelected.username"></strong>? This cannot be undone.</div>
+                            <div style="display:flex;gap:.5rem;">
+                              <button class="rod-link" style="font-size:13px;border:none;color:#dc2626;"
+                                @click="deleteAdminUser()">Confirm Delete</button>
+                              <button class="rod-link" style="font-size:13px;border:none;color:#64748b;"
+                                @click="adminDeleteConfirm = false">Cancel</button>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
                 </div>
               </template>
             </div>
@@ -2421,9 +2464,11 @@
         adminUsersLoading: false,
         adminSelected:     null,
         adminAction:       null,
-        adminPw:           { password:'', confirm:'', saving:false, msg:'', err:'' },
-        adminName:         { full_name:'', saving:false, msg:'', err:'' },
-        adminNewUser:      { username:'', full_name:'', password:'', role:'user', saving:false, msg:'', err:'' },
+        adminPw:            { password:'', confirm:'', saving:false, msg:'', err:'' },
+        adminName:          { full_name:'', saving:false, msg:'', err:'' },
+        adminRole:          { role:'user', saving:false, msg:'', err:'' },
+        adminDeleteConfirm: false,
+        adminNewUser:       { username:'', full_name:'', password:'', role:'user', saving:false, msg:'', err:'' },
 
         // admin — tags
         adminSection:    'users',
@@ -3367,6 +3412,8 @@
           this.adminAction   = 'change_pw';
           this.adminPw       = { password:'', confirm:'', saving:false, msg:'', err:'' };
           this.adminName     = { full_name: u.full_name || u.username, saving:false, msg:'', err:'' };
+          this.adminRole     = { role: u.role, saving:false, msg:'', err:'' };
+          this.adminDeleteConfirm = false;
         },
 
         async changeAdminFullName() {
@@ -3425,6 +3472,35 @@
             await this.loadAdminUsers();
           } catch(e) { this.adminNewUser.err = 'Network error'; }
           finally { this.adminNewUser.saving = false; }
+        },
+
+        async changeAdminRole() {
+          if (!this.adminSelected) return;
+          this.adminRole.saving = true; this.adminRole.err = ''; this.adminRole.msg = '';
+          try {
+            const r = await fetch('/api/admin/users/'+this.adminSelected.id, {
+              method: 'PATCH', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({role: this.adminRole.role}),
+            });
+            if (!r.ok) { const d = await r.json(); this.adminRole.err = d.error||'Error'; return; }
+            this.adminSelected.role = this.adminRole.role;
+            this.adminRole.msg = 'Role updated.';
+            await this.loadAdminUsers();
+          } catch(e) { this.adminRole.err = 'Network error'; }
+          finally { this.adminRole.saving = false; }
+        },
+
+        async deleteAdminUser() {
+          if (!this.adminSelected) return;
+          if (!this.adminDeleteConfirm) { this.adminDeleteConfirm = true; return; }
+          try {
+            const r = await fetch('/api/admin/users/'+this.adminSelected.id, { method: 'DELETE' });
+            if (!r.ok) { const d = await r.json(); alert(d.error||'Error deleting user'); return; }
+            this.adminSelected = null;
+            this.adminAction   = null;
+            this.adminDeleteConfirm = false;
+            await this.loadAdminUsers();
+          } catch(e) { alert('Network error'); }
         },
 
         // ── Display helpers ──────────────────────────────────────────────────

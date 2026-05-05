@@ -326,4 +326,11 @@ CREATE TRIGGER IF NOT EXISTS no_del_parcel_link_adjudications
     BEFORE DELETE ON parcel_link_adjudications
     BEGIN SELECT RAISE(FAIL,'parcel_link_adjudications is append-only'); END;
 """),
+    (18, """
+-- Drop pre-dimension keyword adjudication and user_tags tables.
+-- These were superseded by the Tag/Dimension system (migration 13+).
+-- Data was never in active use; rows are discarded intentionally.
+DROP TABLE IF EXISTS adjudications;
+DROP TABLE IF EXISTS user_tags;
+"""),
 ]

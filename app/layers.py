@@ -12,21 +12,7 @@ invoked from API endpoints, never from dimensions.py.
 
 from .models import get_db, get_reference_db
 from .dimensions import ARTICLE97_THRESHOLD
-
-_FOLD = """
-    t1.event_id = (
-        SELECT MAX(t2.event_id) FROM taggings t2
-        WHERE t2.tag_id      = t1.tag_id
-          AND t2.target_type = t1.target_type
-          AND t2.target_id   = t1.target_id
-    )
-"""
-
-
-def _table_exists(conn, name: str) -> bool:
-    return conn.execute(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", (name,)
-    ).fetchone()[0] > 0
+from .db_utils import FOLD as _FOLD, table_exists as _table_exists
 
 
 def parcel_coverage_rollup() -> dict:

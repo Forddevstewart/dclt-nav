@@ -17,20 +17,28 @@ def create_app():
 
     from .auth import bp as auth_bp, login_manager, ensure_ford
     from .routes import bp as routes_bp
-    from .api import bp as api_bp
-    from .adjudications import bp as adj_bp
+    from .parcels import bp as parcels_bp
+    from .documents import bp as documents_bp
+    from .town_docs import bp as town_docs_bp
+    from .hygiene import bp as hygiene_bp
+    from .meta import bp as meta_bp
     from .admin import bp as admin_bp
     from .tags import bp as tags_bp
     from .exports import bp as exports_bp
+    from .notes import bp as notes_bp
 
     login_manager.init_app(app)
     app.register_blueprint(auth_bp)
     app.register_blueprint(routes_bp)
-    app.register_blueprint(api_bp)
-    app.register_blueprint(adj_bp)
+    app.register_blueprint(parcels_bp)
+    app.register_blueprint(documents_bp)
+    app.register_blueprint(town_docs_bp)
+    app.register_blueprint(hygiene_bp)
+    app.register_blueprint(meta_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(tags_bp)
     app.register_blueprint(exports_bp)
+    app.register_blueprint(notes_bp)
 
     _SKIP_LOG = {"/api/admin/usage", "/api/items"}
 

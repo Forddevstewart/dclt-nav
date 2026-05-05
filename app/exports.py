@@ -3,7 +3,8 @@ import io
 from flask import Blueprint, Response, request
 from flask_login import login_required
 from .models import get_db, get_reference_db
-from .api import KW_KEYS, KW_LABELS, _table_exists
+from .db_utils import table_exists as _table_exists
+from discovery.keywords import KW_KEYS, KW_LABELS
 
 bp = Blueprint("exports", __name__, url_prefix="/exports")
 
@@ -124,31 +125,10 @@ def _fetch_documents(q=None, doc_type=None, kw=None, kw_threshold=0.5):
     db.close()
 
     if kw and kw in KW_KEYS:
-        yes_set = _adjudicated_yes(kw)
         col = f"kw_{kw}"
-        rows = [
-            r for r in rows
-            if f"{r['book']}/{r['page']}" in yes_set or (r.get(col) or 0) >= kw_threshold
-        ]
+        rows = [r for r in rows if (r.get(col) or 0) >= kw_threshold]
 
     return rows
-
-
-def _adjudicated_yes(keyword_id: str) -> set:
-    db = get_db()
-    rows = db.execute(
-        """
-        SELECT target_id FROM (
-            SELECT target_id, verdict,
-                   ROW_NUMBER() OVER (PARTITION BY target_id ORDER BY seq DESC) rn
-            FROM adjudications
-            WHERE target_type = 'document' AND keyword_id = ?
-        ) WHERE rn = 1 AND verdict = 'yes'
-        """,
-        (keyword_id,),
-    ).fetchall()
-    db.close()
-    return {r[0] for r in rows}
 
 
 def _fetch_usage(q=None):

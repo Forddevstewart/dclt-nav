@@ -81,13 +81,40 @@ def update_user(user_id):
     if not _can_change_password(user_id):
         return jsonify({"error": "Forbidden"}), 403
     data = request.get_json() or {}
-    full_name = (data.get("full_name") or "").strip()
-    if not full_name:
-        return jsonify({"error": "Full name required"}), 400
     db = get_db()
-    db.execute("UPDATE users SET full_name = ? WHERE id = ?", (full_name, user_id))
+    if "role" in data:
+        if not _is_admin():
+            db.close()
+            return jsonify({"error": "Forbidden"}), 403
+        role = data["role"]
+        if role not in VALID_ROLES:
+            db.close()
+            return jsonify({"error": "Invalid role"}), 400
+        db.execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
+    if "full_name" in data:
+        full_name = (data.get("full_name") or "").strip()
+        if not full_name:
+            db.close()
+            return jsonify({"error": "Full name required"}), 400
+        db.execute("UPDATE users SET full_name = ? WHERE id = ?", (full_name, user_id))
     db.commit()
     db.close()
+    return jsonify({"ok": True})
+
+
+@bp.route("/users/<int:user_id>", methods=["DELETE"])
+def delete_user(user_id):
+    if not _is_admin():
+        return jsonify({"error": "Forbidden"}), 403
+    if user_id == current_user.id:
+        return jsonify({"error": "Cannot delete your own account"}), 400
+    db = get_db()
+    result = db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    rowcount = result.rowcount
+    db.commit()
+    db.close()
+    if rowcount == 0:
+        return jsonify({"error": "User not found"}), 404
     return jsonify({"ok": True})
 
 

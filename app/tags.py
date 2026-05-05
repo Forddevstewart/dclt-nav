@@ -1,19 +1,11 @@
 from flask import Blueprint, jsonify, request, abort
 from flask_login import login_required, current_user
 from .models import get_db, get_reference_db
+from .db_utils import FOLD as _FOLD
 
 _VALID_ENTITIES = {"parcel", "document"}
 
 bp = Blueprint("tags", __name__, url_prefix="/api")
-
-_FOLD = """
-    t1.event_id = (
-        SELECT MAX(t2.event_id) FROM taggings t2
-        WHERE t2.tag_id      = t1.tag_id
-          AND t2.target_type = t1.target_type
-          AND t2.target_id   = t1.target_id
-    )
-"""
 
 
 @bp.route("/tags")

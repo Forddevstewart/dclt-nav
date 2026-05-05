@@ -16,7 +16,7 @@ import pytest
 from sqlalchemy import create_engine, text
 
 from discovery.config import get_config
-from processing.build import _LAYER_SPECS
+from processing.build.sources import _LAYER_SPECS
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
