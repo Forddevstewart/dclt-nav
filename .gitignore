@@ -12,3 +12,6 @@ dist/
 
 # Discovery pipeline — local output only (logs, reports, metadata CSVs), never committed
 discovery/output/
+
+# Portal-uploaded binaries — live on server alongside transactions.db, never committed
+data/uploads/

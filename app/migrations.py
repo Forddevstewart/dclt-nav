@@ -333,4 +333,27 @@ CREATE TRIGGER IF NOT EXISTS no_del_parcel_link_adjudications
 DROP TABLE IF EXISTS adjudications;
 DROP TABLE IF EXISTS user_tags;
 """),
+    (19, """
+-- Portal-uploaded documents (photos and text notes) captured from the field PWA.
+-- Binaries live on disk at UPLOAD_DIR/{filename}; this table holds metadata only.
+CREATE TABLE IF NOT EXISTS portal_uploads (
+    seq          INTEGER PRIMARY KEY AUTOINCREMENT,
+    upload_id    TEXT    NOT NULL UNIQUE,
+    parcel_id    TEXT    NOT NULL,
+    doc_type     TEXT    NOT NULL CHECK(doc_type IN ('photo','note')),
+    filename     TEXT,
+    mime_type    TEXT,
+    note_text    TEXT,
+    user_id      INTEGER NOT NULL,
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_portal_uploads_parcel
+    ON portal_uploads (parcel_id, seq DESC);
+CREATE TRIGGER IF NOT EXISTS no_upd_portal_uploads
+    BEFORE UPDATE ON portal_uploads
+    BEGIN SELECT RAISE(FAIL,'portal_uploads is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS no_del_portal_uploads
+    BEFORE DELETE ON portal_uploads
+    BEGIN SELECT RAISE(FAIL,'portal_uploads is append-only'); END;
+"""),
 ]

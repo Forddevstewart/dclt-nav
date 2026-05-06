@@ -14,6 +14,9 @@ def create_app():
 
     from discovery.config import get_config
     app.config["REFERENCE_DATABASE"] = str(get_config().db_path("reference"))
+    app.config["UPLOAD_DIR"] = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "data", "uploads"
+    )
 
     from .auth import bp as auth_bp, login_manager, ensure_ford
     from .routes import bp as routes_bp
@@ -26,6 +29,7 @@ def create_app():
     from .tags import bp as tags_bp
     from .exports import bp as exports_bp
     from .notes import bp as notes_bp
+    from .pwa import bp as pwa_bp
 
     login_manager.init_app(app)
     app.register_blueprint(auth_bp)
@@ -39,6 +43,7 @@ def create_app():
     app.register_blueprint(tags_bp)
     app.register_blueprint(exports_bp)
     app.register_blueprint(notes_bp)
+    app.register_blueprint(pwa_bp)
 
     _SKIP_LOG = {"/api/admin/usage", "/api/items"}
 

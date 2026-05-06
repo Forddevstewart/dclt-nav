@@ -1,0 +1,10 @@
+{
+  "name": "DCLT Field",
+  "short_name": "DCLT Field",
+  "description": "DCLT Navigator field tool for parcel lookup and documentation",
+  "start_url": "/pwa/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#2d5a1b",
+  "background_color": "#f7f7f4"
+}

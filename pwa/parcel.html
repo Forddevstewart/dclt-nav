@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2d5a1b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Parcel — DCLT Field</title>
+  <link rel="manifest" href="/pwa/manifest.json">
+  <link rel="stylesheet" href="/pwa/css/app.css">
+</head>
+<body>
+  <header>
+    <button class="btn-ghost" id="back-btn">&#8592; Back</button>
+    <h1 id="parcel-title">&#8203;</h1>
+    <div style="width:70px"></div>
+  </header>
+
+  <div class="parcel-detail-header">
+    <div class="parcel-detail-meta" id="parcel-meta"></div>
+  </div>
+
+  <!-- Add document -->
+  <div class="card-section">
+    <h3>Add Document</h3>
+    <div class="upload-form">
+      <div class="file-buttons">
+        <button class="file-btn" id="btn-camera">&#x1F4F7; Camera</button>
+        <button class="file-btn" id="btn-library">&#x1F5BC; Library</button>
+        <button class="file-btn" id="btn-file">&#x1F4CE; File</button>
+      </div>
+      <input type="file" id="input-camera"  accept="image/*" capture="environment" hidden>
+      <input type="file" id="input-library" accept="image/*" hidden>
+      <input type="file" id="input-file" hidden>
+      <div id="file-selected" class="file-selected hidden"></div>
+      <textarea id="note-text"
+        placeholder="Note — required for text documents, optional caption for photos…"></textarea>
+      <button class="btn-primary" id="upload-btn">Save Document</button>
+      <p id="upload-error" class="error hidden"></p>
+    </div>
+  </div>
+
+  <!-- FarmingDetermination tag -->
+  <div class="card-section">
+    <h3>Farming Determination</h3>
+    <div class="tag-form" id="farming-form">
+      <div class="spinner">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Existing documents -->
+  <div class="card-section">
+    <h3>Documents</h3>
+    <div id="uploads-list" class="uploads-list">
+      <div class="spinner">Loading…</div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="/pwa/js/parcel.js"></script>
+</body>
+</html>
