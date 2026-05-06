@@ -13,5 +13,6 @@ def index():
 
 @bp.route("/docs/navigator-conversation")
 def navigator_conversation_pdf():
-    path = os.path.join(_PROCESSING_DIR, "DCLT Navigator Conversation.pdf")
+    root = os.path.dirname(os.path.dirname(__file__))
+    path = os.path.join(root, "DCLT Navigator Conversation.pdf")
     return send_file(path, mimetype="application/pdf")
