@@ -1,14 +1,14 @@
 """
-Processing — Publish reference.db from raw.db + transactional.db.
+Processing — Publish reference.db from raw.db + transactions.db.
 
 Reads:
-  CivicTwin/db/raw.db           — built by processing/build.py
-  CivicTwin/db/transactional.db — server data synced down (optional)
+  CivicTwin/db/raw.db          — built by processing/build.py
+  CivicTwin/db/transactions.db — server data synced down (optional)
 
 Writes:
-  CivicTwin/db/reference.db     — deployed to server (read-only there)
+  CivicTwin/db/reference.db    — deployed to server (read-only there)
 
-Merge steps applied from transactional.db (each skipped if table absent):
+Merge steps applied from transactions.db (each skipped if table absent):
   parcel_corrections   Field-level overrides on the parcels table
 
 Usage:
@@ -84,7 +84,7 @@ def main() -> None:
     cfg = get_config()
     raw_path = cfg.db_path("raw")
     ref_path = cfg.db_path("reference")
-    tx_path  = cfg.db_path("transactional")
+    tx_path  = cfg.db_path("transactions")
 
     if not raw_path.exists():
         print(f"raw.db not found at {raw_path} — run processing.build first")
@@ -92,7 +92,7 @@ def main() -> None:
 
     has_tx = tx_path.exists()
     print(f"raw:           {raw_path}")
-    print(f"transactional: {tx_path} ({'found' if has_tx else 'not found — skipping merge steps'})")
+    print(f"transactions:  {tx_path} ({'found' if has_tx else 'not found — skipping merge steps'})")
     print(f"reference:     {ref_path}")
 
     # Checkpoint raw.db WAL before copying
