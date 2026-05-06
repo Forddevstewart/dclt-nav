@@ -507,10 +507,11 @@
       <div class="nav-tab" :class="{active:activeTab==='overview'}"  @click="switchTab('overview')">Overview</div>
       <template x-if="CURRENT_USER">
         <div style="display:contents;">
-          <div class="nav-tab" :class="{active:activeTab==='assets'}"    @click="switchTab('assets')">Assets</div>
+          <div class="nav-tab" :class="{active:activeTab==='campaigns'}" @click="switchTab('campaigns')">Campaigns</div>
           <div class="nav-tab" :class="{active:activeTab==='parcels'}"   @click="switchTab('parcels')">Parcels</div>
           <div class="nav-tab" :class="{active:activeTab==='registry'}" @click="switchTab('registry')">Registry</div>
           <div class="nav-tab" :class="{active:activeTab==='town'}"      @click="switchTab('town')">Town</div>
+          <div class="nav-tab" :class="{active:activeTab==='assets'}"    @click="switchTab('assets')">Assets</div>
           <div class="nav-tab" :class="{active:activeTab==='admin'}"     @click="switchTab('admin')">Admin</div>
         </div>
       </template>
@@ -667,6 +668,80 @@
 
         </div><!-- /ov-layout -->
       </div><!-- /ov-page -->
+    </div>
+
+    <!-- ══════════════════════════ CAMPAIGNS TAB ═══════════════════════════ -->
+    <div class="tab-panel" x-show="activeTab==='campaigns'" style="overflow:hidden;">
+      <div class="ov-page">
+        <div class="ov-hero" style="background:linear-gradient(135deg,#1e2d4a 0%,#1e3a5f 55%,#1d4ed8 100%);">
+          <div class="ov-hero-eyebrow" style="color:#93c5fd;">Primary decision surface</div>
+          <h1 class="ov-hero-title">Campaigns</h1>
+          <p class="ov-hero-lead" style="color:#bfdbfe;">Each Campaign drives a single Tag dimension to terminus — the point where no records remain in the work queue. Campaigns are the canonical place for staff to work through determinations.</p>
+        </div>
+        <div style="padding:2rem 2.5rem;max-width:860px;display:flex;flex-direction:column;gap:1rem;">
+          <template x-for="tag in allTags" :key="tag.tag_id">
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1.25rem 1.5rem;"
+                 :style="'border-left:4px solid ' + (campaignMeta(tag)?.color || '#94a3b8')">
+
+              <!-- Header row -->
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;">
+                <div>
+                  <div style="font-size:15px;font-weight:700;color:#0f172a;" x-text="campaignMeta(tag)?.label || tag.name"></div>
+                  <div style="font-size:12px;color:#64748b;margin-top:2px;" x-text="campaignMeta(tag)?.scope || ('Target: ' + (tag.target_entity || 'any'))"></div>
+                </div>
+                <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;padding:.2rem .5rem;border:1px solid #e2e8f0;border-radius:3px;white-space:nowrap;flex-shrink:0;">Coming soon</span>
+              </div>
+
+              <!-- Progress (demo data) -->
+              <template x-if="campaignMeta(tag)?.demo">
+                <div x-data="{
+                  get meta() { return campaignMeta(tag); },
+                  get states() { return tag.states_csv.split(','); },
+                  get total() { return this.meta.demo.total; },
+                  get resolved() { return this.total - (this.meta.demo.counts[this.states[0]] || 0); },
+                  get pct() { return this.total ? (this.resolved / this.total * 100) : 0; }
+                }" style="margin-top:.85rem;">
+                  <!-- Progress bar -->
+                  <div style="height:5px;border-radius:3px;background:#f1f5f9;overflow:hidden;">
+                    <div :style="'height:100%;width:' + pct.toFixed(1) + '%;background:' + meta.color + ';transition:width .4s'"></div>
+                  </div>
+                  <!-- Resolved summary -->
+                  <div style="display:flex;align-items:baseline;gap:.3rem;margin-top:.4rem;">
+                    <span style="font-size:13px;font-weight:700;" :style="'color:' + meta.color" x-text="resolved.toLocaleString()"></span>
+                    <span style="font-size:12px;color:#64748b;" x-text="'of ' + total.toLocaleString() + ' resolved'"></span>
+                    <span style="font-size:11px;color:#94a3b8;margin-left:.25rem;" x-text="'(' + pct.toFixed(0) + '%)'"></span>
+                  </div>
+                  <!-- State breakdown -->
+                  <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.6rem;">
+                    <template x-for="(s, i) in states" :key="s">
+                      <span style="font-size:11px;padding:.15rem .5rem;border-radius:3px;border:1px solid #e2e8f0;color:#475569;"
+                            :style="i===0 ? 'background:#f1f5f9;' : 'background:#fff;'">
+                        <span x-text="s"></span>
+                        <span style="color:#94a3b8;margin-left:.25rem;" x-text="(meta.demo.counts[s] || 0).toLocaleString()"></span>
+                      </span>
+                    </template>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Fallback: state pills only -->
+              <template x-if="!campaignMeta(tag)?.demo">
+                <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.85rem;">
+                  <template x-for="(s, i) in tag.states_csv.split(',')" :key="s">
+                    <span style="font-size:11px;padding:.15rem .45rem;border-radius:3px;border:1px solid #e2e8f0;color:#475569;"
+                          :style="i===0 ? 'background:#f1f5f9;' : 'background:#fff;'"
+                          x-text="s"></span>
+                  </template>
+                </div>
+              </template>
+
+            </div>
+          </template>
+          <template x-if="allTags.length === 0 && !tagsLoading">
+            <div style="font-size:13px;color:#94a3b8;">No tag dimensions defined.</div>
+          </template>
+        </div>
+      </div>
     </div>
 
     <!-- ════════════════════════════ ASSETS TAB ═════════════════════════════ -->
@@ -1598,9 +1673,9 @@
 
       <!-- Secondary tab bar -->
       <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#fff;flex-shrink:0;padding:0 .75rem;">
+        <button class="admin-sec-tab" :class="{active:adminSection==='tags'}"  @click="switchAdminSection('tags')">Tag Maintenance</button>
         <button class="admin-sec-tab" :class="{active:adminSection==='users'}" @click="adminSection='users'">User Admin</button>
         <button class="admin-sec-tab" :class="{active:adminSection==='usage'}" @click="adminSection='usage'">Usage Log</button>
-        <button class="admin-sec-tab" :class="{active:adminSection==='tags'}"  @click="switchAdminSection('tags')">Tag Maintenance</button>
       </div>
 
       <!-- Section content -->
@@ -1935,6 +2010,10 @@
                     <button style="padding:.3rem .6rem;border:1px solid #cbd5e1;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;"
                       @click="addTagState()">Add</button>
                   </div>
+                </div>
+                <div class="section" style="margin-top:.75rem;">
+                  <div class="section-title">Display Order</div>
+                  <input class="search-input" type="number" x-model.number="tagEditForm.displayOrder" style="max-width:120px;">
                 </div>
                 <div class="section" style="margin-top:.75rem;">
                   <label style="display:flex;align-items:center;gap:.4rem;font-size:12px;cursor:pointer;">
@@ -2471,7 +2550,7 @@
         adminNewUser:       { username:'', full_name:'', password:'', role:'user', saving:false, msg:'', err:'' },
 
         // admin — tags
-        adminSection:    'users',
+        adminSection:    'tags',
         allAdminTags:    [],
         adminTagsLoading:false,
         selectedTag:     null,
@@ -3265,6 +3344,32 @@
             .filter(s => t.usage[s] > 0)
             .map(s => `${t.usage[s]} ${s.slice(0,6)}`);
           return parts.join(' · ');
+        },
+
+        campaignMeta(tag) {
+          const META = {
+            'CoverageDetermination': {
+              label: 'Coverage', scope: 'All parcels', color: '#10b981',
+              demo: { total: 650, counts: { Unconfirmed: 447, Undeveloped: 38, Underdeveloped: 112, Developed: 53 } },
+            },
+            'IdentityResolution': {
+              label: 'Identity', scope: 'Parcels where IdentityState ≠ OK', color: '#f59e0b',
+              demo: { total: 83, counts: { Unconfirmed: 61, 'ADB Add': 7, 'ADB Remove': 4, 'GIS Add': 9, 'GIS Remove': 2 } },
+            },
+            'Article97Determination': {
+              label: 'Article 97', scope: 'Documents with keyword score > 40%', color: '#8b5cf6',
+              demo: { total: 118, counts: { Unconfirmed: 74, Confirmed: 29, Denied: 15 } },
+            },
+            'FarmingDetermination': {
+              label: 'Farming', scope: 'All parcels', color: '#84cc16',
+              demo: { total: 650, counts: { Unconfirmed: 523, 'Not Suitable': 68, Possible: 41, Suitable: 18 } },
+            },
+            'AcquisitionDetermination': {
+              label: 'Acquisition', scope: 'Parcels with Possible or Likely suitability', color: '#3b82f6',
+              demo: { total: 184, counts: { Unconfirmed: 141, Pursue: 12, Watch: 23, Pass: 8 } },
+            },
+          };
+          return META[tag.name] || null;
         },
 
         async saveNewTag() {
