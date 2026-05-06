@@ -78,7 +78,7 @@ def uploads_for_parcel(parcel_id):
     rows = db.execute(
         """
         SELECT u.upload_id, u.doc_type, u.filename, u.mime_type,
-               u.note_text, u.created_at, usr.username
+               u.note_text, u.on_premises, u.created_at, usr.username
         FROM portal_uploads u
         JOIN users usr ON u.user_id = usr.id
         WHERE u.parcel_id = ?
@@ -93,9 +93,11 @@ def uploads_for_parcel(parcel_id):
 @bp.route("/api/uploads", methods=["POST"])
 @login_required
 def create_upload():
-    parcel_id = request.form.get("parcel_id", "").strip()
-    doc_type  = request.form.get("doc_type", "").strip()
-    note_text = request.form.get("note_text", "").strip() or None
+    parcel_id   = request.form.get("parcel_id", "").strip()
+    doc_type    = request.form.get("doc_type", "").strip()
+    note_text   = request.form.get("note_text", "").strip() or None
+    op_raw      = request.form.get("on_premises", "")
+    on_premises = 1 if op_raw in ("1", "true", "yes") else (0 if op_raw in ("0", "false", "no") else None)
 
     if not parcel_id:
         abort(400, "parcel_id required")
@@ -125,10 +127,10 @@ def create_upload():
     db.execute(
         """
         INSERT INTO portal_uploads
-            (upload_id, parcel_id, doc_type, filename, mime_type, note_text, user_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+            (upload_id, parcel_id, doc_type, filename, mime_type, note_text, on_premises, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (upload_id, parcel_id, doc_type, filename, mime_type, note_text, current_user.id),
+        (upload_id, parcel_id, doc_type, filename, mime_type, note_text, on_premises, current_user.id),
     )
     db.commit()
     db.close()

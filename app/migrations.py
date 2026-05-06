@@ -356,4 +356,7 @@ CREATE TRIGGER IF NOT EXISTS no_del_portal_uploads
     BEFORE DELETE ON portal_uploads
     BEGIN SELECT RAISE(FAIL,'portal_uploads is append-only'); END;
 """),
+    (20, """
+ALTER TABLE portal_uploads ADD COLUMN on_premises INTEGER;
+"""),
 ]

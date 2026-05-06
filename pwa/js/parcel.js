@@ -86,10 +86,12 @@ async function submitUpload() {
     return;
   }
 
-  const docType = selectedFile ? 'photo' : 'note';
-  const form    = new FormData();
-  form.append('parcel_id', parcelId);
-  form.append('doc_type',  docType);
+  const docType    = selectedFile ? 'photo' : 'note';
+  const onPremises = document.getElementById('on-premises').checked ? '1' : '0';
+  const form       = new FormData();
+  form.append('parcel_id',   parcelId);
+  form.append('doc_type',    docType);
+  form.append('on_premises', onPremises);
   if (selectedFile) form.append('file', selectedFile);
   if (noteText)     form.append('note_text', noteText);
 
@@ -158,7 +160,7 @@ function uploadItem(u) {
       <div class="upload-item-body">
         <div class="upload-item-type">${esc(u.doc_type)}</div>
         ${text}
-        <div class="upload-item-meta">${esc(u.username)} &middot; ${date}</div>
+        <div class="upload-item-meta">${esc(u.username)} &middot; ${date}${u.on_premises === 1 ? ' &middot; On premises' : u.on_premises === 0 ? ' &middot; Remote' : ''}</div>
       </div>
     </div>`;
 }
