@@ -359,4 +359,42 @@ CREATE TRIGGER IF NOT EXISTS no_del_portal_uploads
     (20, """
 ALTER TABLE portal_uploads ADD COLUMN on_premises INTEGER;
 """),
+    (21, """
+-- Campaigns: named work packages that specify which Tag dimensions to adjudicate
+-- and which attributes/document types to surface during that work.
+-- Campaigns live in transactions.db (portal-authored, not pipeline-written).
+CREATE TABLE IF NOT EXISTS campaigns (
+    campaign_id  TEXT    PRIMARY KEY,
+    name         TEXT    NOT NULL,
+    description  TEXT,
+    status       TEXT    NOT NULL DEFAULT 'active'
+                             CHECK(status IN ('active','paused','complete')),
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Dimensions a campaign asks reviewers to adjudicate.
+CREATE TABLE IF NOT EXISTS campaign_dimensions (
+    campaign_id  TEXT    NOT NULL REFERENCES campaigns(campaign_id),
+    dimension    TEXT    NOT NULL,
+    PRIMARY KEY (campaign_id, dimension)
+);
+
+-- Attributes (by attr_id from layer_attributes) to emphasize in the UI
+-- during this campaign. display_order overrides the global default within
+-- the campaign context.
+CREATE TABLE IF NOT EXISTS campaign_attributes (
+    campaign_id   TEXT    NOT NULL REFERENCES campaigns(campaign_id),
+    attr_id       TEXT    NOT NULL,
+    display_order INTEGER,
+    PRIMARY KEY (campaign_id, attr_id)
+);
+
+-- Document source types (e.g. 'registry', 'agendacenter') to foreground
+-- in the parcel document list during this campaign.
+CREATE TABLE IF NOT EXISTS campaign_doc_types (
+    campaign_id  TEXT    NOT NULL REFERENCES campaigns(campaign_id),
+    doc_type     TEXT    NOT NULL,
+    PRIMARY KEY (campaign_id, doc_type)
+);
+"""),
 ]

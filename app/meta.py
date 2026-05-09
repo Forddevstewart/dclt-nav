@@ -2,7 +2,6 @@ from flask import Blueprint, jsonify, request, abort
 from .models import get_reference_db, get_db
 from .db_utils import table_exists
 from discovery.keywords import KW_KEYS, KW_LABELS
-from .parcels import GIS_LAYER_COLS
 
 bp = Blueprint("meta", __name__, url_prefix="/api")
 
@@ -29,13 +28,20 @@ def overview():
     has_sources  = table_exists(db, "gis_sources")
 
     layer_cov = []
-    if has_gis:
-        for label, col, is_numeric in GIS_LAYER_COLS:
-            if is_numeric:
+    if has_gis and table_exists(db, "layer_attributes"):
+        attr_rows = db.execute(
+            "SELECT label, col_name, value_type FROM layer_attributes"
+            " WHERE db_table = 'parcels_gis' AND filterable = 1"
+            " AND value_type IN ('presence','numeric')"
+            " ORDER BY display_group, display_order"
+        ).fetchall()
+        for r in attr_rows:
+            col = r["col_name"]
+            if r["value_type"] == "numeric":
                 n = cnt(f"SELECT COUNT(*) FROM parcels_gis WHERE {col} > 0")
             else:
                 n = cnt(f"SELECT COUNT(*) FROM parcels_gis WHERE {col} IS NOT NULL AND {col} != ''")
-            layer_cov.append({"layer": label, "n": n})
+            layer_cov.append({"layer": r["label"], "n": n})
 
     kw_hits = {}
     if has_ocr:
@@ -117,8 +123,8 @@ def overview():
             ),
         },
         "reference": {
-            "use_codes":      cnt("SELECT COUNT(*) FROM ref_use_codes"),
-            "schema_columns": cnt("SELECT COUNT(*) FROM schema_columns"),
+            "use_codes":        cnt("SELECT COUNT(*) FROM ref_use_codes"),
+            "layer_attributes": cnt("SELECT COUNT(*) FROM layer_attributes") if table_exists(db, "layer_attributes") else 0,
         },
     }
 
@@ -136,6 +142,51 @@ def layer_eval(layer_name):
     from . import layers as _layers
     fn = getattr(_layers, _DYNAMIC_LAYERS[layer_name])
     return jsonify(fn())
+
+
+# ── Attribute registry ───────────────────────────────────────────────────────
+
+@bp.route("/meta/attributes")
+def attributes():
+    """Attribute registry from layer_attributes, grouped by display_group.
+
+    ?node_type=parcel|document — filter by node type (returns all if omitted).
+    """
+    node_type = request.args.get("node_type", "")
+    db = get_reference_db()
+    if not table_exists(db, "layer_attributes"):
+        db.close()
+        return jsonify([])
+
+    if node_type:
+        rows = db.execute(
+            "SELECT attr_id, layer_name, layer_class, node_type, db_table,"
+            "       col_name, gis_source_key, build_stage, label, description,"
+            "       display_group, display_order, value_type, filterable"
+            " FROM layer_attributes WHERE node_type = ?"
+            " ORDER BY display_group, display_order, attr_id",
+            (node_type,),
+        ).fetchall()
+    else:
+        rows = db.execute(
+            "SELECT attr_id, layer_name, layer_class, node_type, db_table,"
+            "       col_name, gis_source_key, build_stage, label, description,"
+            "       display_group, display_order, value_type, filterable"
+            " FROM layer_attributes"
+            " ORDER BY node_type, display_group, display_order, attr_id",
+        ).fetchall()
+    db.close()
+
+    from collections import defaultdict
+    groups: dict = defaultdict(list)
+    for r in rows:
+        d = dict(r)
+        groups[d["display_group"]].append(d)
+
+    return jsonify([
+        {"display_group": g, "attributes": attrs}
+        for g, attrs in groups.items()
+    ])
 
 
 # ── Filter entry points ───────────────────────────────────────────────────────

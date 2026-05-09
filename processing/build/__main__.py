@@ -26,7 +26,7 @@ from .derived import (
     compute_farming_suitability, compute_acquisition_suitability,
     compute_parcel_acq_layers,
 )
-from .reference import load_schema_columns, load_gis_sources, load_ref_use_codes
+from .reference import load_attr_registry, load_gis_sources, load_ref_use_codes
 
 
 def _now_utc() -> str:
@@ -126,7 +126,7 @@ def main() -> None:
         ("acquisition_suitability", None,           lambda e: compute_acquisition_suitability(e)),
         ("parcel_acq_layers",       None,           lambda e: compute_parcel_acq_layers(e)),
         ("link_candidates",         None,           lambda e: _load_link_candidates(e)),
-        ("schema_columns",          None,           lambda e: load_schema_columns(e)),
+        ("attr_registry",            None,           lambda e: load_attr_registry(e)),
         ("gis_sources",             None,           lambda e: load_gis_sources(e)),
         ("ref_use_codes",           None,           lambda e: load_ref_use_codes(e)),
     ]

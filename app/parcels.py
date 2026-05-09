@@ -3,8 +3,8 @@ from pathlib import Path
 from flask import Blueprint, jsonify, abort
 from flask_login import login_required
 from .models import get_reference_db, get_db
-from .db_utils import table_exists, column_exists
-from .dimensions import JOIN_STATUS_TO_IDENTITY_STATE
+from .db_utils import table_exists, column_exists, FOLD as _FOLD
+from .dimensions import JOIN_STATUS_TO_IDENTITY_STATE, DIMENSIONS
 from discovery.keywords import KW_KEYS
 
 bp = Blueprint("parcels", __name__, url_prefix="/api")
@@ -132,29 +132,58 @@ def parcels_list():
 
 @bp.route("/parcels/<parcel_id>")
 def parcel_detail(parcel_id):
-    db = get_reference_db()
+    ref = get_reference_db()
+    tx  = get_db()
 
-    parcel = db.execute(
+    parcel = ref.execute(
         "SELECT * FROM parcels WHERE parcel_id = ? LIMIT 1", (parcel_id,)
     ).fetchone()
     if not parcel:
-        db.close()
+        ref.close(); tx.close()
         abort(404)
 
-    docs = db.execute(
+    docs = ref.execute(
         "SELECT * FROM registry_documents WHERE parcel_id = ? ORDER BY doc_rank",
         (parcel_id,),
     ).fetchall()
 
-    gis = db.execute(
+    gis = ref.execute(
         "SELECT * FROM parcels_gis WHERE parcel_id = ? LIMIT 1", (parcel_id,)
     ).fetchone()
 
-    soil = db.execute(
+    soil = ref.execute(
         "SELECT * FROM layer_soils WHERE parcel_id = ? LIMIT 1", (parcel_id,)
     ).fetchone()
 
-    db.close()
+    # Tags: current fold state + applicability for all parcel dimensions.
+    tag_rows = tx.execute(
+        "SELECT tag_id, name FROM tags"
+        " WHERE deprecated_at IS NULL AND target_entity IN ('parcel','any')"
+        " ORDER BY display_order",
+    ).fetchall()
+    fold_rows = tx.execute(
+        f"SELECT t1.tag_id, t1.state FROM taggings t1"
+        f" WHERE t1.target_type = 'parcel' AND t1.target_id = ? AND {_FOLD}",
+        (parcel_id,),
+    ).fetchall()
+    fold_map = {r["tag_id"]: r["state"] for r in fold_rows}
+
+    tags_block = {}
+    for tr in tag_rows:
+        dim_name = tr["name"]
+        dim = DIMENSIONS.get(dim_name)
+        if dim is None or dim.node_type != "parcel":
+            continue
+        applicable, reason = dim.is_applicable("parcel", parcel_id, ref)
+        tags_block[dim_name] = {
+            "tag_id":     tr["tag_id"],
+            "state":      fold_map.get(tr["tag_id"]),
+            "applicable": applicable,
+            "reason":     reason if not applicable else "",
+        }
+
+    ref.close()
+    tx.close()
 
     doc_list = []
     for d in docs:
@@ -177,6 +206,7 @@ def parcel_detail(parcel_id):
         "documents": doc_list,
         "gis":       _clean(dict(gis), _GIS_SKIP) if gis else None,
         "soil":      _clean(dict(soil), _SOIL_SKIP) if soil else None,
+        "tags":      tags_block,
     })
 
 

@@ -124,6 +124,8 @@
     }
     .filter-chip-clear:hover { background:#fee2e2; }
     .filter-section { font-size:11px; color:#94a3b8; margin-bottom:.25rem; }
+    .filter-group-label { font-size:10px; color:#64748b; margin-top:.5rem; margin-bottom:.1rem; }
+    .tag-chip.not-applicable { opacity:.35; cursor:default; }
 
     /* ── Admin secondary tabs ───────────────────────────────────────────────── */
     .admin-sec-tab {
@@ -689,25 +691,30 @@
                   <div style="font-size:15px;font-weight:700;color:#0f172a;" x-text="campaignMeta(tag)?.label || tag.name"></div>
                   <div style="font-size:12px;color:#64748b;margin-top:2px;" x-text="campaignMeta(tag)?.scope || ('Target: ' + (tag.target_entity || 'any'))"></div>
                 </div>
-                <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;padding:.2rem .5rem;border:1px solid #e2e8f0;border-radius:3px;white-space:nowrap;flex-shrink:0;">Coming soon</span>
+                <button @click="launchDimension(tag)"
+                  style="font-size:11px;font-weight:600;padding:.25rem .65rem;border:1px solid;border-radius:4px;cursor:pointer;flex-shrink:0;white-space:nowrap;"
+                  :style="'border-color:' + (campaignMeta(tag)?.color||'#94a3b8') + ';color:' + (campaignMeta(tag)?.color||'#64748b') + ';background:#fff;'">
+                  Work queue →
+                </button>
               </div>
 
-              <!-- Progress (demo data) -->
-              <template x-if="campaignMeta(tag)?.demo">
+              <!-- Progress (real data) -->
+              <template x-if="campaignProgress && campaignProgress[tag.name]">
                 <div x-data="{
-                  get meta() { return campaignMeta(tag); },
-                  get states() { return tag.states_csv.split(','); },
-                  get total() { return this.meta.demo.total; },
-                  get resolved() { return this.total - (this.meta.demo.counts[this.states[0]] || 0); },
-                  get pct() { return this.total ? (this.resolved / this.total * 100) : 0; }
+                  get prog()     { return campaignProgress[tag.name]; },
+                  get meta()     { return campaignMeta(tag); },
+                  get states()   { return tag.states_csv.split(','); },
+                  get total()    { return this.prog.total; },
+                  get resolved() { return this.total - (this.prog.by_state.find(b => b.state === this.states[0])?.n || 0); },
+                  get pct()      { return this.total ? (this.resolved / this.total * 100) : 0; }
                 }" style="margin-top:.85rem;">
                   <!-- Progress bar -->
                   <div style="height:5px;border-radius:3px;background:#f1f5f9;overflow:hidden;">
-                    <div :style="'height:100%;width:' + pct.toFixed(1) + '%;background:' + meta.color + ';transition:width .4s'"></div>
+                    <div :style="'height:100%;width:' + pct.toFixed(1) + '%;background:' + (meta?.color||'#94a3b8') + ';transition:width .4s'"></div>
                   </div>
                   <!-- Resolved summary -->
                   <div style="display:flex;align-items:baseline;gap:.3rem;margin-top:.4rem;">
-                    <span style="font-size:13px;font-weight:700;" :style="'color:' + meta.color" x-text="resolved.toLocaleString()"></span>
+                    <span style="font-size:13px;font-weight:700;" :style="'color:' + (meta?.color||'#64748b')" x-text="resolved.toLocaleString()"></span>
                     <span style="font-size:12px;color:#64748b;" x-text="'of ' + total.toLocaleString() + ' resolved'"></span>
                     <span style="font-size:11px;color:#94a3b8;margin-left:.25rem;" x-text="'(' + pct.toFixed(0) + '%)'"></span>
                   </div>
@@ -717,15 +724,16 @@
                       <span style="font-size:11px;padding:.15rem .5rem;border-radius:3px;border:1px solid #e2e8f0;color:#475569;"
                             :style="i===0 ? 'background:#f1f5f9;' : 'background:#fff;'">
                         <span x-text="s"></span>
-                        <span style="color:#94a3b8;margin-left:.25rem;" x-text="(meta.demo.counts[s] || 0).toLocaleString()"></span>
+                        <span style="color:#94a3b8;margin-left:.25rem;"
+                              x-text="(prog.by_state.find(b => b.state === s)?.n || 0).toLocaleString()"></span>
                       </span>
                     </template>
                   </div>
                 </div>
               </template>
 
-              <!-- Fallback: state pills only -->
-              <template x-if="!campaignMeta(tag)?.demo">
+              <!-- Loading / no data yet -->
+              <template x-if="!campaignProgress || !campaignProgress[tag.name]">
                 <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.85rem;">
                   <template x-for="(s, i) in tag.states_csv.split(',')" :key="s">
                     <span style="font-size:11px;padding:.15rem .45rem;border-radius:3px;border:1px solid #e2e8f0;color:#475569;"
@@ -944,8 +952,8 @@
                       <span class="stat-sub-val" x-text="overviewData.reference.use_codes"></span>
                     </div>
                     <div class="stat-sub">
-                      <span>Schema columns documented</span>
-                      <span class="stat-sub-val" x-text="overviewData.reference.schema_columns"></span>
+                      <span>Attributes registered</span>
+                      <span class="stat-sub-val" x-text="overviewData.reference.layer_attributes"></span>
                     </div>
                   </div>
                 </div>
@@ -991,30 +999,35 @@
           <template x-if="allParcels.some(p => p.identity_state || p.has_zone1 || p.has_zone2 || p.has_prihab || p.has_esthab || p.has_natcomm || p.has_bm3 || p.has_openspace || p.has_wetlands || p.for_sale || (p.farming_suitability && p.farming_suitability !== 'Not suitable') || (p.acquisition_suitability && p.acquisition_suitability !== 'Not suitable') || (p.coverage_estimate != null && p.coverage_estimate !== 'Developed'))">
             <div>
               <div class="filter-section">Filter by attribute</div>
-              <div class="filter-chips">
-                <template x-for="chip in _PARCEL_LAYER_CHIPS" :key="chip.col">
-                  <div class="filter-chip-wrap">
-                    <button class="filter-chip"
-                      :class="{active: parcelLayerFilters[chip.col]?.length > 0, 'layer-attr': true}"
-                      @click.stop="toggleFilterChipPicker('pl:' + chip.col)"
-                      x-text="parcelLayerChipLabel(chip)">
-                    </button>
-                    <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'pl:' + chip.col" @click.stop>
-                      <template x-for="v in chip.values" :key="v">
-                        <label class="filter-chip-opt">
-                          <input type="checkbox"
-                            :checked="parcelLayerFilters[chip.col]?.includes(v)"
-                            @change="toggleParcelLayerValue(chip.col, v)">
-                          <span x-text="v === 1 ? 'Present' : String(v)"></span>
-                        </label>
-                      </template>
-                      <template x-if="parcelLayerFilters[chip.col]?.length > 0">
-                        <div class="filter-chip-clear" @click="clearParcelLayerFilter(chip.col)">Clear</div>
-                      </template>
-                    </div>
+              <template x-for="group in parcelLayerChipGroups" :key="group.display_group">
+                <div>
+                  <div class="filter-group-label" x-text="group.display_group"></div>
+                  <div class="filter-chips">
+                    <template x-for="chip in group.chips" :key="chip.col">
+                      <div class="filter-chip-wrap">
+                        <button class="filter-chip"
+                          :class="{active: parcelLayerFilters[chip.col]?.length > 0, 'layer-attr': true}"
+                          @click.stop="toggleFilterChipPicker('pl:' + chip.col)"
+                          x-text="parcelLayerChipLabel(chip)">
+                        </button>
+                        <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'pl:' + chip.col" @click.stop>
+                          <template x-for="v in chip.values" :key="v">
+                            <label class="filter-chip-opt">
+                              <input type="checkbox"
+                                :checked="parcelLayerFilters[chip.col]?.includes(v)"
+                                @change="toggleParcelLayerValue(chip.col, v)">
+                              <span x-text="v === 1 ? 'Present' : String(v)"></span>
+                            </label>
+                          </template>
+                          <template x-if="parcelLayerFilters[chip.col]?.length > 0">
+                            <div class="filter-chip-clear" @click="clearParcelLayerFilter(chip.col)">Clear</div>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
                   </div>
-                </template>
-              </div>
+                </div>
+              </template>
             </div>
           </template>
           <template x-if="allParcelTagOptions.length">
@@ -1300,13 +1313,14 @@
                   <div class="tag-chips">
                     <template x-for="tag in allParcelTagOptions" :key="tag.tag_id">
                       <div class="tag-chip"
-                        x-show="(tag.name !== 'CoverageDetermination' || coverageEstimate(parcelDetail?.parcel) !== 'Developed') && (tag.name !== 'AcquisitionDetermination' || ['Possible','Likely'].includes(parcelDetail?.parcel?.acquisition_suitability))"
                         :class="{
-                          applied:  parcelTagState[tag.tag_id] != null,
-                          pending:  tagPending[tag.tag_id],
-                          'retired-state': parcelTagState[tag.tag_id] != null && !tag.states_csv.split(',').includes(parcelTagState[tag.tag_id])
+                          applied:          parcelTagState[tag.tag_id] != null,
+                          pending:          tagPending[tag.tag_id],
+                          'retired-state':  parcelTagState[tag.tag_id] != null && !tag.states_csv.split(',').includes(parcelTagState[tag.tag_id]),
+                          'not-applicable': parcelDetail?.tags?.[tag.name]?.applicable === false
                         }"
-                        @click.stop="toggleTagPicker('parcel', tag.tag_id)">
+                        :title="parcelDetail?.tags?.[tag.name]?.applicable === false ? (parcelDetail.tags[tag.name].reason || 'Not applicable for this parcel') : ''"
+                        @click.stop="parcelDetail?.tags?.[tag.name]?.applicable !== false && toggleTagPicker('parcel', tag.tag_id)">
                         <span x-text="parcelTagState[tag.tag_id] != null ? tag.name + ' : ' + parcelTagState[tag.tag_id] : tag.name"></span>
                         <div class="tag-dropdown" x-show="tagPickerOpen === 'parcel:'+tag.tag_id" @click.stop>
                           <template x-for="(s, i) in parcelTagStates(tag, parcelDetail?.parcel)" :key="s">
@@ -1390,8 +1404,8 @@
             placeholder="Grantor, grantee, address, parcel…" type="search" autocomplete="off">
           <div>
             <div class="filter-section">Filter by attribute</div>
+            <!-- Instrument type chip (ungrouped) -->
             <div class="filter-chips">
-              <!-- Instrument type chip -->
               <div class="filter-chip-wrap">
                 <button class="filter-chip layer-attr"
                   :class="{active: docTypeFilters.length > 0}"
@@ -1410,30 +1424,37 @@
                   </template>
                 </div>
               </div>
-              <!-- Keyword score chips (bucket multi-select) -->
-              <template x-for="chip in _DOC_LAYER_CHIPS" :key="chip.key">
-                <div class="filter-chip-wrap">
-                  <button class="filter-chip"
-                    :class="{active: (docLayerFilters[chip.key]||[]).length > 0, 'layer-attr': true}"
-                    @click.stop="toggleFilterChipPicker('dl:' + chip.key)"
-                    x-text="docLayerChipLabel(chip)">
-                  </button>
-                  <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'dl:' + chip.key" @click.stop>
-                    <template x-for="b in ['0%','0–20%','20–40%','40–60%','60–80%','80–100%']" :key="b">
-                      <label class="filter-chip-opt">
-                        <input type="checkbox"
-                          :checked="(docLayerFilters[chip.key]||[]).includes(b)"
-                          @change="toggleDocLayerBucket(chip.key, b)">
-                        <span x-text="b"></span>
-                      </label>
-                    </template>
-                    <template x-if="(docLayerFilters[chip.key]||[]).length > 0">
-                      <div class="filter-chip-clear" @click="clearDocLayerFilter(chip.key)">Clear</div>
-                    </template>
-                  </div>
-                </div>
-              </template>
             </div>
+            <!-- Keyword score chips grouped by display_group -->
+            <template x-for="group in docLayerChipGroups" :key="group.display_group">
+              <div>
+                <div class="filter-group-label" x-text="group.display_group"></div>
+                <div class="filter-chips">
+                  <template x-for="chip in group.chips" :key="chip.key">
+                    <div class="filter-chip-wrap">
+                      <button class="filter-chip"
+                        :class="{active: (docLayerFilters[chip.key]||[]).length > 0, 'layer-attr': true}"
+                        @click.stop="toggleFilterChipPicker('dl:' + chip.key)"
+                        x-text="docLayerChipLabel(chip)">
+                      </button>
+                      <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'dl:' + chip.key" @click.stop>
+                        <template x-for="b in ['0%','0–20%','20–40%','40–60%','60–80%','80–100%']" :key="b">
+                          <label class="filter-chip-opt">
+                            <input type="checkbox"
+                              :checked="(docLayerFilters[chip.key]||[]).includes(b)"
+                              @change="toggleDocLayerBucket(chip.key, b)">
+                            <span x-text="b"></span>
+                          </label>
+                        </template>
+                        <template x-if="(docLayerFilters[chip.key]||[]).length > 0">
+                          <div class="filter-chip-clear" @click="clearDocLayerFilter(chip.key)">Clear</div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
           </div>
           <template x-if="allDocTagOptions.length">
             <div>
@@ -1733,9 +1754,10 @@
 
       <!-- Secondary tab bar -->
       <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#fff;flex-shrink:0;padding:0 .75rem;">
-        <button class="admin-sec-tab" :class="{active:adminSection==='tags'}"  @click="switchAdminSection('tags')">Tag Maintenance</button>
-        <button class="admin-sec-tab" :class="{active:adminSection==='users'}" @click="adminSection='users'">User Admin</button>
-        <button class="admin-sec-tab" :class="{active:adminSection==='usage'}" @click="adminSection='usage'">Usage Log</button>
+        <button class="admin-sec-tab" :class="{active:adminSection==='campaigns'}" @click="switchAdminSection('campaigns')">Campaigns</button>
+        <button class="admin-sec-tab" :class="{active:adminSection==='tags'}"     @click="switchAdminSection('tags')">Tag Maintenance</button>
+        <button class="admin-sec-tab" :class="{active:adminSection==='users'}"    @click="adminSection='users'">User Admin</button>
+        <button class="admin-sec-tab" :class="{active:adminSection==='usage'}"    @click="adminSection='usage'">Usage Log</button>
       </div>
 
       <!-- Section content -->
@@ -2103,6 +2125,95 @@
 
         </div><!-- /tags section -->
 
+        <!-- ── Campaigns Admin ────────────────────────────────────────────── -->
+        <div x-show="adminSection==='campaigns'" class="tab-section" style="flex-direction:column;gap:1.5rem;overflow-y:auto;padding:1.25rem;">
+
+          <!-- Existing campaigns -->
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:.6rem;">Active &amp; Paused Campaigns</div>
+            <template x-if="adminCampaignsLoading">
+              <div style="font-size:12px;color:#94a3b8;">Loading…</div>
+            </template>
+            <template x-if="!adminCampaignsLoading && adminCampaigns.length === 0">
+              <div style="font-size:12px;color:#94a3b8;">No campaigns yet.</div>
+            </template>
+            <template x-if="!adminCampaignsLoading && adminCampaigns.length > 0">
+              <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead>
+                  <tr style="border-bottom:1px solid #e2e8f0;color:#64748b;">
+                    <th style="text-align:left;padding:.3rem .5rem;">ID</th>
+                    <th style="text-align:left;padding:.3rem .5rem;">Name</th>
+                    <th style="text-align:left;padding:.3rem .5rem;">Status</th>
+                    <th style="padding:.3rem .5rem;"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="c in adminCampaigns" :key="c.campaign_id">
+                    <tr style="border-bottom:1px solid #f1f5f9;">
+                      <td style="padding:.35rem .5rem;color:#64748b;font-family:monospace;" x-text="c.campaign_id"></td>
+                      <td style="padding:.35rem .5rem;font-weight:500;" x-text="c.name"></td>
+                      <td style="padding:.35rem .5rem;">
+                        <span :style="c.status==='active' ? 'color:#166534;background:#dcfce7;' : c.status==='paused' ? 'color:#92400e;background:#fef3c7;' : 'color:#64748b;background:#f1f5f9;'"
+                              style="font-size:10px;font-weight:700;padding:.1rem .4rem;border-radius:3px;text-transform:uppercase;"
+                              x-text="c.status"></span>
+                      </td>
+                      <td style="padding:.35rem .5rem;display:flex;gap:.35rem;">
+                        <template x-if="c.status !== 'active'">
+                          <button class="rod-link" style="font-size:10px;padding:.15rem .4rem;" @click="setCampaignStatus(c.campaign_id,'active')">Activate</button>
+                        </template>
+                        <template x-if="c.status === 'active'">
+                          <button class="rod-link" style="font-size:10px;padding:.15rem .4rem;" @click="setCampaignStatus(c.campaign_id,'paused')">Pause</button>
+                        </template>
+                        <template x-if="c.status !== 'complete'">
+                          <button class="rod-link" style="font-size:10px;padding:.15rem .4rem;color:#dc2626;" @click="setCampaignStatus(c.campaign_id,'complete')">Complete</button>
+                        </template>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </template>
+          </div>
+
+          <!-- Create campaign -->
+          <div style="border-top:1px solid #e2e8f0;padding-top:1.25rem;">
+            <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:.75rem;">New Campaign</div>
+            <div style="display:flex;flex-direction:column;gap:.5rem;max-width:420px;">
+              <input class="search-input" x-model="campaignForm.campaign_id" placeholder="ID (slug, e.g. acquisition_2026)" style="font-family:monospace;">
+              <input class="search-input" x-model="campaignForm.name" placeholder="Name">
+              <input class="search-input" x-model="campaignForm.description" placeholder="Description (optional)">
+              <div>
+                <div style="font-size:11px;color:#64748b;margin-bottom:.3rem;">Dimensions</div>
+                <div style="display:flex;flex-direction:column;gap:.2rem;">
+                  <template x-for="tag in allParcelTagOptions" :key="tag.tag_id">
+                    <label style="font-size:12px;display:flex;align-items:center;gap:.4rem;">
+                      <input type="checkbox"
+                        :value="tag.name"
+                        :checked="campaignForm.dimensions.includes(tag.name)"
+                        @change="campaignForm.dimensions.includes(tag.name)
+                          ? campaignForm.dimensions = campaignForm.dimensions.filter(d=>d!==tag.name)
+                          : campaignForm.dimensions.push(tag.name)">
+                      <span x-text="tag.name"></span>
+                    </label>
+                  </template>
+                </div>
+              </div>
+              <template x-if="campaignForm.err">
+                <div style="font-size:12px;color:#dc2626;" x-text="campaignForm.err"></div>
+              </template>
+              <template x-if="campaignForm.msg">
+                <div style="font-size:12px;color:#166534;" x-text="campaignForm.msg"></div>
+              </template>
+              <button class="rod-link" style="align-self:flex-start;"
+                :disabled="campaignForm.saving"
+                @click="saveCampaign()"
+                x-text="campaignForm.saving ? 'Saving…' : 'Create campaign'">
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /campaigns section -->
+
       </div>
 
     </div><!-- /admin tab -->
@@ -2329,32 +2440,33 @@
   <script>
     // ── Layer attribute filter chips (read from External/Derived Layer columns) ─
     // values: available picker options. 1 = boolean "Present"; otherwise exact column values.
+    // attr_id links each chip to layer_attributes for display_group lookup.
+    // col/key is the field name in the API response (may differ from DB col_name).
     const _PARCEL_LAYER_CHIPS = [
-      {label: 'Identity State',         col: 'identity_state',         values: ['OK','ADB-only','GIS-only']},
-      {label: 'Zone 1 WHP',             col: 'has_zone1',              values: [1]},
-      {label: 'Zone 2 WHP',             col: 'has_zone2',              values: [1]},
-      {label: 'Priority Habitat',       col: 'has_prihab',             values: [1]},
-      {label: 'Est. Habitat',           col: 'has_esthab',             values: [1]},
-      {label: 'Nat. Community',         col: 'has_natcomm',            values: [1]},
-      {label: 'BioMap3',                col: 'has_bm3',                values: [1]},
-      {label: 'Open Space',             col: 'has_openspace',          values: [1]},
-      {label: 'Wetlands',               col: 'has_wetlands',           values: [1]},
-      {label: 'For Sale',               col: 'for_sale',               values: [1]},
-      {label: 'Undeveloped SC',         col: 'is_undeveloped_state_code', values: [1]},
-      {label: 'Farming Suitability',    col: 'farming_suitability',    values: ['Not suitable','Possible','Suitable']},
-      {label: 'Acquisition Suitability',col: 'acquisition_suitability',values: ['Not suitable','Possible','Likely']},
-      {label: 'Coverage Estimate',      col: 'coverage_estimate',      values: ['Missing values','Out of range','Underdeveloped','Developed']},
+      {attr_id: 'identity.identity_state',          label: 'Identity State',          col: 'identity_state',            values: ['OK','ADB-only','GIS-only']},
+      {attr_id: 'gis.zone1_type',                   label: 'Zone 1 WHP',              col: 'has_zone1',                 values: [1]},
+      {attr_id: 'gis.zone2_id',                     label: 'Zone 2 WHP',              col: 'has_zone2',                 values: [1]},
+      {attr_id: 'gis.prihab_id',                    label: 'Priority Habitat',        col: 'has_prihab',                values: [1]},
+      {attr_id: 'gis.esthab_id',                    label: 'Est. Habitat',            col: 'has_esthab',                values: [1]},
+      {attr_id: 'gis.natcomm_id',                   label: 'Nat. Community',          col: 'has_natcomm',               values: [1]},
+      {attr_id: 'gis.bm3_ch_id',                    label: 'BioMap3',                 col: 'has_bm3',                   values: [1]},
+      {attr_id: 'gis.os_site_name',                 label: 'Open Space',              col: 'has_openspace',             values: [1]},
+      {attr_id: 'gis.wetlands_code',                label: 'Wetlands',                col: 'has_wetlands',              values: [1]},
+      {attr_id: 'for_sale.for_sale',                label: 'For Sale',                col: 'for_sale',                  values: [1]},
+      {attr_id: 'usc.is_undeveloped_state_code',    label: 'Undeveloped SC',          col: 'is_undeveloped_state_code', values: [1]},
+      {attr_id: 'farming.farming_suitability',      label: 'Farming Suitability',     col: 'farming_suitability',       values: ['Not suitable','Possible','Suitable']},
+      {attr_id: 'acquisition.acquisition_suitability', label: 'Acquisition Suitability', col: 'acquisition_suitability', values: ['Not suitable','Possible','Likely']},
+      {attr_id: null, display_group: 'Coverage',   label: 'Coverage Estimate',       col: 'coverage_estimate',         values: ['Missing values','Out of range','Underdeveloped','Developed']},
     ];
 
-
     const _DOC_LAYER_CHIPS = [
-      {label: 'Conservation Restriction', key: 'kw_conservation_restriction'},
-      {label: 'Article 97',               key: 'kw_article_97'},
-      {label: 'Deed Restriction',         key: 'kw_deed_restriction'},
-      {label: 'Chapter 61',               key: 'kw_chapter_61'},
-      {label: 'Ag. Pres. Restriction',    key: 'kw_agricultural_preservation_restriction'},
-      {label: 'Perpetual Restriction',    key: 'kw_perpetual_restriction'},
-      {label: 'CC&R',                     key: 'kw_ccr'},
+      {attr_id: 'ocr.kw_conservation_restriction',              label: 'Conservation Restriction', key: 'kw_conservation_restriction'},
+      {attr_id: 'ocr.kw_article_97',                            label: 'Article 97',               key: 'kw_article_97'},
+      {attr_id: 'ocr.kw_deed_restriction',                      label: 'Deed Restriction',         key: 'kw_deed_restriction'},
+      {attr_id: 'ocr.kw_chapter_61',                            label: 'Chapter 61',               key: 'kw_chapter_61'},
+      {attr_id: 'ocr.kw_agricultural_preservation_restriction', label: 'Ag. Pres. Restriction',    key: 'kw_agricultural_preservation_restriction'},
+      {attr_id: 'ocr.kw_perpetual_restriction',                 label: 'Perpetual Restriction',    key: 'kw_perpetual_restriction'},
+      {attr_id: 'ocr.kw_ccr',                                   label: 'CC&R',                     key: 'kw_ccr'},
     ];
 
     // ── Keyword metadata (priority order, for detail view score bars) ─────────
@@ -2549,6 +2661,16 @@
         activeTab: 'overview',
         KW_ORDER,
 
+        // attribute registry (loaded from /api/meta/attributes)
+        attrRegistry: [],
+        attrById:     {},
+
+        // campaigns
+        campaignProgress:      null,
+        adminCampaigns:        [],
+        adminCampaignsLoading: false,
+        campaignForm: { campaign_id:'', name:'', description:'', dimensions:[], saving:false, err:'', msg:'' },
+
         // overview
         overviewData:    null,
         overviewLoading: false,
@@ -2682,6 +2804,28 @@
         },
         get allParcelTagOptions() {
           return this.allTags.filter(t => t.target_entity === 'parcel' || t.target_entity === 'any');
+        },
+
+        // ── Computed — attribute chip groups ───────────────────────────────
+        get parcelLayerChipGroups() {
+          const groups = new Map();
+          for (const chip of _PARCEL_LAYER_CHIPS) {
+            const grp = (chip.attr_id ? this.attrById[chip.attr_id]?.display_group : null)
+                     || chip.display_group || 'Other';
+            if (!groups.has(grp)) groups.set(grp, { display_group: grp, chips: [] });
+            groups.get(grp).chips.push(chip);
+          }
+          return [...groups.values()];
+        },
+        get docLayerChipGroups() {
+          const groups = new Map();
+          for (const chip of _DOC_LAYER_CHIPS) {
+            const grp = (chip.attr_id ? this.attrById[chip.attr_id]?.display_group : null)
+                     || 'Legal Restrictions';
+            if (!groups.has(grp)) groups.set(grp, { display_group: grp, chips: [] });
+            groups.get(grp).chips.push(chip);
+          }
+          return [...groups.values()];
         },
 
         // ── Computed — parcels ──────────────────────────────────────────────
@@ -2861,6 +3005,7 @@
             else                  this.updateLinkStatus(link.link_id, action);
             this.townAdjRequest = null;
           });
+          this.loadAttrRegistry();
           if (CURRENT_USER) {
             this.loadParcels();
             this.loadTags();
@@ -2872,6 +3017,7 @@
           if (!CURRENT_USER && tab !== 'overview') return;
           this.activeTab = tab;
           this.tagPickerOpen = null;
+          if (tab==='campaigns' && !this.campaignProgress && CURRENT_USER) this.loadCampaignProgress();
           if (tab==='assets' && !this.overviewData && !this.overviewLoading) this.loadOverview();
           if (tab==='registry' && this.allRegistry.length===0) this.loadRegistry();
           if (tab==='town' && this.townDocList.length===0) this.loadTownDocs();
@@ -2902,6 +3048,80 @@
             this.townDocsOverview = tdR.ok ? await tdR.json() : null;
           } catch(e) { console.error('overview:', e); }
           finally { this.overviewLoading = false; }
+        },
+
+        async loadAttrRegistry() {
+          try {
+            const r = await fetch('/api/meta/attributes');
+            if (!r.ok) return;
+            const groups = await r.json();
+            const byId = {};
+            for (const g of groups) {
+              for (const a of g.attributes) byId[a.attr_id] = a;
+            }
+            this.attrById     = byId;
+            this.attrRegistry = groups;
+          } catch(e) { console.error('attr registry:', e); }
+        },
+
+        async loadCampaignProgress() {
+          try {
+            const r = await fetch('/api/campaigns/progress');
+            if (r.ok) this.campaignProgress = await r.json();
+          } catch(e) { console.error('campaign progress:', e); }
+        },
+
+        async launchDimension(tag) {
+          this.switchTab('parcels');
+          const tagId = String(tag.tag_id);
+          if (!Object.prototype.hasOwnProperty.call(this.parcelTagFoldMaps, tagId)) {
+            const r = await fetch('/api/tagged/parcel?tag_ids=' + tagId);
+            if (r.ok) this.parcelTagFoldMaps = {...this.parcelTagFoldMaps, [tagId]: await r.json()};
+          }
+          this.parcelLayerFilters = {};
+          this.parcelTagFilters   = {[tagId]: [tag.states_csv.split(',')[0]]};
+          this.parcelPage = 1;
+        },
+
+        async loadAdminCampaigns() {
+          this.adminCampaignsLoading = true;
+          try {
+            const r = await fetch('/api/campaigns/all');
+            this.adminCampaigns = r.ok ? await r.json() : [];
+          } catch(e) { this.adminCampaigns = []; }
+          finally { this.adminCampaignsLoading = false; }
+        },
+
+        async saveCampaign() {
+          const f = this.campaignForm;
+          f.err = ''; f.msg = '';
+          if (!f.campaign_id.trim() || !f.name.trim()) { f.err = 'ID and name required'; return; }
+          f.saving = true;
+          try {
+            const r = await fetch('/api/campaigns', {
+              method: 'POST', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({
+                campaign_id: f.campaign_id.trim(),
+                name:        f.name.trim(),
+                description: f.description.trim(),
+                dimensions:  f.dimensions,
+              }),
+            });
+            const d = await r.json();
+            if (!r.ok) { f.err = d.error || String(r.status); return; }
+            f.msg = 'Campaign created';
+            f.campaign_id = ''; f.name = ''; f.description = ''; f.dimensions = [];
+            await this.loadAdminCampaigns();
+          } catch(e) { f.err = 'Network error'; }
+          finally { f.saving = false; }
+        },
+
+        async setCampaignStatus(campaign_id, status) {
+          await fetch('/api/campaigns/' + encodeURIComponent(campaign_id) + '/status', {
+            method: 'PATCH', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({status}),
+          });
+          await this.loadAdminCampaigns();
         },
 
         async loadParcels() {
@@ -2945,9 +3165,8 @@
           this.parcelTownDocs     = null;
           this.tagPickerOpen      = null;
           try {
-            const [detailResp, tagResp, tdResp, uploadsResp] = await Promise.all([
+            const [detailResp, tdResp, uploadsResp] = await Promise.all([
               fetch('/api/parcels/'+encodeURIComponent(p.parcel_id)),
-              CURRENT_USER ? fetch('/api/tagging/parcel/'+encodeURIComponent(p.parcel_id)) : Promise.resolve(null),
               fetch('/api/parcels/'+encodeURIComponent(p.parcel_id)+'/town-docs'),
               CURRENT_USER ? fetch('/api/uploads/parcel/'+encodeURIComponent(p.parcel_id)) : Promise.resolve(null),
             ]);
@@ -2955,13 +3174,9 @@
             this.parcelDetail   = await detailResp.json();
             this.parcelTownDocs = tdResp.ok ? await tdResp.json() : [];
             this.parcelUploads  = (uploadsResp && uploadsResp.ok) ? await uploadsResp.json() : [];
-            if (tagResp && tagResp.ok) {
-              const td = await tagResp.json();
-              this.allTags       = td.tags;
-              this.parcelTagState = {};
-              for (const [k, v] of Object.entries(td.current)) {
-                if (v !== null && v.state !== null) this.parcelTagState[k] = v.state;
-              }
+            this.parcelTagState = {};
+            for (const info of Object.values(this.parcelDetail.tags || {})) {
+              if (info && info.state !== null) this.parcelTagState[info.tag_id] = info.state;
             }
             const parcel = this.parcelDetail.parcel;
             this.$nextTick(() => _updateParcelMap(
@@ -3355,7 +3570,8 @@
           this.adminSection = section;
           this.selectedTag  = null;
           this.tagEditForm  = { isNew:false, name:'', states:[], statesRaw:'', newState:'', deprecated:false, displayOrder:0, saving:false, deleting:false, err:'', msg:'' };
-          if (section === 'tags') await this.loadAdminTags();
+          if (section === 'tags')      await this.loadAdminTags();
+          if (section === 'campaigns') await this.loadAdminCampaigns();
         },
 
         async loadAdminTags() {
@@ -3423,26 +3639,11 @@
 
         campaignMeta(tag) {
           const META = {
-            'CoverageDetermination': {
-              label: 'Coverage', scope: 'All parcels', color: '#10b981',
-              demo: { total: 650, counts: { Unconfirmed: 447, Undeveloped: 38, Underdeveloped: 112, Developed: 53 } },
-            },
-            'IdentityResolution': {
-              label: 'Identity', scope: 'Parcels where IdentityState ≠ OK', color: '#f59e0b',
-              demo: { total: 83, counts: { Unconfirmed: 61, 'ADB Add': 7, 'ADB Remove': 4, 'GIS Add': 9, 'GIS Remove': 2 } },
-            },
-            'Article97Determination': {
-              label: 'Article 97', scope: 'Documents with keyword score > 40%', color: '#8b5cf6',
-              demo: { total: 118, counts: { Unconfirmed: 74, Confirmed: 29, Denied: 15 } },
-            },
-            'FarmingDetermination': {
-              label: 'Farming', scope: 'All parcels', color: '#84cc16',
-              demo: { total: 650, counts: { Unconfirmed: 523, 'Not Suitable': 68, Possible: 41, Suitable: 18 } },
-            },
-            'AcquisitionDetermination': {
-              label: 'Acquisition', scope: 'Parcels with Possible or Likely suitability', color: '#3b82f6',
-              demo: { total: 184, counts: { Unconfirmed: 141, Pursue: 12, Watch: 23, Pass: 8 } },
-            },
+            'CoverageDetermination':    { label: 'Coverage',    scope: 'All parcels',                                   color: '#10b981' },
+            'IdentityResolution':       { label: 'Identity',    scope: 'Parcels where IdentityState ≠ OK',             color: '#f59e0b' },
+            'Article97Determination':   { label: 'Article 97',  scope: 'Documents with keyword score > 40%',           color: '#8b5cf6' },
+            'FarmingDetermination':     { label: 'Farming',     scope: 'All parcels',                                   color: '#84cc16' },
+            'AcquisitionDetermination': { label: 'Acquisition', scope: 'Parcels with Possible or Likely suitability',  color: '#3b82f6' },
           };
           return META[tag.name] || null;
         },
