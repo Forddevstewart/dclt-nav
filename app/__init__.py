@@ -4,7 +4,7 @@ import uuid
 from flask import Flask, request, session
 
 
-def create_app():
+def create_app(test_config=None):
     app = Flask(__name__, template_folder="templates", static_folder="static")
 
     app.config["DATABASE"] = os.path.join(
@@ -17,6 +17,9 @@ def create_app():
     app.config["UPLOAD_DIR"] = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), "data", "uploads"
     )
+
+    if test_config is not None:
+        app.config.update(test_config)
 
     from .auth import bp as auth_bp, login_manager, ensure_ford
     from .routes import bp as routes_bp
