@@ -8,6 +8,8 @@
   <script>
     const CURRENT_USER = {{ ({"id": current_user.id, "username": current_user.username, "full_name": current_user.full_name, "role": current_user.role} | tojson) if current_user.is_authenticated else "null" }};
   </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
@@ -307,13 +309,27 @@
     .kw-bar-fill  { height: 100%; border-radius: 4px; transition: width .3s; }
     .kw-val { text-align: right; font-weight: 600; color: #1e293b; font-size: 11px; }
 
-    /* ── GIS flags ───────────────────────────────────────────────────────── */
-    .gis-flag-grid  { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .8rem; }
-    .gis-flag { font-size: 11px; padding: .18rem .5rem; border-radius: 3px; font-weight: 500; line-height: 1.4; }
-    .gis-flag.on  { background: #dcfce7; color: #166534; cursor: pointer; }
-    .gis-flag.on:hover { background: #bbf7d0; }
-    .gis-flag.off { background: #f1f5f9; color: #94a3b8; }
-    .gis-groups { display: flex; flex-direction: column; gap: .4rem; }
+    /* ── GIS flat layer list ─────────────────────────────────────────────── */
+    .gis-llist  { display:flex; flex-direction:column; margin-top:.25rem; }
+    .gis-lrow   { padding:.2rem 0; border-bottom:1px solid var(--pn-paper-3); }
+    .gis-lrow:last-child { border-bottom:none; }
+    .gis-lrow-hd { display:flex; align-items:baseline; justify-content:space-between; gap:.5rem; }
+    .gis-lname  { font-size:11px; font-weight:600; color:var(--pn-ink-2); }
+    .gis-lname.absent { color:var(--pn-ink-5); font-weight:400; font-style:italic; }
+    .gis-nodata { font-size:10px; color:var(--pn-ink-5); font-style:italic; font-family:'IBM Plex Mono',monospace; flex-shrink:0; }
+    .gis-lfields { display:grid; grid-template-columns:1fr 1fr; gap:.05rem .5rem; margin-top:.2rem; }
+    .gis-lf  { font-size:11px; color:var(--pn-ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .gis-lf b { font-weight:400; color:var(--pn-ink-2); }
+
+    /* ── Compact 2-up grid for short-value sections ──────────────────────── */
+    .pn-compact-grid { display:grid; grid-template-columns:1fr 1fr; }
+    .pn-compact-cell { padding:.25rem .35rem; border-bottom:1px solid var(--pn-paper-3); border-right:1px solid var(--pn-paper-3); }
+    .pn-compact-cell:nth-child(2n) { border-right:none; }
+    .pn-compact-k { font-size:10px; color:var(--pn-ink-4); }
+    .pn-compact-v { font-size:11px; font-weight:500; color:var(--pn-ink); }
+    .pn-compact-v.mono { font-family:'IBM Plex Mono',monospace; font-size:10px; }
+
+    /* ── (legacy stubs kept for map-control refs) ────────────────────────── */
     .gis-group  { border: 1px solid #e2e8f0; border-radius: 4px; overflow: hidden; }
     .gis-group-header {
       display: flex; align-items: center; justify-content: space-between;
@@ -472,6 +488,132 @@
     .kw-hits-table td { padding: .2rem .3rem; border-bottom: 1px solid #f8fafc; }
     .kw-hits-table td:last-child { text-align: right; }
     .kw-hits-table tr:last-child td { border-bottom: none; }
+
+    /* ── Parcel Navigator (design handoff tokens + layout) ──────────────────── */
+    .pn-nav {
+      display:flex; width:100%; height:100%; overflow:hidden;
+      font-family:'IBM Plex Sans',system-ui,sans-serif; font-size:12px;
+      /* design tokens scoped to navigator */
+      --pn-ink:#0f1115; --pn-ink-2:#2a2f37; --pn-ink-3:#5a6270;
+      --pn-ink-4:#8a93a1; --pn-ink-5:#b8bfc9;
+      --pn-rule:#d8dde4; --pn-rules:#b8bfc9;
+      --pn-paper:#ffffff; --pn-paper-2:#f6f7f9; --pn-paper-3:#eef0f3;
+      --pn-decided:#1f6f43; --pn-decided-bg:#e3f0e8;
+      --pn-undec:#8a5a00;   --pn-undec-bg:#fbeecf;
+      --pn-na:#5a6270;      --pn-na-bg:#e8eaee;
+      --pn-accent:#c14a1a;
+      --pn-human:#1a3a8a; --pn-machine:#5a4a2a;
+    }
+    .pn-left  { width:280px; flex-shrink:0; border-right:1px solid var(--pn-rule); background:var(--pn-paper-2); display:flex; flex-direction:column; overflow:hidden; }
+    .pn-center{ flex:1; overflow-y:auto; min-width:0; background:var(--pn-paper); display:flex; flex-direction:column; }
+    .pn-right { width:400px; flex-shrink:0; border-left:1px solid var(--pn-rule); background:var(--pn-paper-2); display:flex; flex-direction:column; overflow:hidden; }
+
+    /* Left rail */
+    .pn-lctrl { padding:10px 12px 8px; border-bottom:1px solid var(--pn-rule); display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex-shrink:0; max-height:52%; }
+    .pn-sinput { width:100%; background:var(--pn-paper); border:1px solid var(--pn-rules); padding:5px 8px; font-size:12px; color:var(--pn-ink); font-family:'IBM Plex Sans',system-ui,sans-serif; outline:none; }
+    .pn-sinput:focus { border-color:var(--pn-ink-3); }
+    .pn-lmeta  { display:flex; justify-content:space-between; align-items:center; padding:5px 12px; font-size:11px; color:var(--pn-ink-3); border-bottom:1px solid var(--pn-rule); flex-shrink:0; gap:6px; }
+    .pn-lcount { color:var(--pn-ink); font-weight:600; font-family:'IBM Plex Mono',monospace; }
+
+    /* Parcel list rows */
+    .pn-lrow { display:grid; grid-template-columns:54px 1fr 40px; gap:6px; align-items:center; padding:7px 12px; border-bottom:1px solid var(--pn-rule); cursor:pointer; }
+    .pn-lrow:hover { background:var(--pn-paper-3); }
+    .pn-lrow.pn-sel { background:var(--pn-paper); border-left:2px solid var(--pn-accent); padding-left:10px; }
+    .pn-lid  { font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:500; color:var(--pn-ink); overflow:hidden; text-overflow:ellipsis; }
+    .pn-lrow.pn-sel .pn-lid { color:var(--pn-accent); }
+    .pn-laddr { font-size:11px; font-weight:500; color:var(--pn-ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .pn-lname { font-size:10px; color:var(--pn-ink-3); text-transform:uppercase; letter-spacing:.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .pn-dots  { display:flex; gap:3px; justify-content:flex-end; flex-shrink:0; }
+    .pn-dot   { width:7px; height:7px; border:1px solid var(--pn-ink-5); background:var(--pn-paper-3); }
+    .pn-dot.on{ background:var(--pn-decided); border-color:var(--pn-decided); }
+    .pn-dot.attn { background:var(--pn-undec); border-color:var(--pn-undec); }
+
+    /* Parcel header */
+    .pn-head  { padding:16px 22px 14px; border-bottom:1px solid var(--pn-rule); flex-shrink:0; }
+    .pn-htitle{ display:flex; align-items:baseline; gap:12px; margin-top:4px; flex-wrap:wrap; }
+    .pn-hid   { font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:600; color:var(--pn-ink); }
+    .pn-haddr { font-size:14px; font-weight:500; color:var(--pn-ink); }
+    .pn-hvill { font-size:11px; color:var(--pn-ink-3); }
+    .pn-hsub  { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; }
+
+    /* Status chips */
+    .pn-chip { display:inline-flex; align-items:center; font-family:'IBM Plex Mono',monospace; font-size:10px; padding:1px 6px; text-transform:uppercase; letter-spacing:.04em; border:1px solid currentColor; line-height:1.4; white-space:nowrap; }
+    .pn-chip-plain    { background:var(--pn-paper-3); color:var(--pn-ink-2); border-color:var(--pn-rule); }
+    .pn-chip-decided  { color:var(--pn-decided); background:var(--pn-decided-bg); }
+    .pn-chip-undecided{ color:var(--pn-undec);   background:var(--pn-undec-bg); }
+    .pn-chip-na       { color:var(--pn-na);       background:var(--pn-na-bg); }
+
+    /* Decision cards */
+    .pn-decisions { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; padding:14px 22px 16px; border-bottom:1px solid var(--pn-rule); flex-shrink:0; }
+    .pn-dcard { border:1px solid var(--pn-rule); background:var(--pn-paper); padding:11px 13px; cursor:pointer; display:flex; flex-direction:column; gap:5px; position:relative; }
+    .pn-dcard:hover { border-color:var(--pn-ink-3); background:var(--pn-paper-2); }
+    .pn-dcard.decided   { border-left:3px solid var(--pn-decided); padding-left:11px; }
+    .pn-dcard.undecided { border-left:3px solid var(--pn-undec);   padding-left:11px; background:#fffaf0; }
+    .pn-dcard.na        { border-left:3px solid var(--pn-na);      padding-left:11px; cursor:default; }
+    .pn-dcard-h  { display:flex; align-items:center; justify-content:space-between; gap:4px; }
+    .pn-dcard-lbl{ font-family:'IBM Plex Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--pn-ink-3); }
+    .pn-dcard-val{ font-size:13px; font-weight:500; color:var(--pn-ink); line-height:1.3; }
+    .pn-dcard.undecided .pn-dcard-val { color:var(--pn-undec); font-style:italic; }
+    .pn-dcard.na        .pn-dcard-val { color:var(--pn-na); }
+    .pn-dcard-foot{ display:flex; align-items:center; justify-content:space-between; padding-top:5px; border-top:1px dashed var(--pn-rule); font-size:9px; margin-top:2px; }
+    .pn-dcard-scope { font-family:'IBM Plex Mono',monospace; color:var(--pn-ink-4); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+    .pn-dcard:hover:not(.na) .pn-dcard-scope { color:var(--pn-accent); }
+
+    /* Section wrapper */
+    .pn-section   { padding:14px 22px; border-bottom:1px solid var(--pn-rule); flex-shrink:0; }
+    .pn-section-h { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; }
+    .pn-eyebrow   { font-family:'IBM Plex Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--pn-ink-3); }
+
+    /* Attribute grid */
+    .pn-attr-grid  { display:grid; grid-template-columns:1fr 1fr; gap:14px 36px; }
+    .pn-ag-title   { font-family:'IBM Plex Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; color:var(--pn-ink-2); padding-bottom:4px; margin-bottom:4px; border-bottom:1px dashed var(--pn-rule); }
+    .pn-arow       { display:grid; grid-template-columns:108px 1fr auto; gap:8px; align-items:baseline; padding:4px 0; border-bottom:1px solid var(--pn-paper-3); font-size:12px; }
+    .pn-arow:last-child { border-bottom:none; }
+    .pn-ak         { color:var(--pn-ink-3); }
+    .pn-av         { color:var(--pn-ink); font-weight:500; }
+    .pn-av.mono    { font-family:'IBM Plex Mono',monospace; font-size:11px; }
+    .pn-aprov      { display:inline-flex; align-items:center; gap:3px; font-size:9px; font-family:'IBM Plex Mono',monospace; white-space:nowrap; color:var(--pn-ink-4); }
+    .pn-pdot       { display:inline-block; width:5px; height:5px; flex-shrink:0; }
+    .pn-pdot.m     { border:1px solid var(--pn-machine); transform:rotate(45deg); }
+    .pn-pdot.h     { background:var(--pn-human); border-radius:50%; }
+
+    /* Right rail */
+    .pn-rail-hdr  { display:flex; align-items:center; justify-content:space-between; padding:7px 12px; background:var(--pn-paper-2); border-bottom:1px solid var(--pn-rule); font-family:'IBM Plex Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--pn-ink-3); flex-shrink:0; }
+    .pn-map-wrap  { height:230px; flex-shrink:0; position:relative; overflow:hidden; }
+    .pn-strip     { flex-shrink:0; border-top:1px solid var(--pn-rule); overflow:hidden; }
+    .pn-strip-row { display:flex; gap:6px; padding:8px 12px; overflow-x:auto; }
+    .pn-thumb     { flex:0 0 55px; cursor:pointer; }
+    .pn-tart      { width:55px; height:64px; border:1px solid var(--pn-rule); background:var(--pn-paper-3); display:flex; align-items:center; justify-content:center; font-size:18px; }
+    .pn-thumb.active .pn-tart { border:2px solid var(--pn-accent); }
+    .pn-tname     { font-size:9px; font-family:'IBM Plex Mono',monospace; color:var(--pn-ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+    .pn-viewer    { flex:1; overflow:hidden; display:flex; flex-direction:column; min-height:0; }
+
+    /* Expand modes: right rail fills middle + right */
+    .pn-nav.pn-exp-map .pn-center,
+    .pn-nav.pn-exp-doc .pn-center { display:none; }
+    .pn-nav.pn-exp-map .pn-right,
+    .pn-nav.pn-exp-doc .pn-right  { flex:1; width:auto; max-width:none; }
+    .pn-nav.pn-exp-map .pn-map-wrap { height:auto; flex:1; }
+    .pn-nav.pn-exp-map .pn-strip   { display:none; }
+    .pn-nav.pn-exp-map .pn-viewer  { display:none; }
+    .pn-nav.pn-exp-doc .pn-map-wrap { display:none; }
+    .pn-expand-btn { background:none; border:none; cursor:pointer; color:var(--pn-ink-4); padding:2px 4px; font-size:13px; line-height:1; border-radius:3px; }
+    .pn-expand-btn:hover { color:var(--pn-ink); background:var(--pn-paper-3); }
+
+    /* Left rail accordion sections */
+    .pn-lsec       { border-bottom:1px solid var(--pn-rule); flex-shrink:0; }
+    .pn-lsec-hdr   { display:flex; align-items:center; justify-content:space-between; padding:7px 12px 6px; cursor:pointer; user-select:none; }
+    .pn-lsec-hdr:hover { background:var(--pn-paper-3); }
+    .pn-lsec-title { font-family:'IBM Plex Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--pn-ink-2); font-weight:600; }
+    .pn-lsec-body  { padding:0 12px 8px; display:flex; flex-direction:column; gap:6px; }
+    .pn-lsec-caret { font-size:9px; color:var(--pn-ink-4); }
+    .pn-filter-dot { width:5px; height:5px; border-radius:50%; background:var(--pn-accent); flex-shrink:0; }
+
+    /* Links section compact rows */
+    .pn-link-row { display:flex; align-items:center; gap:7px; padding:3px 0; cursor:pointer; font-size:11px; color:var(--pn-ink-2); border-radius:2px; }
+    .pn-link-row:hover { color:var(--pn-ink); }
+    .pn-link-row.active { color:var(--pn-accent); font-weight:500; }
+    .pn-link-sub  { font-family:'IBM Plex Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--pn-ink-3); padding:6px 0 3px; border-top:1px dashed var(--pn-rule); margin-top:4px; display:flex; align-items:center; gap:6px; }
   </style>
 </head>
 <body x-data="app()">
@@ -674,14 +816,16 @@
 
     <!-- ══════════════════════════ CAMPAIGNS TAB ═══════════════════════════ -->
     <div class="tab-panel" x-show="activeTab==='campaigns'" style="overflow:hidden;">
-      <div class="ov-page">
+
+      <!-- ── Inventory ──────────────────────────────────────────────────────────── -->
+      <div class="ov-page" x-show="campaignView==='inventory'">
         <div class="ov-hero" style="background:linear-gradient(135deg,#1e2d4a 0%,#1e3a5f 55%,#1d4ed8 100%);">
           <div class="ov-hero-eyebrow" style="color:#93c5fd;">Primary decision surface</div>
           <h1 class="ov-hero-title">Campaigns</h1>
           <p class="ov-hero-lead" style="color:#bfdbfe;">Each Campaign drives a single Tag dimension to terminus — the point where no records remain in the work queue. Campaigns are the canonical place for staff to work through determinations.</p>
         </div>
         <div style="padding:2rem 2.5rem;max-width:860px;display:flex;flex-direction:column;gap:1rem;">
-          <template x-for="tag in allTags" :key="tag.tag_id">
+          <template x-for="tag in campaignSortedTags" :key="tag.tag_id">
             <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1.25rem 1.5rem;"
                  :style="'border-left:4px solid ' + (campaignMeta(tag)?.color || '#94a3b8')">
 
@@ -691,7 +835,7 @@
                   <div style="font-size:15px;font-weight:700;color:#0f172a;" x-text="campaignMeta(tag)?.label || tag.name"></div>
                   <div style="font-size:12px;color:#64748b;margin-top:2px;" x-text="campaignMeta(tag)?.scope || ('Target: ' + (tag.target_entity || 'any'))"></div>
                 </div>
-                <button @click="launchDimension(tag)"
+                <button @click="launchCampaignWork(tag)"
                   style="font-size:11px;font-weight:600;padding:.25rem .65rem;border:1px solid;border-radius:4px;cursor:pointer;flex-shrink:0;white-space:nowrap;"
                   :style="'border-color:' + (campaignMeta(tag)?.color||'#94a3b8') + ';color:' + (campaignMeta(tag)?.color||'#64748b') + ';background:#fff;'">
                   Work queue →
@@ -750,11 +894,382 @@
           </template>
         </div>
       </div>
+
+      <!-- ── Campaign work surface ──────────────────────────────────────────────── -->
+      <div x-show="campaignView==='work'" style="width:100%;display:flex;flex-direction:column;overflow:hidden;">
+
+        <!-- Campaign header -->
+        <div style="background:#fff;border-bottom:1px solid #e2e8f0;padding:12px 24px 10px;flex-shrink:0;"
+             :style="'border-left:4px solid ' + (campaignMeta(selectedCampaignTag)?.color || '#d97706')">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;">
+            <div style="display:flex;gap:20px;align-items:flex-start;">
+              <button @click="campaignView='inventory'"
+                style="font-size:12px;font-weight:500;padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;background:#fff;color:#475569;margin-top:4px;flex-shrink:0;font-family:inherit;">
+                ← Campaigns
+              </button>
+              <template x-if="selectedCampaignTag">
+                <div>
+                  <div style="font-size:11px;font-weight:700;letter-spacing:1.2px;margin-bottom:4px;text-transform:uppercase;"
+                       :style="'color:' + (campaignMeta(selectedCampaignTag)?.color || '#d97706')"
+                       x-text="'CAMPAIGN · ' + (campaignMeta(selectedCampaignTag)?.label || selectedCampaignTag.name).toUpperCase()">
+                  </div>
+                  <h1 style="margin:0;font-size:22px;font-weight:700;color:#0f172a;letter-spacing:-0.3px;"
+                      x-text="campaignMeta(selectedCampaignTag)?.label || selectedCampaignTag.name">
+                  </h1>
+                  <div style="font-size:13px;color:#64748b;margin-top:2px;"
+                       x-text="campaignMeta(selectedCampaignTag)?.scope || selectedCampaignTag.target_entity">
+                  </div>
+                </div>
+              </template>
+            </div>
+            <!-- Queue position pill -->
+            <template x-if="cwFilteredQueue.length > 0">
+              <div style="display:flex;align-items:baseline;gap:4px;background:#f8fafc;border:1px solid #e2e8f0;padding:8px 14px;border-radius:8px;flex-shrink:0;">
+                <span style="font-size:22px;font-weight:700;color:#0f172a;" x-text="cwIdx+1"></span>
+                <span style="color:#94a3b8;font-size:16px;">/</span>
+                <span style="font-size:15px;color:#64748b;" x-text="cwFilteredQueue.length"></span>
+                <span style="margin-left:6px;font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.6px;">in queue</span>
+              </div>
+            </template>
+          </div>
+          <!-- Progress row -->
+          <template x-if="selectedCampaignTag && campaignProgress && campaignProgress[selectedCampaignTag.name]">
+            <div x-data="{
+              get prog()     { return campaignProgress[selectedCampaignTag.name]; },
+              get meta()     { return campaignMeta(selectedCampaignTag); },
+              get states()   { return selectedCampaignTag.states_csv.split(','); },
+              get total()    { return prog.total; },
+              get resolved() { return total - (prog.by_state.find(b => b.state === states[0])?.n || 0); },
+              get pct()      { return total ? (resolved / total * 100) : 0; }
+            }" style="margin-top:12px;display:grid;grid-template-columns:180px auto 1fr;align-items:center;gap:16px;">
+              <div style="height:6px;border-radius:999px;background:#f1f5f9;overflow:hidden;">
+                <div :style="'height:100%;border-radius:999px;width:' + Math.max(pct, 0.6).toFixed(1) + '%;background:' + (meta?.color||'#d97706') + ';transition:width .4s'"></div>
+              </div>
+              <div style="font-size:12px;color:#475569;white-space:nowrap;">
+                <span style="font-weight:600;" :style="'color:' + (meta?.color||'#d97706')" x-text="resolved.toLocaleString()"></span>
+                <span x-text="' of ' + total.toLocaleString() + ' resolved'"></span>
+                <span style="color:#94a3b8;margin-left:4px;" x-text="'(' + pct.toFixed(0) + '%)'"></span>
+              </div>
+              <div style="display:flex;gap:16px;justify-content:flex-end;">
+                <template x-for="b in prog.by_state" :key="b.state">
+                  <div style="display:flex;gap:6px;align-items:baseline;">
+                    <span style="font-size:11px;color:#64748b;" x-text="b.state"></span>
+                    <span style="font-size:13px;font-weight:600;" :style="b.n > 0 ? 'color:#0f172a' : 'color:#94a3b8'" x-text="b.n.toLocaleString()"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 3-col body -->
+        <div style="flex:1;display:grid;grid-template-columns:260px 1fr 360px;overflow:hidden;border-top:1px solid #e2e8f0;">
+
+          <!-- Left: queue list -->
+          <aside style="background:#fff;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden;">
+            <!-- Head -->
+            <div style="padding:12px 14px;border-bottom:1px solid #f1f5f9;display:flex;flex-direction:column;gap:8px;flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                <span style="font-size:13px;font-weight:600;">Work queue</span>
+                <span style="font-size:11px;color:#64748b;" x-text="cwQueue.length + ' unconfirmed'"></span>
+              </div>
+              <input x-model.debounce.200ms="cwFilterQuery" placeholder="Filter queue…"
+                style="border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit;background:#f8fafc;outline:none;" />
+              <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                <button @click="cwSetFilter('all')"
+                  style="font-size:10px;padding:3px 7px;border-radius:999px;font-family:inherit;cursor:pointer;border:1px solid;"
+                  :style="cwFilter==='all' ? 'background:#0f172a;color:#fff;border-color:#0f172a;' : 'background:#fff;color:#475569;border-color:#e2e8f0;'">
+                  All
+                </button>
+                <button @click="cwSetFilter('adb_only')"
+                  style="font-size:10px;padding:3px 7px;border-radius:999px;font-family:inherit;cursor:pointer;border:1px solid;"
+                  :style="cwFilter==='adb_only' ? 'background:#0f172a;color:#fff;border-color:#0f172a;' : 'background:#fff;color:#475569;border-color:#e2e8f0;'">
+                  ADB only
+                </button>
+                <button @click="cwSetFilter('gis_only')"
+                  style="font-size:10px;padding:3px 7px;border-radius:999px;font-family:inherit;cursor:pointer;border:1px solid;"
+                  :style="cwFilter==='gis_only' ? 'background:#0f172a;color:#fff;border-color:#0f172a;' : 'background:#fff;color:#475569;border-color:#e2e8f0;'">
+                  GIS only
+                </button>
+                <button @click="cwSetFilter('mismatch')"
+                  style="font-size:10px;padding:3px 7px;border-radius:999px;font-family:inherit;cursor:pointer;border:1px solid;"
+                  :style="cwFilter==='mismatch' ? 'background:#0f172a;color:#fff;border-color:#0f172a;' : 'background:#fff;color:#475569;border-color:#e2e8f0;'">
+                  Mismatch
+                </button>
+              </div>
+            </div>
+            <!-- List -->
+            <div style="flex:1;overflow:auto;">
+              <template x-if="cwQueueLoading">
+                <div style="padding:24px;text-align:center;font-size:12px;color:#94a3b8;">Loading queue…</div>
+              </template>
+              <template x-if="!cwQueueLoading && cwFilteredQueue.length === 0">
+                <div style="padding:24px;text-align:center;font-size:12px;color:#94a3b8;">No parcels in queue</div>
+              </template>
+              <template x-for="(p, i) in cwFilteredQueue" :key="p.parcel_id">
+                <button @click="cwSelectIdx(i)"
+                  style="display:block;width:100%;text-align:left;background:transparent;border:none;border-left:3px solid transparent;border-bottom:1px solid #f1f5f9;padding:10px 12px;cursor:pointer;font-family:inherit;"
+                  :style="{
+                    background:      i === cwIdx ? '#fffbeb' : 'transparent',
+                    borderLeftColor: i === cwIdx
+                      ? (campaignMeta(selectedCampaignTag)?.color || '#d97706')
+                      : (cwDecisions[p.parcel_id] ? '#10b981' : 'transparent'),
+                  }">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-size:13px;font-weight:600;color:#0f172a;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;" x-text="p.parcel_id"></span>
+                    <span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;letter-spacing:0.4px;"
+                          :style="cwDecisions[p.parcel_id] ? 'color:#047857;background:#d1fae5;' : 'color:#92400e;background:#fef3c7;'"
+                          x-text="cwDecisions[p.parcel_id] || 'NA'"></span>
+                  </div>
+                  <div style="font-size:11px;color:#334155;margin-top:2px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                       x-text="p.owner_name || '(no owner)'"></div>
+                  <div style="font-size:10px;color:#94a3b8;margin-top:3px;">
+                    <span x-text="p.identity_state === 'ADB-only' ? 'ADB only' : 'GIS only'"></span>
+                    <span> · </span>
+                    <span x-text="(+(p.billingacres||0)).toFixed(2) + ' ac'"></span>
+                  </div>
+                </button>
+              </template>
+            </div>
+          </aside>
+
+          <!-- Center: parcel detail -->
+          <main style="overflow:auto;padding:16px 22px;display:flex;flex-direction:column;gap:18px;background:#f3f4f3;">
+
+            <template x-if="cwDetailLoading">
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:32px;text-align:center;font-size:12px;color:#94a3b8;">
+                Loading parcel…
+              </div>
+            </template>
+
+            <template x-if="!cwDetailLoading && cwFilteredQueue.length === 0 && !cwQueueLoading">
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:32px;text-align:center;">
+                <div style="font-size:13px;font-weight:600;color:#64748b;margin-bottom:4px;">Queue cleared for now</div>
+                <div style="font-size:12px;color:#94a3b8;">No unresolved parcels match the current filter.</div>
+              </div>
+            </template>
+
+            <template x-if="cwParcelDetail && !cwDetailLoading">
+
+              <!-- Parcel strip -->
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+                <div>
+                  <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;margin-bottom:4px;">PARCEL</div>
+                  <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;">
+                    <span style="font-size:22px;font-weight:700;letter-spacing:-0.4px;" x-text="cwParcelDetail.parcel.parcel_id"></span>
+                    <span style="font-size:13px;color:#334155;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;"
+                          x-text="cwParcelDetail.parcel.site_addr || '(no address)'"></span>
+                  </div>
+                  <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+                    <template x-if="cwParcelDetail.parcel.owner_category">
+                      <span style="font-size:10px;font-weight:700;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:3px;letter-spacing:0.6px;"
+                            x-text="cwParcelDetail.parcel.owner_category.toUpperCase()"></span>
+                    </template>
+                    <template x-if="cwParcelDetail.parcel.is_public">
+                      <span style="font-size:10px;font-weight:700;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:3px;letter-spacing:0.6px;">PUBLIC</span>
+                    </template>
+                    <template x-if="cwParcelDetail.parcel.use_code_norm">
+                      <span style="font-size:10px;font-weight:700;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:3px;letter-spacing:0.6px;"
+                            x-text="cwParcelDetail.parcel.use_code_norm.toUpperCase()"></span>
+                    </template>
+                    <span style="font-size:11px;color:#64748b;"
+                          x-text="(+(cwParcelDetail.parcel.billingacres||0)).toFixed(2) + ' ac · ' + (cwParcelDetail.parcel.village||'')"></span>
+                  </div>
+                </div>
+                <button @click="cwOpenFullParcel(cwParcelDetail.parcel.parcel_id)"
+                  style="font-size:12px;color:#1d4ed8;background:none;border:none;cursor:pointer;font-weight:500;margin-top:4px;white-space:nowrap;flex-shrink:0;font-family:inherit;padding:0;">
+                  Open full parcel →
+                </button>
+              </div>
+
+              <!-- Decision -->
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px 16px;">
+                <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;margin-bottom:10px;">DECISION</div>
+                <div style="position:relative;display:inline-block;" @click.outside="cwChipOpen=false">
+                  <!-- Chip -->
+                  <button @click="cwChipOpen=!cwChipOpen"
+                    style="border:1px solid;border-radius:8px;min-width:240px;cursor:pointer;text-align:left;font-family:inherit;padding:10px 12px;"
+                    :style="{
+                      borderColor: cwDecisions[cwParcelDetail.parcel.parcel_id] ? (campaignMeta(selectedCampaignTag)?.color||'#d97706') : '#e2e8f0',
+                      background:  cwDecisions[cwParcelDetail.parcel.parcel_id] ? '#fef3c7' : '#fff',
+                    }">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                      <span style="font-size:10px;font-weight:700;letter-spacing:1.4px;color:#475569;">IDENTITY</span>
+                      <span style="font-size:10px;font-weight:700;letter-spacing:0.8px;padding:2px 8px;border-radius:4px;"
+                            :style="cwDecisions[cwParcelDetail.parcel.parcel_id]
+                              ? 'background:' + (campaignMeta(selectedCampaignTag)?.color||'#d97706') + ';color:#fff;'
+                              : 'background:#fef3c7;color:#92400e;'"
+                            x-text="cwDecisions[cwParcelDetail.parcel.parcel_id] || 'NA'"></span>
+                    </div>
+                    <div style="font-size:15px;font-weight:600;color:#0f172a;font-style:italic;margin-bottom:4px;"
+                         x-text="cwDecisions[cwParcelDetail.parcel.parcel_id] || 'Unconfirmed'"></div>
+                    <div style="font-size:11px;color:#64748b;display:flex;justify-content:space-between;align-items:center;">
+                      <span>Resolve mismatch</span>
+                      <span x-text="cwChipOpen ? '▴' : '▾'" style="color:#94a3b8;"></span>
+                    </div>
+                  </button>
+                  <!-- Popover -->
+                  <div x-show="cwChipOpen" @click.stop
+                    style="position:absolute;top:calc(100% + 6px);left:0;width:340px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 12px 32px -8px rgba(15,23,42,.18);padding:12px;z-index:50;">
+                    <div style="font-size:13px;font-weight:600;color:#0f172a;">Set Identity determination</div>
+                    <div style="font-size:11px;color:#64748b;margin-top:2px;margin-bottom:10px;">Pick the action that resolves the ADB ↔ GIS mismatch.</div>
+                    <div style="display:flex;flex-direction:column;gap:6px;">
+                      <template x-for="d in cwIdentityDecisions" :key="d.key">
+                        <button @click="cwDecisions = {...cwDecisions, [cwParcelDetail.parcel.parcel_id]: d.key}; cwChipOpen=false"
+                          style="text-align:left;border:1px solid;border-radius:6px;padding:8px 10px;cursor:pointer;font-family:inherit;"
+                          :style="{
+                            background:  cwDecisions[cwParcelDetail.parcel.parcel_id]===d.key ? '#fef3c7' : '#fff',
+                            borderColor: cwDecisions[cwParcelDetail.parcel.parcel_id]===d.key ? '#fcd34d' : '#e2e8f0',
+                          }">
+                          <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:13px;font-weight:600;color:#0f172a;" x-text="d.key"></span>
+                            <template x-if="cwSuggestion(cwCurrentParcel) === d.key">
+                              <span style="font-size:10px;font-weight:600;letter-spacing:0.4px;"
+                                    :style="'color:' + (campaignMeta(selectedCampaignTag)?.color||'#d97706')">✦ suggested</span>
+                            </template>
+                          </div>
+                          <div style="font-size:11px;color:#64748b;margin-top:2px;" x-text="d.hint"></div>
+                        </button>
+                      </template>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid #f1f5f9;">
+                      <button @click="cwClearDecision(cwParcelDetail.parcel.parcel_id); cwChipOpen=false"
+                        style="background:transparent;border:none;color:#64748b;font-size:12px;cursor:pointer;padding:0;font-family:inherit;">
+                        Clear determination
+                      </button>
+                      <span style="display:flex;align-items:center;gap:3px;font-size:10px;color:#94a3b8;">
+                        <kbd style="font-family:ui-monospace,monospace;font-size:10px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:3px;padding:1px 5px;">1</kbd>
+                        <kbd style="font-family:ui-monospace,monospace;font-size:10px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:3px;padding:1px 5px;">2</kbd>
+                        <kbd style="font-family:ui-monospace,monospace;font-size:10px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:3px;padding:1px 5px;">3</kbd>
+                        <kbd style="font-family:ui-monospace,monospace;font-size:10px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:3px;padding:1px 5px;">4</kbd>
+                        to pick
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Identity evidence -->
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px 16px;">
+                <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;margin-bottom:10px;">IDENTITY EVIDENCE</div>
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;">
+                    <span style="font-size:13px;font-weight:600;color:#0f172a;">Owner mismatch</span>
+                    <span style="font-size:11px;font-weight:600;letter-spacing:0.4px;"
+                          :style="'color:' + (campaignMeta(selectedCampaignTag)?.color||'#d97706')"
+                          x-text="cwParcelDetail.parcel.identity_state === 'ADB-only' ? 'ADB only — missing in GIS' : 'GIS only — missing in ADB'"></span>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:stretch;">
+                    <!-- ADB -->
+                    <div style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;padding:10px 12px;">
+                      <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.8px;display:flex;align-items:center;gap:6px;margin-bottom:6px;text-transform:uppercase;">
+                        <span style="width:8px;height:8px;border-radius:999px;background:#d97706;display:inline-block;flex-shrink:0;"></span>
+                        ADB · assessor
+                      </div>
+                      <div style="font-size:15px;font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-bottom:4px;word-break:break-word;"
+                           :style="cwParcelDetail.parcel.identity_state !== 'GIS-only' && cwParcelDetail.parcel.owner_name ? 'color:#0f172a;' : 'color:#94a3b8;font-style:italic;'"
+                           x-text="cwParcelDetail.parcel.identity_state === 'GIS-only' ? '— no record —' : (cwParcelDetail.parcel.owner_name || '— no record —')"></div>
+                      <div style="font-size:11px;color:#64748b;"
+                           x-text="cwParcelDetail.parcel.identity_state !== 'GIS-only' ? ('Parcel ' + cwParcelDetail.parcel.parcel_id) : 'Not in assessor database'"></div>
+                    </div>
+                    <!-- Arrow -->
+                    <div style="align-self:center;font-size:18px;color:#cbd5e1;font-weight:600;">↔</div>
+                    <!-- GIS -->
+                    <div style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;padding:10px 12px;">
+                      <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.8px;display:flex;align-items:center;gap:6px;margin-bottom:6px;text-transform:uppercase;">
+                        <span style="width:8px;height:8px;border-radius:999px;background:#1d4ed8;display:inline-block;flex-shrink:0;"></span>
+                        GIS · parcel layer
+                      </div>
+                      <div style="font-size:15px;font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-bottom:4px;word-break:break-word;"
+                           :style="cwParcelDetail.parcel.identity_state !== 'ADB-only' ? 'color:#0f172a;' : 'color:#94a3b8;font-style:italic;'"
+                           x-text="cwParcelDetail.parcel.identity_state === 'ADB-only' ? '— no record —' : (cwParcelDetail.parcel.owner_name || '— no record —')"></div>
+                      <div style="font-size:11px;color:#64748b;"
+                           x-text="cwParcelDetail.parcel.identity_state === 'ADB-only' ? 'No polygon in GIS layer' : ((+(cwParcelDetail.parcel.billingacres||0)).toFixed(2) + ' ac')"></div>
+                    </div>
+                  </div>
+                  <!-- Suggestion -->
+                  <div style="margin-top:12px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#78350f;line-height:1.5;">
+                    <span style="color:#d97706;font-weight:600;">✦ Suggestion:</span>
+                    <strong x-text="' ' + (cwSuggestion(cwCurrentParcel) || '—')"></strong>
+                    <span x-text="cwParcelDetail.parcel.identity_state === 'ADB-only'
+                      ? ' — Owner on ADB but no matching polygon in GIS layer.'
+                      : ' — Parcel polygon in GIS but no matching assessor record.'"></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Basic info -->
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px 16px;">
+                <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;margin-bottom:10px;">BASIC INFO</div>
+                <template x-for="row in cwBasicInfoRows(cwParcelDetail.parcel)" :key="row.k">
+                  <div style="display:grid;grid-template-columns:120px 1fr 90px;gap:12px;border-bottom:1px solid #f1f5f9;align-items:center;padding:8px 0;">
+                    <div style="font-size:12px;color:#64748b;" x-text="row.k"></div>
+                    <div style="font-size:13px;color:#0f172a;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;" x-text="row.v"></div>
+                    <div style="font-size:10px;color:#94a3b8;text-align:right;letter-spacing:0.3px;">↑ Assessor</div>
+                  </div>
+                </template>
+              </div>
+
+            </template><!-- /cwParcelDetail -->
+          </main><!-- /center col -->
+
+          <!-- Right: map + actions -->
+          <aside style="background:#fff;border-left:1px solid #e2e8f0;padding:14px 16px;display:flex;flex-direction:column;gap:12px;overflow:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;">
+              <span style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;"
+                    x-text="cwParcelDetail ? 'MAP · ' + cwParcelDetail.parcel.parcel_id : 'MAP'"></span>
+            </div>
+            <!-- Map -->
+            <div style="position:relative;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;height:360px;flex-shrink:0;">
+              <div id="campaign-map" style="position:absolute;inset:0;"></div>
+              <template x-if="!cwParcelDetail">
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#f8fafc;font-size:11px;color:#94a3b8;font-family:'IBM Plex Mono',monospace;">
+                  Select a parcel
+                </div>
+              </template>
+            </div>
+            <!-- Save & Next -->
+            <div style="display:flex;gap:8px;">
+              <button @click="cwSkip()"
+                style="background:#fff;border:1px solid #e2e8f0;color:#64748b;padding:9px 14px;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit;flex:1;">
+                Skip
+              </button>
+              <button @click="cwSaveAndNext()"
+                :disabled="!cwDecisions[cwParcelDetail?.parcel?.parcel_id]"
+                style="border:none;padding:9px 16px;border-radius:6px;font-size:13px;font-weight:600;font-family:inherit;flex:2;color:#fff;"
+                :style="cwDecisions[cwParcelDetail?.parcel?.parcel_id]
+                  ? 'background:' + (campaignMeta(selectedCampaignTag)?.color||'#d97706') + ';cursor:pointer;'
+                  : 'background:#cbd5e1;cursor:not-allowed;'">
+                Save &amp; Next →
+              </button>
+            </div>
+            <!-- Keyboard hints -->
+            <div style="text-align:center;">
+              <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#94a3b8;">
+                <kbd style="font-family:ui-monospace,monospace;font-size:10px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:3px;padding:1px 5px;margin:0 2px;">S</kbd> skip ·
+                <kbd style="font-family:ui-monospace,monospace;font-size:10px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:3px;padding:1px 5px;margin:0 2px;">↵</kbd> save ·
+                <kbd style="font-family:ui-monospace,monospace;font-size:10px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:3px;padding:1px 5px;margin:0 2px;">J</kbd>
+                <kbd style="font-family:ui-monospace,monospace;font-size:10px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:3px;padding:1px 5px;margin:0 2px;">K</kbd> navigate
+              </span>
+            </div>
+          </aside><!-- /right col -->
+
+        </div><!-- /3-col body -->
+      </div><!-- /campaign work surface -->
+
     </div>
 
     <!-- ════════════════════════════ ASSETS TAB ═════════════════════════════ -->
-    <div class="tab-panel" x-show="activeTab==='assets'" style="overflow:hidden;">
-      <div class="overview-page">
+    <div class="tab-panel" x-show="activeTab==='assets'" style="overflow:hidden;display:flex;flex-direction:column;">
+
+      <!-- ── Assets sub-navigation ──────────────────────────────────────────── -->
+      <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#fff;flex-shrink:0;padding:0 .75rem;">
+        <button class="admin-sec-tab" :class="{active:assetsSubtab==='reference'}" @click="assetsSubtab='reference'">Reference DB</button>
+        <button class="admin-sec-tab" :class="{active:assetsSubtab==='reports'}"   @click="assetsSubtab='reports'; loadReports()">Reports</button>
+      </div>
+
+      <!-- ── Reference DB panel ─────────────────────────────────────────────── -->
+      <div class="overview-page" x-show="assetsSubtab==='reference'">
 
         <template x-if="overviewLoading">
           <div class="loading-msg">Loading…</div>
@@ -984,55 +1499,223 @@
           </div>
         </template>
 
-      </div>
-    </div><!-- /assets tab -->
+      </div><!-- /reference panel -->
 
-    <!-- ═══════════════════════════ PARCELS TAB ══════════════════════════════ -->
-    <div class="tab-panel three-col" x-show="activeTab==='parcels'">
+      <!-- ── Reports panel ──────────────────────────────────────────────────── -->
+      <div class="overview-page" x-show="assetsSubtab==='reports'">
 
-      <!-- Left: parcel list -->
-      <div class="col-left">
-        <div class="col-left-controls">
-          <input class="search-input" x-model.debounce.200ms="parcelSearch"
-            placeholder="Name or address" type="search" autocomplete="off"
-            @input="parcelPage=1">
-          <template x-if="allParcels.some(p => p.identity_state || p.has_zone1 || p.has_zone2 || p.has_prihab || p.has_esthab || p.has_natcomm || p.has_bm3 || p.has_openspace || p.has_wetlands || p.for_sale || (p.farming_suitability && p.farming_suitability !== 'Not suitable') || (p.acquisition_suitability && p.acquisition_suitability !== 'Not suitable') || (p.coverage_estimate != null && p.coverage_estimate !== 'Developed'))">
-            <div>
-              <div class="filter-section">Filter by attribute</div>
-              <template x-for="group in parcelLayerChipGroups" :key="group.display_group">
-                <div>
-                  <div class="filter-group-label" x-text="group.display_group"></div>
-                  <div class="filter-chips">
-                    <template x-for="chip in group.chips" :key="chip.col">
-                      <div class="filter-chip-wrap">
-                        <button class="filter-chip"
-                          :class="{active: parcelLayerFilters[chip.col]?.length > 0, 'layer-attr': true}"
-                          @click.stop="toggleFilterChipPicker('pl:' + chip.col)"
-                          x-text="parcelLayerChipLabel(chip)">
-                        </button>
-                        <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'pl:' + chip.col" @click.stop>
-                          <template x-for="v in chip.values" :key="v">
-                            <label class="filter-chip-opt">
-                              <input type="checkbox"
-                                :checked="parcelLayerFilters[chip.col]?.includes(v)"
-                                @change="toggleParcelLayerValue(chip.col, v)">
-                              <span x-text="v === 1 ? 'Present' : String(v)"></span>
-                            </label>
-                          </template>
-                          <template x-if="parcelLayerFilters[chip.col]?.length > 0">
-                            <div class="filter-chip-clear" @click="clearParcelLayerFilter(chip.col)">Clear</div>
-                          </template>
-                        </div>
+        <template x-if="reportsLoading">
+          <div class="loading-msg">Loading reports…</div>
+        </template>
+        <template x-if="!reportsLoading && reportsData">
+          <div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start;">
+
+              <!-- ── Assessor Report ──────────────────────────────────────── -->
+              <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <div class="stat-card"
+                  x-data="{
+                    get minor()    { return reportsData.assessor.gisid_refresh.filter(r=>r.drift_class==='drift-minor'); },
+                    get moderate() { return reportsData.assessor.gisid_refresh.filter(r=>r.drift_class==='drift-moderate'); },
+                    get major()    { return reportsData.assessor.gisid_refresh.filter(r=>r.drift_class==='drift-major'); },
+                    open: 'major'
+                  }">
+                  <div class="stat-card-title">Assessor — GISID Refresh</div>
+                  <p style="font-size:11px;color:#64748b;margin:.25rem 0 .6rem;">
+                    ADB GISID column is stale — MassGIS centroid shifted between dataset
+                    vintages. Parcel identity is unaffected; this is a hygiene update to
+                    BT_Extract. Major drift (≥ 50 ft) may indicate polygon reassignment
+                    and warrants manual review.
+                  </p>
+                  <div style="display:flex;gap:.75rem;margin-bottom:.75rem;">
+                    <template x-for="[cls,label,color] in [['major','Major ≥ 50 ft','#dc2626'],['moderate','Moderate 10–50 ft','#d97706'],['minor','Minor < 10 ft','#16a34a']]" :key="cls">
+                      <div @click="open=cls"
+                        :style="`cursor:pointer;flex:1;padding:.4rem .6rem;border-radius:4px;border:1px solid ${open===cls ? color : '#e2e8f0'};background:${open===cls ? '#fafafa' : 'transparent'};`">
+                        <div :style="`font-size:10px;font-weight:600;color:${color};text-transform:uppercase;`" x-text="label"></div>
+                        <div style="font-size:18px;font-weight:700;color:#0f172a;line-height:1.3;"
+                          x-text="cls==='major'?major.length:cls==='moderate'?moderate.length:minor.length"></div>
                       </div>
                     </template>
                   </div>
+                  <div x-data="{expanded:false}" x-effect="expanded=false">
+                    <table class="layer-table" style="font-size:11px;width:100%;">
+                      <thead>
+                        <tr>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Parcel</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Address</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Stale GIS ID</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Correct loc_id</td>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="r in (expanded ? (open==='major'?major:open==='moderate'?moderate:minor) : (open==='major'?major:open==='moderate'?moderate:minor).slice(0,10))" :key="r.parcel_id">
+                          <tr>
+                            <td style="font-family:monospace;" x-text="r.parcel_id"></td>
+                            <td x-text="r.site_addr||'—'"></td>
+                            <td style="font-family:monospace;color:#dc2626;font-size:10px;" x-text="r.adb_gisid"></td>
+                            <td style="font-family:monospace;color:#16a34a;font-size:10px;" x-text="r.current_loc_id"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                    <template x-if="(open==='major'?major:open==='moderate'?moderate:minor).length > 10">
+                      <button @click="expanded=!expanded"
+                        style="margin-top:.4rem;font-size:11px;color:#3b82f6;background:none;border:none;cursor:pointer;padding:0;"
+                        x-text="expanded ? '▲ Show fewer' : '▼ Show all ' + (open==='major'?major:open==='moderate'?moderate:minor).length.toLocaleString() + ' parcels'">
+                      </button>
+                    </template>
+                  </div>
                 </div>
-              </template>
+
+                <div class="stat-card">
+                  <div class="stat-card-title">Assessor — Identity Campaign Verdicts</div>
+                  <p style="font-size:11px;color:#64748b;margin:.25rem 0 .6rem;">
+                    IdentityResolution campaign decisions where the Assessor has the action.
+                  </p>
+                  <template x-if="reportsData.assessor.identity_verdicts.length === 0">
+                    <div style="font-size:12px;color:#94a3b8;">No verdicts recorded yet.</div>
+                  </template>
+                  <template x-if="reportsData.assessor.identity_verdicts.length > 0">
+                    <table class="layer-table" style="font-size:11px;width:100%;">
+                      <thead>
+                        <tr>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Parcel</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Address</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Owner</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Verdict</td>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="r in reportsData.assessor.identity_verdicts" :key="r.parcel_id">
+                          <tr>
+                            <td style="font-family:monospace;" x-text="r.parcel_id"></td>
+                            <td x-text="r.site_addr||'—'"></td>
+                            <td x-text="r.owner_name||'—'"></td>
+                            <td style="font-weight:600;" x-text="r.verdict"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </template>
+                </div>
+              </div>
+
+              <!-- ── GIS Report ───────────────────────────────────────────── -->
+              <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <div class="stat-card">
+                  <div class="stat-card-title">MassGIS — Corrections</div>
+                  <p style="font-size:11px;color:#64748b;margin:.25rem 0 .6rem;">
+                    Parcels requiring GIS layer corrections:
+                    <strong>absent</strong> = polygon missing from GIS;
+                    <strong>blank-map-par-id</strong> = polygon exists (by loc_id) but map_par_id is empty or misassigned;
+                    <strong>unmatched-polygon</strong> = GIS polygon with no ADB counterpart.
+                  </p>
+                  <template x-if="reportsData.gis.corrections.length === 0">
+                    <div style="font-size:12px;color:#94a3b8;">No corrections needed.</div>
+                  </template>
+                  <template x-if="reportsData.gis.corrections.length > 0">
+                    <table class="layer-table" style="font-size:11px;width:100%;">
+                      <thead>
+                        <tr>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Parcel</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Address</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Status</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">ADB GIS ID</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">GIS map_par_id</td>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="r in reportsData.gis.corrections" :key="(r.parcel_id||'')+(r.adb_gisid||'')">
+                          <tr>
+                            <td style="font-family:monospace;" x-text="r.parcel_id||'—'"></td>
+                            <td x-text="r.site_addr||'—'"></td>
+                            <td>
+                              <span :style="r.status==='absent'?'color:#dc2626;font-weight:600':r.status==='blank-map-par-id'?'color:#d97706;font-weight:600':'color:#7c3aed;font-weight:600'"
+                                x-text="r.status"></span>
+                            </td>
+                            <td style="font-family:monospace;font-size:10px;" x-text="r.adb_gisid||'—'"></td>
+                            <td style="font-family:monospace;" x-text="r.gis_map_par_id||'—'"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </template>
+                </div>
+
+                <div class="stat-card">
+                  <div class="stat-card-title">MassGIS — Identity Campaign Verdicts</div>
+                  <p style="font-size:11px;color:#64748b;margin:.25rem 0 .6rem;">
+                    IdentityResolution campaign decisions where MassGIS has the action.
+                  </p>
+                  <template x-if="reportsData.gis.identity_verdicts.length === 0">
+                    <div style="font-size:12px;color:#94a3b8;">No verdicts recorded yet.</div>
+                  </template>
+                  <template x-if="reportsData.gis.identity_verdicts.length > 0">
+                    <table class="layer-table" style="font-size:11px;width:100%;">
+                      <thead>
+                        <tr>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Parcel</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Address</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Owner</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Verdict</td>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="r in reportsData.gis.identity_verdicts" :key="r.parcel_id">
+                          <tr>
+                            <td style="font-family:monospace;" x-text="r.parcel_id"></td>
+                            <td x-text="r.site_addr||'—'"></td>
+                            <td x-text="r.owner_name||'—'"></td>
+                            <td style="font-weight:600;" x-text="r.verdict"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </template>
+                </div>
+              </div>
+
+            </div><!-- /reports grid -->
+          </div>
+        </template>
+
+      </div><!-- /reports panel -->
+
+    </div><!-- /assets tab -->
+
+    <!-- ═══════════════════════════ PARCELS TAB ══════════════════════════════ -->
+    <div class="tab-panel" x-show="activeTab==='parcels'" style="overflow:hidden;">
+    <div class="pn-nav" :class="{'pn-exp-map': pnExpandMode==='map', 'pn-exp-doc': pnExpandMode==='doc'}">
+
+      <!-- ── Left rail ──────────────────────────────────────────────────────── -->
+      <div class="pn-left">
+
+        <!-- Search -->
+        <div style="padding:9px 12px;border-bottom:1px solid var(--pn-rule);flex-shrink:0;">
+          <input class="pn-sinput" x-model.debounce.200ms="parcelSearch"
+            placeholder="Search id, owner, address…" type="search" autocomplete="off"
+            @input="parcelPage=1">
+          <template x-if="activeCampaign">
+            <div style="background:var(--pn-undec-bg);border:1px solid var(--pn-undec);padding:4px 8px;font-size:11px;display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:6px;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--pn-undec);" x-text="activeCampaign.name"></span>
+              <button @click="deactivateCampaign()" style="border:none;background:none;color:var(--pn-undec);cursor:pointer;font-size:12px;padding:0;">✕</button>
             </div>
           </template>
-          <template x-if="allParcelTagOptions.length">
-            <div>
-              <div class="filter-section">Filter by tag</div>
+        </div>
+
+        <!-- Campaigns / Decisions accordion -->
+        <div class="pn-lsec">
+          <div class="pn-lsec-hdr" @click="pnCampaignsOpen = !pnCampaignsOpen">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="pn-lsec-title">Campaigns</span>
+              <template x-if="Object.values(parcelTagFilters).some(v=>v.length>0)">
+                <span class="pn-filter-dot"></span>
+              </template>
+            </div>
+            <span class="pn-lsec-caret" x-text="pnCampaignsOpen ? '▲' : '▼'"></span>
+          </div>
+          <div x-show="pnCampaignsOpen" class="pn-lsec-body">
+            <template x-if="allParcelTagOptions.length">
               <div class="filter-chips">
                 <template x-for="tag in allParcelTagOptions" :key="tag.tag_id">
                   <div class="filter-chip-wrap">
@@ -1044,9 +1727,7 @@
                     <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'pt:' + tag.tag_id" @click.stop>
                       <template x-for="s in tag.states_csv.split(',')" :key="s">
                         <label class="filter-chip-opt">
-                          <input type="checkbox"
-                            :checked="parcelTagFilters[tag.tag_id]?.includes(s)"
-                            @change="toggleParcelTagState(tag.tag_id, s)">
+                          <input type="checkbox" :checked="parcelTagFilters[tag.tag_id]?.includes(s)" @change="toggleParcelTagState(tag.tag_id, s)">
                           <span x-text="s"></span>
                         </label>
                       </template>
@@ -1057,325 +1738,448 @@
                   </div>
                 </template>
               </div>
-            </div>
-          </template>
-          <template x-if="Object.values(parcelLayerFilters).some(v=>v.length>0) || Object.values(parcelTagFilters).some(v=>v.length>0)">
-            <button style="font-size:11px;color:#dc2626;background:none;border:none;padding:0;cursor:pointer;text-align:left;"
-              @click="parcelLayerFilters={}; parcelTagFilters={}; parcelTagFoldMaps={}; parcelPage=1;">
-              Clear filters
-            </button>
-          </template>
-          <!-- sort row hidden -->
-
-        </div>
-
-        <div class="col-left-footer">
-          <span x-text="parcelFilteredCount.toLocaleString()+' parcel'+(parcelFilteredCount!==1?'s':'')+(parcelSearch.trim()?' found':'')"></span>
-          <a :href="parcelExportUrl" class="paging-btn" style="text-decoration:none;" download>↓ CSV</a>
-          <div class="paging-btns">
-            <button class="paging-btn" @click="parcelPage=1"            :disabled="parcelPage===1">«</button>
-            <button class="paging-btn" @click="parcelPage--"            :disabled="parcelPage===1">‹</button>
-            <span   class="paging-page" x-text="parcelPage+' / '+parcelTotalPages"></span>
-            <button class="paging-btn" @click="parcelPage++"            :disabled="parcelPage>=parcelTotalPages">›</button>
-            <button class="paging-btn" @click="parcelPage=parcelTotalPages" :disabled="parcelPage>=parcelTotalPages">»</button>
+            </template>
+            <template x-if="!allParcelTagOptions.length">
+              <span style="font-size:11px;color:var(--pn-ink-4);">No dimensions defined</span>
+            </template>
           </div>
         </div>
 
-        <div class="col-left-list">
-          <template x-if="parcelsLoading"><div class="loading-msg">Loading…</div></template>
+        <!-- Attributes accordion (closed by default) -->
+        <div class="pn-lsec">
+          <div class="pn-lsec-hdr" @click="pnAttrsOpen = !pnAttrsOpen">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="pn-lsec-title">Attributes</span>
+              <template x-if="Object.values(parcelLayerFilters).some(v=>v.length>0)">
+                <span class="pn-filter-dot"></span>
+              </template>
+            </div>
+            <span class="pn-lsec-caret" x-text="pnAttrsOpen ? '▲' : '▼'"></span>
+          </div>
+          <div x-show="pnAttrsOpen" class="pn-lsec-body">
+            <template x-for="group in parcelLayerChipGroups" :key="group.display_group">
+              <div>
+                <div class="filter-group-label" x-text="group.display_group"></div>
+                <div class="filter-chips">
+                  <template x-for="chip in group.chips" :key="chip.col">
+                    <div class="filter-chip-wrap">
+                      <button class="filter-chip"
+                        :class="{active: parcelLayerFilters[chip.col]?.length > 0, 'layer-attr': true}"
+                        @click.stop="toggleFilterChipPicker('pl:' + chip.col)"
+                        x-text="parcelLayerChipLabel(chip)">
+                      </button>
+                      <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'pl:' + chip.col" @click.stop>
+                        <template x-for="v in chip.values" :key="v">
+                          <label class="filter-chip-opt">
+                            <input type="checkbox" :checked="parcelLayerFilters[chip.col]?.includes(v)" @change="toggleParcelLayerValue(chip.col, v)">
+                            <span x-text="v === 1 ? 'Present' : String(v)"></span>
+                          </label>
+                        </template>
+                        <template x-if="parcelLayerFilters[chip.col]?.length > 0">
+                          <div class="filter-chip-clear" @click="clearParcelLayerFilter(chip.col)">Clear</div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Clear all filters -->
+        <template x-if="Object.values(parcelLayerFilters).some(v=>v.length>0) || Object.values(parcelTagFilters).some(v=>v.length>0)">
+          <div style="padding:6px 12px;border-bottom:1px solid var(--pn-rule);flex-shrink:0;">
+            <button style="font-size:10px;color:var(--pn-accent);background:none;border:none;padding:0;cursor:pointer;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.04em;"
+              @click="parcelLayerFilters={}; parcelTagFilters={}; parcelTagFoldMaps={}; parcelPage=1;">
+              Clear all filters
+            </button>
+          </div>
+        </template>
+        <!-- List metadata -->
+        <div class="pn-lmeta">
+          <span><span class="pn-lcount" x-text="parcelFilteredCount.toLocaleString()"></span>
+            <span x-text="' parcel'+(parcelFilteredCount!==1?'s':'')+(parcelSearch.trim()?' found':'')"></span>
+          </span>
+          <div style="display:flex;align-items:center;gap:3px;">
+            <button class="paging-btn" @click="parcelPage=Math.max(1,parcelPage-1)" :disabled="parcelPage===1" style="font-size:11px;padding:1px 5px;">‹</button>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--pn-ink-3);" x-text="parcelPage+'/'+parcelTotalPages"></span>
+            <button class="paging-btn" @click="parcelPage=Math.min(parcelTotalPages,parcelPage+1)" :disabled="parcelPage>=parcelTotalPages" style="font-size:11px;padding:1px 5px;">›</button>
+            <a :href="parcelExportUrl" style="font-size:10px;color:var(--pn-ink-4);text-decoration:none;font-family:'IBM Plex Mono',monospace;margin-left:2px;" download title="Export CSV">↓</a>
+          </div>
+        </div>
+
+        <!-- Parcel list — paginated to fit viewport -->
+        <div id="pn-list-scroll" style="flex:1;overflow:hidden;">
+          <template x-if="parcelsLoading">
+            <div style="padding:1rem;font-size:12px;color:var(--pn-ink-4);font-family:'IBM Plex Mono',monospace;">Loading…</div>
+          </template>
           <template x-if="!parcelsLoading">
             <div>
-              <template x-for="p in pagedParcels" :key="p.parcel_id">
-                <div class="list-row" :class="{selected:selectedParcelId===p.parcel_id}" @click="selectParcel(p)">
-                  <div class="row-id"   x-text="p.parcel_id"></div>
-                  <div class="row-main" x-text="p.site_addr||'(no address)'"></div>
-                  <div class="row-sub"  x-text="p.owner_name||'—'"></div>
+              <template x-for="p in pagedParcels" :key="String(p.parcel_id||'')">
+                <div class="pn-lrow" :class="{'pn-sel': selectedParcelId===p.parcel_id}" @click="selectParcel(p)">
+                  <div class="pn-lid" x-text="p.parcel_id"></div>
+                  <div style="min-width:0;">
+                    <div class="pn-laddr" x-text="p.site_addr||'(no address)'"></div>
+                    <div class="pn-lname" x-text="p.owner_name||'—'"></div>
+                  </div>
+                  <div class="pn-dots">
+                    <template x-for="dot in pnTagDots(p)" :key="dot.t">
+                      <span class="pn-dot" :class="{on: dot.on, attn: dot.attn}" :title="dot.t"></span>
+                    </template>
+                  </div>
                 </div>
               </template>
               <template x-if="pagedParcels.length===0">
-                <div class="empty-state" style="height:100px;">No results</div>
+                <div style="padding:2rem 1rem;text-align:center;font-size:12px;color:var(--pn-ink-4);">No results</div>
               </template>
             </div>
           </template>
         </div>
-      </div>
 
-      <!-- Middle: parcel detail -->
-      <div class="col-mid">
-        <div class="col-mid-inner">
+      </div><!-- /pn-left -->
 
-          <template x-if="!selectedParcelId">
-            <div class="empty-state" style="height:60vh;">
-              <span class="empty-icon">🗂</span><span>Select a parcel</span>
-            </div>
-          </template>
-          <template x-if="selectedParcelId && parcelDetailLoading">
-            <div class="loading-msg">Loading…</div>
-          </template>
-          <template x-if="selectedParcelId && !parcelDetailLoading && parcelDetailError">
-            <div class="empty-state" style="color:#dc2626;">
-              <span class="empty-icon">⚠</span>
-              <span x-text="parcelDetailError"></span>
-            </div>
-          </template>
-          <template x-if="selectedParcelId && !parcelDetailLoading && parcelDetail">
-            <div>
-              <div style="margin-bottom:1rem;">
-                <div style="font-size:18px;font-weight:700;color:#0f172a;" x-text="parcelDetail.parcel.site_addr||parcelDetail.parcel.parcel_id"></div>
-                <div style="font-size:13px;color:#64748b;margin-top:2px;" x-text="parcelDetail.parcel.parcel_id"></div>
-                <div style="margin-top:.4rem;display:flex;flex-wrap:wrap;gap:.35rem;">
-                  <span class="badge" :class="propClassBadge(parcelDetail.parcel.property_class)" x-text="parcelDetail.parcel.property_class||'Unknown'"></span>
-                  <span x-show="parcelDetail.parcel.is_undeveloped_state_code" class="badge badge-amber">Undeveloped SC</span>
-                  <span x-show="parcelDetail.parcel.is_public" class="badge badge-teal">Public</span>
-                  <span x-show="(parcelDetail.parcel.condo_units||0)>0" class="badge badge-purple" x-text="parcelDetail.parcel.condo_units+' condo units'"></span>
-                </div>
+      <!-- ── Center ──────────────────────────────────────────────────────────── -->
+      <div class="pn-center">
+
+        <!-- Empty state -->
+        <template x-if="!selectedParcelId">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--pn-ink-4);padding:3rem;">
+            <svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="24" height="24" rx="1"/><path d="M4 12h24M12 12v16"/></svg>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;">Select a parcel</span>
+          </div>
+        </template>
+
+        <!-- Loading -->
+        <template x-if="selectedParcelId && parcelDetailLoading">
+          <div style="padding:2rem;font-size:12px;color:var(--pn-ink-4);font-family:'IBM Plex Mono',monospace;">Loading…</div>
+        </template>
+
+        <!-- Error -->
+        <template x-if="selectedParcelId && !parcelDetailLoading && parcelDetailError">
+          <div style="padding:2rem;color:#dc2626;font-size:12px;" x-text="parcelDetailError"></div>
+        </template>
+
+        <!-- Detail -->
+        <template x-if="selectedParcelId && !parcelDetailLoading && parcelDetail">
+          <div>
+
+            <!-- ── 1. Parcel Info ──────────────────────────────────────── -->
+            <div class="pn-head">
+              <div class="pn-eyebrow">Parcel</div>
+              <div class="pn-htitle">
+                <span class="pn-hid" x-text="parcelDetail.parcel.parcel_id"></span>
+                <span class="pn-haddr" x-text="parcelDetail.parcel.site_addr"></span>
+                <span class="pn-hvill" x-text="parcelDetail.parcel.village"></span>
               </div>
-
-              <div class="section">
-                <div class="section-title">Parcel Attributes</div>
-                <table class="attr-table">
-                  <tbody>
-                    <template x-for="[lbl,val] in parcelAttrs(parcelDetail.parcel)" :key="lbl">
-                      <tr><td class="attr-label" x-text="lbl"></td><td class="attr-value" x-text="val||'—'"></td></tr>
-                    </template>
-                  </tbody>
-                </table>
+              <div class="pn-hsub">
+                <span class="pn-chip pn-chip-plain" x-text="parcelDetail.parcel.property_class||'Unknown'"></span>
+                <template x-if="parcelDetail.parcel.is_public">
+                  <span class="pn-chip pn-chip-plain">Public</span>
+                </template>
+                <template x-if="parcelDetail.parcel.is_undeveloped_state_code">
+                  <span class="pn-chip pn-chip-plain">Undeveloped SC</span>
+                </template>
+                <template x-if="(parcelDetail.parcel.condo_units||0)>0">
+                  <span class="pn-chip pn-chip-plain" x-text="parcelDetail.parcel.condo_units+' condo units'"></span>
+                </template>
+                <template x-if="parcelDetail.parcel.billingacres">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--pn-ink-3);" x-text="Number(parcelDetail.parcel.billingacres).toFixed(2)+' ac'"></span>
+                </template>
               </div>
-
-              <template x-if="conservationLayers(parcelDetail.parcel)">
-                <div class="section">
-                  <div class="section-title">Conservation Layers</div>
-                  <table class="attr-table">
-                    <tbody>
-                      <template x-for="[lbl,val] in conservationLayers(parcelDetail.parcel)" :key="lbl">
-                        <tr><td class="attr-label" x-text="lbl"></td><td class="attr-value" x-text="val"></td></tr>
-                      </template>
-                    </tbody>
-                  </table>
+            </div>
+            <!-- Parcel info rows -->
+            <div class="pn-section" style="padding-top:10px;padding-bottom:10px;">
+              <template x-for="row in pnParcelInfoRows(parcelDetail.parcel)" :key="row.k">
+                <div class="pn-arow">
+                  <div class="pn-ak" x-text="row.k"></div>
+                  <div class="pn-av" :class="{mono: row.mono}" x-text="row.v"></div>
+                  <div class="pn-aprov"><span class="pn-pdot m"></span><span x-text="row.src"></span></div>
                 </div>
               </template>
+            </div>
 
-              <div class="section">
-                <div class="section-title">Registry of Deeds
-                  <template x-if="(parcelDetail.documents||[]).length">
-                    <span style="font-weight:400;text-transform:none;letter-spacing:0;"
-                      x-text="' — '+(parcelDetail.documents||[]).length+' record'+((parcelDetail.documents||[]).length!==1?'s':'')"></span>
+            <!-- ── 2. Decisions ───────────────────────────────────────── -->
+            <template x-if="CURRENT_USER && allParcelTagOptions.length">
+              <div>
+                <div style="display:flex;align-items:baseline;justify-content:space-between;padding:12px 22px 0;">
+                  <span class="pn-eyebrow">Decisions</span>
+                  <template x-if="tagsLoading">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--pn-ink-4);">Loading…</span>
                   </template>
                 </div>
-                <template x-if="(parcelDetail.documents||[]).length===0">
-                  <div style="color:#94a3b8;font-size:13px;">No records found</div>
-                </template>
-                <template x-if="(parcelDetail.documents||[]).length>0">
-                  <div style="overflow-x:auto;">
-                    <table class="doc-table">
-                      <thead><tr><th>#</th><th>Type</th><th>Recorded</th><th>Grantor</th><th>Grantee</th><th>Book/Page</th><th>PDF</th></tr></thead>
-                      <tbody>
-                        <template x-for="doc in (parcelDetail.documents||[])" :key="doc.doc_rank">
-                          <tr class="doc-row" :class="{active:parcelSelectedDoc&&parcelSelectedDoc.doc_rank===doc.doc_rank}" @click="selectParcelDoc(doc)">
-                            <td x-text="doc.doc_rank"></td>
-                            <td x-text="doc.instrument_type||'—'"></td>
-                            <td x-text="doc.recorded_date?doc.recorded_date.slice(0,10):'—'"></td>
-                            <td class="doc-party" :title="doc.grantor" x-text="doc.grantor||'—'"></td>
-                            <td class="doc-party" :title="doc.grantee" x-text="doc.grantee||'—'"></td>
-                            <td x-text="doc.book+' / '+doc.page"></td>
-                            <td>
-                              <template x-if="doc.scan_cached"><span class="badge badge-green" style="font-size:10px;padding:.1rem .35rem;">Local</span></template>
-                              <template x-if="!doc.scan_cached"><span class="badge badge-gray" style="font-size:10px;padding:.1rem .35rem;">RoD</span></template>
-                            </td>
-                          </tr>
+                <div class="pn-decisions">
+                  <template x-for="tag in allParcelTagOptions" :key="tag.tag_id">
+                    <div class="pn-dcard"
+                      :class="pnDecisionStatus(tag, parcelDetail)"
+                      :title="parcelDetail?.tags?.[tag.name]?.applicable === false ? (parcelDetail.tags[tag.name].reason || 'Not applicable') : ''"
+                      @click.stop="parcelDetail?.tags?.[tag.name]?.applicable !== false && toggleTagPicker('parcel', tag.tag_id)">
+                      <div class="pn-dcard-h">
+                        <span class="pn-dcard-lbl" x-text="campaignMeta(tag)?.label || tag.name"></span>
+                        <span class="pn-chip"
+                          :class="'pn-chip-'+pnDecisionStatus(tag,parcelDetail)"
+                          x-text="pnDecisionStatus(tag,parcelDetail)">
+                        </span>
+                      </div>
+                      <div class="pn-dcard-val"
+                        :class="{'not-applicable': parcelDetail?.tags?.[tag.name]?.applicable === false}"
+                        x-text="parcelTagState[tag.tag_id] ?? tag.states_csv.split(',')[0]">
+                      </div>
+                      <!-- Inline tag picker -->
+                      <div x-show="tagPickerOpen === 'parcel:'+tag.tag_id" @click.stop
+                        style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #cbd5e1;box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:30;padding:3px 0;min-width:140px;">
+                        <template x-for="(s, i) in parcelTagStates(tag, parcelDetail?.parcel)" :key="s">
+                          <div class="tag-dd-item"
+                            :class="{current: parcelTagState[tag.tag_id]===s, 'default-state': i===0 && parcelTagState[tag.tag_id]==null}"
+                            @click="applyTag('parcel', selectedParcelId, tag.tag_id, s)"
+                            x-text="s"></div>
                         </template>
-                      </tbody>
-                    </table>
-                  </div>
-                </template>
-              </div>
-
-              <div class="section" x-show="parcelTownDocs && parcelTownDocs.length > 0">
-                <div class="section-title">Town Documents
-                  <span style="font-weight:400;text-transform:none;letter-spacing:0;"
-                    x-text="parcelTownDocs ? ' — '+parcelTownDocs.length+' confirmed link'+(parcelTownDocs.length!==1?'s':'') : ''"></span>
-                </div>
-                <div style="overflow-x:auto;">
-                  <table class="doc-table">
-                    <thead><tr><th>Committee</th><th>Type</th><th>Date</th><th>Match</th></tr></thead>
-                    <tbody>
-                      <template x-for="td in parcelTownDocs" :key="td.link_id">
-                        <tr class="doc-row" :class="{active: parcelSelectedTownDoc && parcelSelectedTownDoc.link_id===td.link_id}" @click="selectParcelTownDoc(td)">
-                          <td x-text="(td.committee||'').replace(/_/g,' ')"></td>
-                          <td>
-                            <template x-if="td.doc_type==='Updated'">
-                              <span class="badge badge-blue" style="font-size:10px;padding:.1rem .35rem;">Updated</span>
-                            </template>
-                            <template x-if="td.doc_type!=='Updated'">
-                              <span x-text="td.doc_type||'—'"></span>
-                            </template>
-                          </td>
-                          <td x-text="td.meeting_date||'—'"></td>
-                          <td>
-                            <span style="font-size:10px;padding:.1rem .3rem;border-radius:3px;"
-                              :style="td.match_type==='ocr_map_lot' ? 'background:#dcfce7;color:#166534;' : td.match_type==='ocr_address' ? 'background:#dbeafe;color:#1d4ed8;' : 'background:#fef9c3;color:#854d0e;'"
-                              x-text="td.match_type==='ocr_map_lot' ? 'Map/Lot' : td.match_type==='ocr_address' ? 'Address' : 'Manual'"></span>
-                          </td>
-                        </tr>
-                      </template>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div class="section">
-                <div class="section-title">GIS Layers</div>
-                <template x-if="!parcelDetail.gis">
-                  <div style="color:#94a3b8;font-size:13px;">No GIS overlay data</div>
-                </template>
-                <template x-if="parcelDetail.gis">
-                  <div>
-                    <div class="gis-flag-grid">
-                      <template x-for="g in gisGroups(parcelDetail.gis,parcelDetail.soil)" :key="g.key">
-                        <span class="gis-flag" :class="g.present?'on':'off'" x-text="g.label" @click="g.present&&toggleGis(g.key)"></span>
-                      </template>
-                    </div>
-                    <div class="gis-groups">
-                      <template x-for="g in gisGroups(parcelDetail.gis,parcelDetail.soil)" :key="g.key">
-                        <template x-if="g.present">
-                          <div class="gis-group">
-                            <div class="gis-group-header" @click="toggleGis(g.key)">
-                              <span x-text="g.label"></span>
-                              <span style="font-size:10px;color:#94a3b8;" x-text="parcelGisOpen[g.key]?'▲':'▼'"></span>
-                            </div>
-                            <div class="gis-group-body" x-show="parcelGisOpen[g.key]">
-                              <template x-for="[lbl,val] in g.fields.filter(f=>f[1]!==null&&f[1]!==undefined&&f[1]!=='')" :key="lbl">
-                                <div class="gis-detail-row">
-                                  <span class="gis-detail-label" x-text="lbl"></span>
-                                  <span class="gis-detail-value" x-text="val"></span>
-                                </div>
-                              </template>
+                        <template x-if="parcelTagState[tag.tag_id] != null">
+                          <div>
+                            <hr class="tag-dd-divider">
+                            <div class="tag-dd-item tag-dd-remove"
+                              @click="applyTag('parcel', selectedParcelId, tag.tag_id, null)">
+                              Remove tag
                             </div>
                           </div>
                         </template>
-                      </template>
+                      </div>
+                      <div class="pn-dcard-foot">
+                        <span class="pn-dcard-scope" x-text="campaignMeta(tag)?.scope || tag.target_entity"></span>
+                        <span style="color:var(--pn-ink-5);font-size:10px;">→</span>
+                      </div>
                     </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- ── 3. Identity Attributes ────────────────────────────── -->
+            <template x-if="pnIdentityRows(parcelDetail.parcel).length">
+              <div class="pn-section">
+                <div class="pn-section-h"><span class="pn-eyebrow">Identity</span></div>
+                <template x-for="row in pnIdentityRows(parcelDetail.parcel)" :key="row.k">
+                  <div class="pn-arow">
+                    <div class="pn-ak" x-text="row.k"></div>
+                    <div class="pn-av" :class="{mono: row.mono}" x-text="row.v"></div>
+                    <div class="pn-aprov"><span class="pn-pdot m"></span><span x-text="row.src"></span></div>
                   </div>
                 </template>
               </div>
+            </template>
 
-              <!-- Field Documents (portal-uploaded photos, PDFs, notes) -->
-              <template x-if="parcelUploads.length > 0">
-                <div class="section">
-                  <div class="section-title">Field Documents
-                    <span style="font-weight:400;text-transform:none;letter-spacing:0;"
-                      x-text="' — '+parcelUploads.length+' item'+(parcelUploads.length!==1?'s':'')"></span>
+            <!-- ── 4. Links ───────────────────────────────────────────── -->
+            <div class="pn-section">
+              <div class="pn-section-h">
+                <span class="pn-eyebrow">Links</span>
+                <button class="pn-expand-btn" @click="pnShowMap()"
+                  title="Show map" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">
+                  ⊙ map
+                </button>
+              </div>
+
+              <!-- Registry docs -->
+              <div class="pn-link-sub">
+                <span>Registry</span>
+                <span style="color:var(--pn-ink-4);" x-text="(parcelDetail.documents||[]).length"></span>
+              </div>
+              <template x-if="(parcelDetail.documents||[]).length===0">
+                <div style="font-size:11px;color:var(--pn-ink-4);padding:3px 0;">No records found</div>
+              </template>
+              <template x-for="doc in (parcelDetail.documents||[]).slice(0,6)" :key="doc.doc_rank">
+                <div class="pn-link-row"
+                  :class="{active: parcelSelectedDoc && parcelSelectedDoc.doc_rank===doc.doc_rank}"
+                  @click="selectParcelDoc(doc)">
+                  <span style="font-size:14px;">📄</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;" x-text="'Bk '+doc.book+'/'+doc.page"></span>
+                  <span style="color:var(--pn-ink-3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" x-text="doc.instrument_type||'—'"></span>
+                  <span style="color:var(--pn-ink-5);font-size:10px;font-family:'IBM Plex Mono',monospace;" x-text="doc.recorded_date?doc.recorded_date.slice(0,4):''"></span>
+                  <template x-if="doc.scan_cached"><span class="pn-chip pn-chip-decided" style="font-size:8px;padding:0 4px;">●</span></template>
+                </div>
+              </template>
+              <template x-if="(parcelDetail.documents||[]).length > 6">
+                <div style="font-size:10px;color:var(--pn-ink-4);padding:2px 0;font-family:'IBM Plex Mono',monospace;"
+                  x-text="'+ '+((parcelDetail.documents||[]).length - 6)+' more'"></div>
+              </template>
+
+              <!-- Town docs -->
+              <template x-if="parcelTownDocs && parcelTownDocs.length">
+                <div>
+                  <div class="pn-link-sub">
+                    <span>Town Docs</span>
+                    <span style="color:var(--pn-ink-4);" x-text="parcelTownDocs.length"></span>
                   </div>
-                  <table class="doc-table">
-                    <thead>
-                      <tr>
-                        <th style="width:28px;"></th>
-                        <th>Note</th>
-                        <th>User</th>
-                        <th>Date</th>
-                        <th>On site</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <template x-for="u in parcelUploads" :key="u.upload_id">
-                        <tr class="doc-row"
-                            :class="{active: parcelSelectedUpload && parcelSelectedUpload.upload_id===u.upload_id}"
-                            @click="selectParcelUpload(u)">
-                          <td style="text-align:center;font-size:14px;">
-                            <template x-if="u.mime_type && u.mime_type.startsWith('image/')">
-                              <span title="Photo">📷</span>
-                            </template>
-                            <template x-if="u.mime_type === 'application/pdf'">
-                              <span title="PDF">📄</span>
-                            </template>
-                            <template x-if="u.doc_type === 'note'">
-                              <span title="Note">📝</span>
-                            </template>
-                          </td>
-                          <td class="doc-party" :title="u.note_text||''" x-text="u.note_text||'—'"></td>
-                          <td x-text="u.username"></td>
-                          <td x-text="new Date(u.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})"></td>
-                          <td x-text="u.on_premises===1 ? 'Yes' : u.on_premises===0 ? 'No' : '—'"></td>
-                        </tr>
-                      </template>
-                    </tbody>
-                  </table>
+                  <template x-for="td in parcelTownDocs.slice(0,4)" :key="td.link_id">
+                    <div class="pn-link-row"
+                      :class="{active: parcelSelectedTownDoc && parcelSelectedTownDoc.link_id===td.link_id}"
+                      @click="selectParcelTownDoc(td)">
+                      <span style="font-size:14px;">📋</span>
+                      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" x-text="(td.committee||'').replace(/_/g,' ')"></span>
+                      <span style="color:var(--pn-ink-4);font-size:10px;font-family:'IBM Plex Mono',monospace;" x-text="td.meeting_date||''"></span>
+                    </div>
+                  </template>
                 </div>
               </template>
 
-              <!-- Tags -->
-              <template x-if="CURRENT_USER">
-                <div class="section">
-                  <div class="section-title">Tags</div>
-                  <template x-if="tagsLoading">
-                    <div style="font-size:12px;color:#94a3b8;">Loading…</div>
+              <!-- Field docs (photos, notes) -->
+              <template x-if="parcelUploads.length">
+                <div>
+                  <div class="pn-link-sub">
+                    <span>Field</span>
+                    <span style="color:var(--pn-ink-4);" x-text="parcelUploads.length"></span>
+                  </div>
+                  <template x-for="u in parcelUploads.slice(0,4)" :key="u.upload_id">
+                    <div class="pn-link-row"
+                      :class="{active: parcelSelectedUpload && parcelSelectedUpload.upload_id===u.upload_id}"
+                      @click="selectParcelUpload(u)">
+                      <span style="font-size:14px;">
+                        <template x-if="u.mime_type && u.mime_type.startsWith('image/')">📷</template>
+                        <template x-if="u.doc_type==='note'">📝</template>
+                        <template x-if="u.mime_type==='application/pdf'">📄</template>
+                      </span>
+                      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;" x-text="u.note_text||u.filename||'—'"></span>
+                      <span style="color:var(--pn-ink-4);font-size:10px;font-family:'IBM Plex Mono',monospace;" x-text="u.username"></span>
+                    </div>
                   </template>
-                  <div class="tag-chips">
-                    <template x-for="tag in allParcelTagOptions" :key="tag.tag_id">
-                      <div class="tag-chip"
-                        :class="{
-                          applied:          parcelTagState[tag.tag_id] != null,
-                          pending:          tagPending[tag.tag_id],
-                          'retired-state':  parcelTagState[tag.tag_id] != null && !tag.states_csv.split(',').includes(parcelTagState[tag.tag_id]),
-                          'not-applicable': parcelDetail?.tags?.[tag.name]?.applicable === false
-                        }"
-                        :title="parcelDetail?.tags?.[tag.name]?.applicable === false ? (parcelDetail.tags[tag.name].reason || 'Not applicable for this parcel') : ''"
-                        @click.stop="parcelDetail?.tags?.[tag.name]?.applicable !== false && toggleTagPicker('parcel', tag.tag_id)">
-                        <span x-text="parcelTagState[tag.tag_id] != null ? tag.name + ' : ' + parcelTagState[tag.tag_id] : tag.name"></span>
-                        <div class="tag-dropdown" x-show="tagPickerOpen === 'parcel:'+tag.tag_id" @click.stop>
-                          <template x-for="(s, i) in parcelTagStates(tag, parcelDetail?.parcel)" :key="s">
-                            <div class="tag-dd-item"
-                              :class="{current: parcelTagState[tag.tag_id]===s, 'default-state': i===0 && parcelTagState[tag.tag_id]==null}"
-                              @click="applyTag('parcel', selectedParcelId, tag.tag_id, s)">
-                              <span x-text="s"></span>
-                            </div>
-                          </template>
-                          <template x-if="parcelTagState[tag.tag_id] != null">
-                            <div>
-                              <hr class="tag-dd-divider">
-                              <div class="tag-dd-item tag-dd-remove"
-                                @click="applyTag('parcel', selectedParcelId, tag.tag_id, null)">
-                                Remove tag
-                              </div>
-                            </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- ── 5. Conservation ────────────────────────────────────── -->
+            <template x-if="pnConservationRows(parcelDetail.parcel, parcelDetail.gis).length">
+              <div class="pn-section">
+                <div class="pn-section-h"><span class="pn-eyebrow">Conservation</span></div>
+                <div class="pn-compact-grid">
+                  <template x-for="row in pnConservationRows(parcelDetail.parcel, parcelDetail.gis)" :key="row.k">
+                    <div class="pn-compact-cell">
+                      <div class="pn-compact-k" x-text="row.k"></div>
+                      <div class="pn-compact-v" :class="{mono:row.mono}" x-text="row.v"></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- ── 6. Suitability ──────────────────────────────────────── -->
+            <template x-if="pnSuitabilityRows(parcelDetail.parcel).length">
+              <div class="pn-section">
+                <div class="pn-section-h"><span class="pn-eyebrow">Suitability</span></div>
+                <div class="pn-compact-grid">
+                  <template x-for="row in pnSuitabilityRows(parcelDetail.parcel)" :key="row.k">
+                    <div class="pn-compact-cell">
+                      <div class="pn-compact-k" x-text="row.k"></div>
+                      <div class="pn-compact-v" :class="{mono:row.mono}" x-text="row.v"></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- ── 7. GIS Layers (flat, alpha) ────────────────────────── -->
+            <template x-if="parcelDetail.gis">
+              <div class="pn-section">
+                <div class="pn-section-h"><span class="pn-eyebrow">GIS Layers</span></div>
+                <div class="gis-llist">
+                  <template x-for="g in gisGroupsSorted(parcelDetail.gis, parcelDetail.soil)" :key="g.key">
+                    <div class="gis-lrow">
+                      <div class="gis-lrow-hd">
+                        <span class="gis-lname" :class="{absent:!g.present}" x-text="g.label"></span>
+                        <template x-if="!g.present">
+                          <span class="gis-nodata">no data</span>
+                        </template>
+                      </div>
+                      <template x-if="g.present">
+                        <div class="gis-lfields">
+                          <template x-for="[lbl,val] in g.fields.filter(f=>f[1]!==null&&f[1]!==undefined&&f[1]!=='')" :key="lbl">
+                            <div class="gis-lf"><b x-text="lbl+': '"></b><span x-text="val"></span></div>
                           </template>
                         </div>
-                      </div>
-                    </template>
-                    <template x-if="allParcelTagOptions.length === 0 && !tagsLoading">
-                      <span style="font-size:12px;color:#94a3b8;">No dimensions defined</span>
-                    </template>
-                  </div>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+          </div>
+        </template>
+
+      </div><!-- /pn-center -->
+
+      <!-- ── Right rail ──────────────────────────────────────────────────────── -->
+      <div class="pn-right">
+
+        <!-- Map -->
+        <div class="pn-map-wrap">
+          <div class="pn-rail-hdr">
+            <span x-text="selectedParcelId ? 'Map · ' + selectedParcelId : 'Map'"></span>
+            <button class="pn-expand-btn" @click="pnExpandMode = pnExpandMode==='map' ? null : 'map'"
+              :title="pnExpandMode==='map' ? 'Collapse map (Esc)' : 'Expand map'"
+              x-text="pnExpandMode==='map' ? '↙' : '↗'">
+            </button>
+          </div>
+          <div id="parcel-map" x-show="selectedParcelId" style="position:absolute;inset:32px 0 0 0;"></div>
+          <template x-if="!selectedParcelId">
+            <div style="position:absolute;inset:32px 0 0 0;display:flex;align-items:center;justify-content:center;color:var(--pn-ink-5);font-size:11px;font-family:'IBM Plex Mono',monospace;">Select a parcel</div>
+          </template>
+        </div>
+
+        <!-- Document / upload strip -->
+        <template x-if="parcelDetail">
+          <div class="pn-strip">
+            <div class="pn-rail-hdr">
+              <span>Attached
+                <span style="color:var(--pn-ink-4);margin-left:4px;" x-text="'· '+((parcelDetail.documents||[]).length + parcelUploads.length)"></span>
+              </span>
+            </div>
+            <div class="pn-strip-row">
+              <template x-for="doc in (parcelDetail.documents||[]).slice(0,8)" :key="doc.doc_rank">
+                <div class="pn-thumb" :class="{active: parcelSelectedDoc && parcelSelectedDoc.doc_rank===doc.doc_rank}" @click="selectParcelDoc(doc)">
+                  <div class="pn-tart" style="font-size:16px;">📄</div>
+                  <div class="pn-tname" x-text="doc.book+'/'+doc.page"></div>
                 </div>
               </template>
-
+              <template x-for="u in parcelUploads.slice(0,4)" :key="u.upload_id">
+                <div class="pn-thumb" :class="{active: parcelSelectedUpload && parcelSelectedUpload.upload_id===u.upload_id}" @click="selectParcelUpload(u)">
+                  <div class="pn-tart">
+                    <template x-if="u.mime_type && u.mime_type.startsWith('image/')"><span>📷</span></template>
+                    <template x-if="u.doc_type==='note'"><span>📝</span></template>
+                    <template x-if="u.mime_type==='application/pdf'"><span>📄</span></template>
+                  </div>
+                  <div class="pn-tname" x-text="u.note_text||u.filename||'—'"></div>
+                </div>
+              </template>
+              <template x-if="(parcelDetail.documents||[]).length===0 && parcelUploads.length===0">
+                <span style="font-size:11px;color:var(--pn-ink-4);font-family:'IBM Plex Mono',monospace;padding:4px 0;">No attachments</span>
+              </template>
             </div>
-          </template>
-
-        </div>
-      </div>
-
-      <!-- Right: Map / PDF viewer -->
-      <div class="col-right">
-        <div class="col-right-header" x-text="parcelSelectedUpload ? 'Field Document' : parcelSelectedTownDoc ? 'Town Document' : parcelSelectedDoc ? 'Document View' : (selectedParcelId ? 'Parcel Map' : 'Document View')"></div>
-        <div class="col-right-body">
-          <div x-show="!selectedParcelId" class="empty-state">
-            <span class="empty-icon">📄</span><span>Select a parcel</span>
           </div>
-          <div id="parcel-map" x-show="selectedParcelId && !parcelSelectedDoc && !parcelSelectedTownDoc && !parcelSelectedUpload" style="flex:1;width:100%;min-height:0;"></div>
+        </template>
+
+        <!-- Viewer -->
+        <div class="pn-viewer">
+          <div class="pn-rail-hdr">
+            <span x-text="parcelSelectedUpload ? 'Field Document' : parcelSelectedTownDoc ? 'Town Document' : parcelSelectedDoc ? ('Doc · ' + (parcelSelectedDoc.book||'') + '/' + (parcelSelectedDoc.page||'')) : 'Document View'"></span>
+            <button class="pn-expand-btn" @click="pnExpandMode = pnExpandMode==='doc' ? null : 'doc'"
+              :title="pnExpandMode==='doc' ? 'Collapse document (Esc)' : 'Expand document'"
+              x-text="pnExpandMode==='doc' ? '↙' : '↗'">
+            </button>
+          </div>
+          <div x-show="!parcelSelectedDoc && !parcelSelectedTownDoc && !parcelSelectedUpload"
+            style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--pn-ink-5);font-size:11px;font-family:'IBM Plex Mono',monospace;">
+            Select a document
+          </div>
           <div x-show="parcelSelectedDoc && !parcelPdfUrl" class="no-scan-panel">
             <div class="rod-doc-meta" x-text="parcelSelectedDoc ? (parcelSelectedDoc.instrument_type||'Document')+' · Book '+parcelSelectedDoc.book+', Page '+parcelSelectedDoc.page : ''"></div>
-            <div style="font-size:13px;color:#64748b;">No local scan</div>
-            <button class="rod-link"
-              @click="parcelPdfUrl='/api/documents/'+parcelSelectedDoc.book+'/'+parcelSelectedDoc.page+'/rod'">
+            <div style="font-size:12px;color:var(--pn-ink-3);">No local scan</div>
+            <button class="rod-link" @click="parcelPdfUrl='/api/documents/'+parcelSelectedDoc.book+'/'+parcelSelectedDoc.page+'/rod'">
               Read from Registry of Deeds
             </button>
           </div>
           <iframe x-show="parcelSelectedDoc && parcelPdfUrl" :src="parcelPdfUrl || ''" style="flex:1;width:100%;height:100%;border:none;"></iframe>
           <iframe x-show="parcelSelectedTownDoc" :src="parcelSelectedTownDoc ? '/api/town-docs/pdf/'+parcelSelectedTownDoc.doc_id : ''" style="flex:1;width:100%;height:100%;border:none;"></iframe>
-          <!-- Field upload viewers -->
           <div x-show="parcelSelectedUpload && parcelSelectedUpload.mime_type && parcelSelectedUpload.mime_type.startsWith('image/')"
-               style="flex:1;width:100%;display:flex;align-items:center;justify-content:center;background:#0f172a;overflow:hidden;">
+               style="flex:1;display:flex;align-items:center;justify-content:center;background:#0f172a;overflow:hidden;">
             <img :src="parcelSelectedUpload ? '/api/uploads/'+parcelSelectedUpload.upload_id+'/file' : ''"
                  style="max-width:100%;max-height:100%;object-fit:contain;" loading="lazy">
           </div>
@@ -1383,15 +2187,17 @@
                   :src="parcelSelectedUpload && parcelSelectedUpload.mime_type === 'application/pdf' ? '/api/uploads/'+parcelSelectedUpload.upload_id+'/file' : ''"
                   style="flex:1;width:100%;height:100%;border:none;"></iframe>
           <div x-show="parcelSelectedUpload && parcelSelectedUpload.doc_type === 'note'"
-               style="flex:1;width:100%;padding:1.5rem;overflow-y:auto;">
-            <div style="font-size:12px;color:#94a3b8;margin-bottom:.75rem;"
-                 x-text="parcelSelectedUpload ? parcelSelectedUpload.username+' · '+new Date(parcelSelectedUpload.created_at).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) : ''"></div>
-            <div style="font-size:14px;color:#1e293b;white-space:pre-wrap;line-height:1.6;"
+               style="flex:1;padding:1.25rem;overflow-y:auto;">
+            <div style="font-size:11px;color:var(--pn-ink-4);font-family:'IBM Plex Mono',monospace;margin-bottom:.6rem;"
+                 x-text="parcelSelectedUpload ? parcelSelectedUpload.username+' · '+new Date(parcelSelectedUpload.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''"></div>
+            <div style="font-size:13px;color:var(--pn-ink);white-space:pre-wrap;line-height:1.6;font-family:'IBM Plex Serif',Georgia,serif;"
                  x-text="parcelSelectedUpload ? parcelSelectedUpload.note_text : ''"></div>
           </div>
         </div>
-      </div>
 
+      </div><!-- /pn-right -->
+
+    </div><!-- /pn-nav -->
     </div><!-- /parcels tab -->
 
     <!-- ══════════════════════════ DOCUMENTS TAB ════════════════════════════ -->
@@ -2128,88 +2934,73 @@
         <!-- ── Campaigns Admin ────────────────────────────────────────────── -->
         <div x-show="adminSection==='campaigns'" class="tab-section" style="flex-direction:column;gap:1.5rem;overflow-y:auto;padding:1.25rem;">
 
-          <!-- Existing campaigns -->
           <div>
-            <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:.6rem;">Active &amp; Paused Campaigns</div>
+            <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:.25rem;">Campaigns</div>
+            <div style="font-size:11px;color:#64748b;margin-bottom:.75rem;">Campaigns are defined in code. Use this screen to set status and adjust display order.</div>
             <template x-if="adminCampaignsLoading">
               <div style="font-size:12px;color:#94a3b8;">Loading…</div>
             </template>
             <template x-if="!adminCampaignsLoading && adminCampaigns.length === 0">
-              <div style="font-size:12px;color:#94a3b8;">No campaigns yet.</div>
+              <div style="font-size:12px;color:#94a3b8;">No campaigns found.</div>
             </template>
             <template x-if="!adminCampaignsLoading && adminCampaigns.length > 0">
               <table style="width:100%;border-collapse:collapse;font-size:12px;">
                 <thead>
                   <tr style="border-bottom:1px solid #e2e8f0;color:#64748b;">
-                    <th style="text-align:left;padding:.3rem .5rem;">ID</th>
-                    <th style="text-align:left;padding:.3rem .5rem;">Name</th>
+                    <th style="text-align:left;padding:.3rem .5rem;width:1.5rem;"></th>
+                    <th style="text-align:left;padding:.3rem .5rem;">Campaign</th>
+                    <th style="text-align:left;padding:.3rem .5rem;">Scope</th>
                     <th style="text-align:left;padding:.3rem .5rem;">Status</th>
                     <th style="padding:.3rem .5rem;"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <template x-for="c in adminCampaigns" :key="c.campaign_id">
+                  <template x-for="(c, ci) in adminCampaigns" :key="c.campaign_id">
                     <tr style="border-bottom:1px solid #f1f5f9;">
-                      <td style="padding:.35rem .5rem;color:#64748b;font-family:monospace;" x-text="c.campaign_id"></td>
-                      <td style="padding:.35rem .5rem;font-weight:500;" x-text="c.name"></td>
+                      <!-- color swatch -->
+                      <td style="padding:.35rem .5rem;">
+                        <div :style="'width:10px;height:10px;border-radius:50%;background:' + (c.color || '#94a3b8')"></div>
+                      </td>
+                      <!-- name + label -->
+                      <td style="padding:.35rem .5rem;">
+                        <div style="font-weight:600;" x-text="c.label || c.name"></div>
+                        <div style="font-size:10px;color:#94a3b8;font-family:monospace;" x-text="c.campaign_id"></div>
+                      </td>
+                      <!-- scope -->
+                      <td style="padding:.35rem .5rem;color:#475569;max-width:200px;" x-text="c.scope || c.description || '—'"></td>
+                      <!-- status badge -->
                       <td style="padding:.35rem .5rem;">
                         <span :style="c.status==='active' ? 'color:#166534;background:#dcfce7;' : c.status==='paused' ? 'color:#92400e;background:#fef3c7;' : 'color:#64748b;background:#f1f5f9;'"
                               style="font-size:10px;font-weight:700;padding:.1rem .4rem;border-radius:3px;text-transform:uppercase;"
                               x-text="c.status"></span>
                       </td>
-                      <td style="padding:.35rem .5rem;display:flex;gap:.35rem;">
-                        <template x-if="c.status !== 'active'">
-                          <button class="rod-link" style="font-size:10px;padding:.15rem .4rem;" @click="setCampaignStatus(c.campaign_id,'active')">Activate</button>
-                        </template>
-                        <template x-if="c.status === 'active'">
-                          <button class="rod-link" style="font-size:10px;padding:.15rem .4rem;" @click="setCampaignStatus(c.campaign_id,'paused')">Pause</button>
-                        </template>
-                        <template x-if="c.status !== 'complete'">
-                          <button class="rod-link" style="font-size:10px;padding:.15rem .4rem;color:#dc2626;" @click="setCampaignStatus(c.campaign_id,'complete')">Complete</button>
-                        </template>
+                      <!-- actions -->
+                      <td style="padding:.35rem .5rem;">
+                        <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:nowrap;">
+                          <!-- priority arrows -->
+                          <button style="border:1px solid #e2e8f0;background:#fff;border-radius:3px;padding:.1rem .3rem;cursor:pointer;font-size:10px;color:#64748b;"
+                                  :disabled="ci === 0"
+                                  @click="shiftCampaignPriority(c.campaign_id,'up')">▲</button>
+                          <button style="border:1px solid #e2e8f0;background:#fff;border-radius:3px;padding:.1rem .3rem;cursor:pointer;font-size:10px;color:#64748b;"
+                                  :disabled="ci === adminCampaigns.length - 1"
+                                  @click="shiftCampaignPriority(c.campaign_id,'down')">▼</button>
+                          <!-- status controls -->
+                          <template x-if="c.status !== 'active'">
+                            <button class="rod-link" style="font-size:10px;padding:.15rem .4rem;" @click="setCampaignStatus(c.campaign_id,'active')">Activate</button>
+                          </template>
+                          <template x-if="c.status === 'active'">
+                            <button class="rod-link" style="font-size:10px;padding:.15rem .4rem;" @click="setCampaignStatus(c.campaign_id,'paused')">Pause</button>
+                          </template>
+                          <template x-if="c.status !== 'complete'">
+                            <button class="rod-link" style="font-size:10px;padding:.15rem .4rem;color:#dc2626;" @click="setCampaignStatus(c.campaign_id,'complete')">Complete</button>
+                          </template>
+                        </div>
                       </td>
                     </tr>
                   </template>
                 </tbody>
               </table>
             </template>
-          </div>
-
-          <!-- Create campaign -->
-          <div style="border-top:1px solid #e2e8f0;padding-top:1.25rem;">
-            <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:.75rem;">New Campaign</div>
-            <div style="display:flex;flex-direction:column;gap:.5rem;max-width:420px;">
-              <input class="search-input" x-model="campaignForm.campaign_id" placeholder="ID (slug, e.g. acquisition_2026)" style="font-family:monospace;">
-              <input class="search-input" x-model="campaignForm.name" placeholder="Name">
-              <input class="search-input" x-model="campaignForm.description" placeholder="Description (optional)">
-              <div>
-                <div style="font-size:11px;color:#64748b;margin-bottom:.3rem;">Dimensions</div>
-                <div style="display:flex;flex-direction:column;gap:.2rem;">
-                  <template x-for="tag in allParcelTagOptions" :key="tag.tag_id">
-                    <label style="font-size:12px;display:flex;align-items:center;gap:.4rem;">
-                      <input type="checkbox"
-                        :value="tag.name"
-                        :checked="campaignForm.dimensions.includes(tag.name)"
-                        @change="campaignForm.dimensions.includes(tag.name)
-                          ? campaignForm.dimensions = campaignForm.dimensions.filter(d=>d!==tag.name)
-                          : campaignForm.dimensions.push(tag.name)">
-                      <span x-text="tag.name"></span>
-                    </label>
-                  </template>
-                </div>
-              </div>
-              <template x-if="campaignForm.err">
-                <div style="font-size:12px;color:#dc2626;" x-text="campaignForm.err"></div>
-              </template>
-              <template x-if="campaignForm.msg">
-                <div style="font-size:12px;color:#166534;" x-text="campaignForm.msg"></div>
-              </template>
-              <button class="rod-link" style="align-self:flex-start;"
-                :disabled="campaignForm.saving"
-                @click="saveCampaign()"
-                x-text="campaignForm.saving ? 'Saving…' : 'Create campaign'">
-              </button>
-            </div>
           </div>
 
         </div><!-- /campaigns section -->
@@ -2482,6 +3273,143 @@
     const KW_THRESHOLD = 0.4;
 
     // ── Pure helpers (no `this`) ──────────────────────────────────────────────
+    // ── Parcel Navigator helpers ──────────────────────────────────────────────
+
+    function pnDecisionStatus(tag, pd) {
+      if (!pd || !pd.tags) return 'undecided';
+      const info = pd.tags[tag.name];
+      if (info && info.applicable === false) return 'na';
+      const state = info ? info.state : null;
+      const def   = tag.states_csv.split(',')[0];
+      return (state != null && state !== def) ? 'decided' : 'undecided';
+    }
+
+    function pnParcelInfoRows(parcel) {
+      if (!parcel) return [];
+      const f = v => v !== null && v !== undefined && String(v).trim() !== '';
+      const cur = v => f(v) ? String(v) : null;
+      const usd = v => f(v) ? '$' + Number(v).toLocaleString() : null;
+      const ac  = v => f(v) ? Number(v).toFixed(2) + ' ac' : null;
+      return [
+        { k:'Owner',    v:cur(parcel.owner_name),     src:'Assessor' },
+        { k:'Category', v:cur(parcel.owner_category), src:'Assessor' },
+        { k:'Use Code', v:parcel.use_code_norm?(parcel.use_code_norm+(parcel.use_code_desc?' — '+parcel.use_code_desc:'')):null, src:'Assessor' },
+        { k:'Zone',     v:cur(parcel.zonedesc),        src:'Assessor' },
+        { k:'Village',  v:cur(parcel.village),         src:'Assessor' },
+        { k:'Acres',    v:ac(parcel.billingacres),     src:'Assessor', mono:true },
+        { k:'Value',    v:usd(parcel.totalapprvalue),  src:'Assessor', mono:true },
+      ].filter(r=>r.v!==null);
+    }
+
+    function pnIdentityRows(parcel) {
+      if (!parcel) return [];
+      const f = v => v !== null && v !== undefined && String(v).trim() !== '';
+      const cur = v => f(v) ? String(v) : null;
+      const gs = parcel.parcel_gisid_status;
+      const ms = parcel.parcel_massgis_status;
+      return [
+        { k:'Identity State',    v:cur(parcel.identity_state),   src:'GIS / ADB' },
+        { k:'Parcel Class',      v:(parcel.parcel_class && parcel.parcel_class !== 'standard') ? cur(parcel.parcel_class) : null, src:'Derived' },
+        { k:'GIS ID Status',     v:(gs && gs !== 'matches') ? cur(gs) : null, src:'Derived' },
+        { k:'MassGIS Status',    v:(ms && ms !== 'ok')      ? cur(ms) : null, src:'Derived' },
+        { k:'ADB GIS ID',        v:(parcel.parcel_adb_gisid && parcel.parcel_adb_gisid !== '') ? cur(parcel.parcel_adb_gisid) : null, src:'Assessor', mono:true },
+        { k:'Deed Ref.',         v:(parcel.booklast&&parcel.pagelast)?'Bk '+parcel.booklast+' Pg '+parcel.pagelast:null, src:'Assessor', mono:true },
+        { k:'Public',            v:parcel.is_public?'Yes':(parcel.is_public===0?'No':null), src:'Assessor' },
+        { k:'Condo Units',       v:(parcel.condo_units>0)?String(parcel.condo_units):null, src:'Assessor' },
+      ].filter(r=>r.v!==null);
+    }
+
+    function pnConservationRows(parcel, gis) {
+      if (!parcel) return [];
+      const f = v => v !== null && v !== undefined && String(v).trim() !== '';
+      const ac = v => f(v) ? Number(v).toFixed(2)+' ac' : null;
+      return [
+        { k:'Open Space',       v:ac(parcel.os_acres),        src:'MassGIS', mono:true },
+        { k:'BioMap Core',      v:ac(parcel.bm3_core_acres),  src:'MassGIS', mono:true },
+        { k:'BioMap CNL',       v:ac(parcel.bm3_cnl_acres),   src:'MassGIS', mono:true },
+        { k:'BioMap Wetland',   v:ac(parcel.bm3_local_acres), src:'MassGIS', mono:true },
+        { k:'Zone 2 WHP',       v:ac(parcel.zone2_acres),     src:'MassDEP', mono:true },
+        { k:'Zone 1 WHP',       v:(gis&&f(gis.zone1_type))?gis.zone1_type:null, src:'MassDEP' },
+        { k:'Priority Habitat', v:parcel.phrs_present!=null?(parcel.phrs_present?'Present':'Not detected'):null, src:'NHESP' },
+        { k:'Vernal Pool',      v:parcel.vp_present!=null?(parcel.vp_present?'Present':'Not detected'):null,     src:'NHESP' },
+        { k:'Wetlands',         v:(gis&&f(gis.wetlands_code))?gis.wetlands_code:null, src:'MassDEP' },
+        { k:'Natural Community',v:(gis&&f(gis.natcomm_name))?gis.natcomm_name:null,   src:'NHESP' },
+      ].filter(r=>r.v!==null);
+    }
+
+    function pnSuitabilityRows(parcel) {
+      if (!parcel) return [];
+      const f = v => v !== null && v !== undefined && String(v).trim() !== '';
+      const cur = v => f(v) ? String(v) : null;
+      const pct = v => v!=null ? (v*100).toFixed(1)+'%' : null;
+      return [
+        { k:'Coverage Estimate',   v:cur(parcel.coverage_estimate),       src:'Derived' },
+        { k:'Coverage Ratio',      v:pct(parcel.coverage_ratio),          src:'Derived', mono:true },
+        { k:'Farming Suitability', v:cur(parcel.farming_suitability),     src:'NRCS SSURGO' },
+        { k:'Acq. Suitability',    v:cur(parcel.acquisition_suitability), src:'Scoring' },
+        { k:'Undeveloped SC',      v:parcel.is_undeveloped_state_code?'Yes':null, src:'Assessor' },
+      ].filter(r=>r.v!==null);
+    }
+
+    function pnAttrGroups(parcel, gis) {
+      if (!parcel) return [];
+      const f   = v => v !== null && v !== undefined && String(v).trim() !== '';
+      const cur = v => f(v) ? String(v) : null;
+      const usd = v => f(v) ? '$' + Number(v).toLocaleString() : null;
+      const ac  = v => f(v) ? Number(v).toFixed(2) + ' ac' : null;
+      const pct = v => v != null ? (v * 100).toFixed(1) + '%' : null;
+      const groups = [
+        { id:'identity', title:'Identity', rows: (() => {
+          const gs = parcel.parcel_gisid_status;
+          const ms = parcel.parcel_massgis_status;
+          return [
+            { k:'Owner',          v:cur(parcel.owner_name),     src:'Assessor' },
+            { k:'Owner Category', v:cur(parcel.owner_category), src:'Assessor' },
+            { k:'Village',        v:cur(parcel.village),        src:'Assessor' },
+            { k:'Zone',           v:cur(parcel.zonedesc),       src:'Assessor' },
+            { k:'Use Code',       v:parcel.use_code_norm?(parcel.use_code_norm+(parcel.use_code_desc?' — '+parcel.use_code_desc:'')):null, src:'Assessor' },
+            { k:'Identity State', v:cur(parcel.identity_state), src:'GIS / ADB' },
+            { k:'Parcel Class',   v:(parcel.parcel_class && parcel.parcel_class !== 'standard') ? cur(parcel.parcel_class) : null, src:'Derived' },
+            { k:'GIS ID Status',  v:(gs && gs !== 'matches') ? cur(gs) : null, src:'Derived' },
+            { k:'MassGIS Status', v:(ms && ms !== 'ok')      ? cur(ms) : null, src:'Derived' },
+            { k:'ADB GIS ID',     v:(parcel.parcel_adb_gisid && parcel.parcel_adb_gisid !== '') ? cur(parcel.parcel_adb_gisid) : null, src:'Assessor', mono:true },
+          ].filter(r=>r.v!==null);
+        })() },
+        { id:'valuation', title:'Valuation', rows: [
+          { k:'Appraised Value', v:usd(parcel.totalapprvalue), src:'Assessor', mono:true },
+          { k:'Billing Acres',   v:ac(parcel.billingacres),    src:'Assessor', mono:true },
+          { k:'Property Class',  v:cur(parcel.property_class), src:'Assessor' },
+          { k:'Condo Units',     v:(parcel.condo_units>0)?String(parcel.condo_units):null, src:'Assessor' },
+        ].filter(r=>r.v!==null) },
+        { id:'conservation', title:'Conservation', rows: [
+          { k:'Open Space',      v:ac(parcel.os_acres),        src:'MassGIS', mono:true },
+          { k:'BioMap Core',     v:ac(parcel.bm3_core_acres),  src:'MassGIS', mono:true },
+          { k:'BioMap CNL',      v:ac(parcel.bm3_cnl_acres),   src:'MassGIS', mono:true },
+          { k:'BioMap Wetland',  v:ac(parcel.bm3_local_acres), src:'MassGIS', mono:true },
+          { k:'Zone 2 WHP',      v:ac(parcel.zone2_acres),     src:'MassGIS', mono:true },
+          { k:'Priority Habitat',v:parcel.phrs_present!=null?(parcel.phrs_present?'Present':'Not detected'):null, src:'NHESP' },
+          { k:'Vernal Pool',     v:parcel.vp_present!=null?(parcel.vp_present?'Present':'Not detected'):null,     src:'NHESP' },
+          { k:'Wetlands',        v:(gis&&f(gis.wetlands_code))?gis.wetlands_code:null, src:'MassDEP' },
+        ].filter(r=>r.v!==null) },
+        { id:'suitability', title:'Suitability', rows: [
+          { k:'Coverage Estimate',  v:cur(parcel.coverage_estimate),       src:'Derived' },
+          { k:'Coverage Ratio',     v:pct(parcel.coverage_ratio),          src:'Derived', mono:true },
+          { k:'Farming Suitability',v:cur(parcel.farming_suitability),     src:'NRCS SSURGO' },
+          { k:'Acq. Suitability',   v:cur(parcel.acquisition_suitability), src:'Scoring' },
+        ].filter(r=>r.v!==null) },
+      ];
+      return groups.filter(g=>g.rows.length>0);
+    }
+
+    function pnTagDots(p) {
+      return [
+        { t:'Coverage',    on:p.coverage_estimate&&!['Missing values','Developed',null].includes(p.coverage_estimate), attn:false },
+        { t:'Identity',    on:false, attn:p.identity_state&&p.identity_state!=='OK' },
+        { t:'Farming',     on:p.farming_suitability&&p.farming_suitability!=='Not suitable', attn:false },
+        { t:'Acquisition', on:['Possible','Likely'].includes(p.acquisition_suitability), attn:false },
+      ];
+    }
+
     function coverageEstimate(p) {
       if (!p || p.coverage_status == null) return null;
       if (p.coverage_status === 'no_acreage' || p.coverage_status === 'no_structure') return 'Missing values';
@@ -2493,7 +3421,7 @@
     function parcelAttrs(p) {
       const cur  = v => (v !== null && v !== undefined && v !== '') ? v : null;
       const usd  = v => v ? '$' + Number(v).toLocaleString() : null;
-      const ac   = v => v ? Number(v).toFixed(3) + ' ac' : null;
+      const ac   = v => v ? Number(v).toFixed(2) + ' ac' : null;
       const covPct = p.coverage_ratio != null ? (p.coverage_ratio * 100).toFixed(1) + '%' : null;
       return [
         ['Owner',          cur(p.owner_name)],
@@ -2514,7 +3442,7 @@
 
     function conservationLayers(p) {
       if (!p || p.acquisition_suitability == null) return null;
-      const ac   = v => v != null ? Number(v).toFixed(1) + ' ac' : '—';
+      const ac   = v => v != null ? Number(v).toFixed(2) + ' ac' : '—';
       const pres = v => v == null  ? '—' : v ? 'Present' : 'Not detected';
       return [
         ['Protected Open Space', ac(p.os_acres)],
@@ -2538,7 +3466,8 @@
 
     function gisGroups(gis, soil) {
       if (!gis) return [];
-      const f = v => v !== null && v !== undefined && v !== '';
+      const f  = v => v !== null && v !== undefined && v !== '';
+      const ac = v => (v != null && v !== '') ? Number(v).toFixed(2) + ' ac' : null;
       const farmland = [];
       if (soil) {
         if (soil.prime)     farmland.push(['Prime Farmland',             'Yes']);
@@ -2548,19 +3477,23 @@
       }
       return [
         { key:'zone1',   label:'Zone 1 WHP',              present:f(gis.zone1_type),    fields:[['Type',gis.zone1_type],['Site',gis.zone1_site],['Supplier',gis.zone1_supplier],['Buffer ft',gis.zone1_ft],['PWS ID',gis.zone1_pws_id]] },
-        { key:'zone2',   label:'Zone 2 WHP',              present:f(gis.zone2_id),       fields:[['ID',gis.zone2_id],['Supplier',gis.zone2_supplier],['Acres',gis.zone2_acres],['PWS ID',gis.zone2_pws_id]] },
+        { key:'zone2',   label:'Zone 2 WHP',              present:f(gis.zone2_id),       fields:[['ID',gis.zone2_id],['Supplier',gis.zone2_supplier],['Acres',ac(gis.zone2_acres)],['PWS ID',gis.zone2_pws_id]] },
         { key:'prihab',  label:'Priority Habitat',        present:f(gis.prihab_id),     fields:[['ID',gis.prihab_id],['Version',gis.prihab_version]] },
         { key:'esthab',  label:'Est. Habitat',            present:f(gis.esthab_id),     fields:[['ID',gis.esthab_id],['Version',gis.esthab_version]] },
         { key:'natcomm', label:'Nat. Community',          present:f(gis.natcomm_id),    fields:[['Name',gis.natcomm_name],['Rank',gis.natcomm_rank],['Community',gis.natcomm_community],['Description',gis.natcomm_description]] },
-        { key:'bm3vp',   label:'BioMap3 VP',              present:f(gis.bm3_vp_id),    fields:[['ID',gis.bm3_vp_id],['Acres',gis.bm3_vp_acres]] },
-        { key:'bm3wc',   label:'BioMap3 Wetland',         present:f(gis.bm3_wc_id),    fields:[['ID',gis.bm3_wc_id],['Acres',gis.bm3_wc_acres],['Integrity',gis.bm3_wc_integrity],['Resilience',gis.bm3_wc_resilience]] },
-        { key:'bm3ch',   label:'BioMap3 Core',            present:f(gis.bm3_ch_id),    fields:[['ID',gis.bm3_ch_id],['Acres',gis.bm3_ch_acres],['Town Acres',gis.bm3_ch_town_acres]] },
-        { key:'bm3cnl',  label:'BioMap3 CNL',             present:f(gis.bm3_cnl_id),   fields:[['ID',gis.bm3_cnl_id],['Acres',gis.bm3_cnl_acres],['Town Acres',gis.bm3_cnl_town_acres]] },
-        { key:'os',      label:'Open Space',              present:f(gis.os_site_name),  fields:[['Site',gis.os_site_name],['Alt Name',gis.os_alt_name],['Owner',gis.os_owner],['Type',gis.os_type],['Purpose',gis.os_purpose],['Access',gis.os_public_access],['Protection',gis.os_protection_level],['Acres',gis.os_acres],['Manager',gis.os_manager],['Comments',gis.os_comments]] },
-        { key:'wetlands',label:'Wetlands',                present:f(gis.wetlands_code), fields:[['Code',gis.wetlands_code],['Description',gis.wetlands_val_desc],['Poly Code',gis.wetlands_poly_code],['Acres',gis.wetlands_acres]] },
+        { key:'bm3vp',   label:'BioMap3 VP',              present:f(gis.bm3_vp_id),    fields:[['ID',gis.bm3_vp_id],['Acres',ac(gis.bm3_vp_acres)]] },
+        { key:'bm3wc',   label:'BioMap3 Wetland',         present:f(gis.bm3_wc_id),    fields:[['ID',gis.bm3_wc_id],['Acres',ac(gis.bm3_wc_acres)],['Integrity',gis.bm3_wc_integrity],['Resilience',gis.bm3_wc_resilience]] },
+        { key:'bm3ch',   label:'BioMap3 Core',            present:f(gis.bm3_ch_id),    fields:[['ID',gis.bm3_ch_id],['Acres',ac(gis.bm3_ch_acres)],['Town Acres',ac(gis.bm3_ch_town_acres)]] },
+        { key:'bm3cnl',  label:'BioMap3 CNL',             present:f(gis.bm3_cnl_id),   fields:[['ID',gis.bm3_cnl_id],['Acres',ac(gis.bm3_cnl_acres)],['Town Acres',ac(gis.bm3_cnl_town_acres)]] },
+        { key:'os',      label:'Open Space',              present:f(gis.os_site_name),  fields:[['Site',gis.os_site_name],['Alt Name',gis.os_alt_name],['Owner',gis.os_owner],['Type',gis.os_type],['Purpose',gis.os_purpose],['Access',gis.os_public_access],['Protection',gis.os_protection_level],['Acres',ac(gis.os_acres)],['Manager',gis.os_manager],['Comments',gis.os_comments]] },
+        { key:'wetlands',label:'Wetlands',                present:f(gis.wetlands_code), fields:[['Code',gis.wetlands_code],['Description',gis.wetlands_val_desc],['Poly Code',gis.wetlands_poly_code],['Acres',ac(gis.wetlands_acres)]] },
         { key:'struct',  label:'Structures',              present:(gis.struct_count||0)>0, fields:[['Count',gis.struct_count],['Total Sq Ft',gis.struct_total_sqft?Number(gis.struct_total_sqft).toLocaleString():null],['Has Archived',gis.struct_has_archived?'Yes':'No']] },
         { key:'soil',    label:'Soil',                    present:f(gis.soil_name),     fields:[['Name',gis.soil_name],['Component',gis.soil_component],['Drainage',gis.soil_drainage_class],['Farmland Class',gis.soil_farmland_class],['Hydric Rating',gis.soil_hydric_rating],['Hydro Group',gis.soil_hydro_group],['Slope',gis.soil_slope],['Depth to WTbl',gis.soil_depth_to_water_table],['Flooding',gis.soil_flooding],['Ponding',gis.soil_ponding],['Septic',gis.soil_septic],...farmland] },
       ];
+    }
+
+    function gisGroupsSorted(gis, soil) {
+      return gisGroups(gis, soil).slice().sort((a, b) => a.label.localeCompare(b.label));
     }
 
     // ── Parcel map (Leaflet, managed outside Alpine reactivity) ──────────────
@@ -2594,6 +3527,7 @@
         maxZoom: 20,
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       }).addTo(_lmap);
+      new ResizeObserver(() => _lmap.invalidateSize()).observe(document.getElementById('parcel-map'));
     }
 
     function _clearWmsLayers() {
@@ -2654,6 +3588,67 @@
       }
     }
 
+    // ── Campaign work-queue map (separate Leaflet instance from parcel map) ──────
+    let _cmap        = null;
+    let _cLayer      = null;
+    let _cWmsControl = null;
+    let _cWmsLayers  = {};
+
+    function _initCampaignMap() {
+      if (_cmap) return;
+      _cmap = L.map('campaign-map', { zoomControl: true });
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 20,
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(_cmap);
+      new ResizeObserver(() => _cmap && _cmap.invalidateSize()).observe(
+        document.getElementById('campaign-map')
+      );
+    }
+
+    function _clearCwWmsLayers() {
+      Object.values(_cWmsLayers).forEach(l => _cmap.removeLayer(l));
+      _cWmsLayers = {};
+      if (_cWmsControl) { _cWmsControl.remove(); _cWmsControl = null; }
+    }
+
+    async function _updateCampaignMap(parcelId, centroidLat, centroidLon, gis) {
+      _initCampaignMap();
+      await new Promise(r => requestAnimationFrame(r));
+      _cmap.invalidateSize();
+      if (_cLayer) { _cmap.removeLayer(_cLayer); _cLayer = null; }
+      _clearCwWmsLayers();
+      try {
+        const resp = await fetch('/api/parcels/' + encodeURIComponent(parcelId) + '/geometry');
+        if (resp.ok) {
+          const feature = await resp.json();
+          _cLayer = L.geoJSON(feature, {
+            style: { color: '#2563eb', weight: 2, fillColor: '#3b82f6', fillOpacity: 0.2 },
+          }).addTo(_cmap);
+          _cmap.fitBounds(_cLayer.getBounds(), { maxZoom: 18, padding: [20, 20] });
+        }
+      } catch(_) {}
+      if (!_cLayer && centroidLat && centroidLon) {
+        _cLayer = L.marker([centroidLat, centroidLon]).addTo(_cmap);
+        _cmap.setView([centroidLat, centroidLon], 17);
+      }
+      if (!_cLayer) { _cmap.setView([41.7352, -70.1939], 13); }
+      // WMS overlays for GIS layers present on this parcel
+      const overlays = {};
+      for (const [key, cfg] of Object.entries(_GIS_WMS)) {
+        const val = gis && gis[key];
+        if (val === null || val === undefined || val === '' || val === 0) continue;
+        const opts = { layers: cfg.wmsLayer, format: 'image/png', transparent: true, version: '1.1.1', attribution: 'MassGIS' };
+        if (cfg.styles) opts.styles = cfg.styles;
+        const layer = L.tileLayer.wms(_WMS, opts);
+        _cWmsLayers[key] = layer;
+        overlays[cfg.label] = layer;
+      }
+      if (Object.keys(overlays).length > 0) {
+        _cWmsControl = L.control.layers(null, overlays, { collapsed: false }).addTo(_cmap);
+      }
+    }
+
     // ── Alpine component ──────────────────────────────────────────────────────
     function app() {
       return {
@@ -2665,15 +3660,50 @@
         attrRegistry: [],
         attrById:     {},
 
+        // parcel navigator UI state
+        pnExpandMode:    null,    // 'map' | 'doc' | null — which panel fills center+right
+        pnCampaignsOpen: true,    // decisions/campaigns filter accordion
+        pnAttrsOpen:     false,   // attribute filter accordion
+
         // campaigns
         campaignProgress:      null,
+        campaignView:          'inventory',  // 'inventory' | 'work'
+        selectedCampaignTag:   null,
+        activeCampaignId:      null,
+        activeCampaign:        null,
         adminCampaigns:        [],
         adminCampaignsLoading: false,
-        campaignForm: { campaign_id:'', name:'', description:'', dimensions:[], saving:false, err:'', msg:'' },
+        campaignMetaByDim:     {},   // dimension → {campaign_id, label, scope, color}
+        campaignMetaLoaded:    false,
+
+        // campaign work queue (identity)
+        cwQueue:          [],
+        cwQueueLoading:   false,
+        cwIdx:            0,
+        cwDecisions:      {},     // parcelId → state string
+        cwFilter:         'all',  // 'all' | 'adb_only' | 'gis_only'
+        cwFilterQuery:    '',
+        cwParcelDetail:   null,
+        cwDetailLoading:  false,
+        cwDetailError:    null,
+        cwChipOpen:       false,
+        cwIdentityDecisions: [
+          { key: 'ADB Add',    hint: 'Add owner record to assessor database' },
+          { key: 'ADB Remove', hint: 'Retire stale assessor record' },
+          { key: 'GIS Add',    hint: 'Add parcel polygon to GIS layer' },
+          { key: 'GIS Remove', hint: 'Retire spurious GIS polygon' },
+        ],
 
         // overview
         overviewData:    null,
         overviewLoading: false,
+
+        // identity reports
+        reportsData:    null,
+        reportsLoading: false,
+
+        // assets sub-tab
+        assetsSubtab: 'reference',
 
         // parcels
         allParcels:          [],
@@ -2692,7 +3722,6 @@
         parcelSelectedTownDoc: null,
         parcelUploads:         [],
         parcelSelectedUpload:  null,
-        parcelGisOpen:       {},
         parcelTagFilters:    {},   // tagId → [selectedStates]
         parcelTagFoldMaps:   {},   // tagId → {parcelId: state}
         parcelLayerFilters:  {},   // col   → [selectedValues]
@@ -2805,6 +3834,13 @@
         get allParcelTagOptions() {
           return this.allTags.filter(t => t.target_entity === 'parcel' || t.target_entity === 'any');
         },
+        get campaignSortedTags() {
+          return [...this.allTags].sort((a, b) => {
+            const oa = this.campaignMetaByDim[a.name]?.display_order ?? 9999;
+            const ob = this.campaignMetaByDim[b.name]?.display_order ?? 9999;
+            return oa - ob;
+          });
+        },
 
         // ── Computed — attribute chip groups ───────────────────────────────
         get parcelLayerChipGroups() {
@@ -2845,7 +3881,7 @@
             list = list.filter(p => {
               const fold = Object.prototype.hasOwnProperty.call(foldMap, p.parcel_id)
                 ? foldMap[p.parcel_id]
-                : defaultState;
+                : (tag && tag.name === 'IdentityResolution' && p.identity_state === 'OK') ? null : defaultState;
               return states.includes(fold);
             });
           }
@@ -2867,6 +3903,22 @@
         get parcelFilteredCount() { return this.filteredParcels.length; },
         get parcelTotalPages()    { return Math.max(1,Math.ceil(this.filteredParcels.length/this.parcelPageSize)); },
         get pagedParcels()        { const s=(this.parcelPage-1)*this.parcelPageSize; return this.filteredParcels.slice(s,s+this.parcelPageSize); },
+
+        // ── Computed — campaign work queue ──────────────────────────────────
+        get cwFilteredQueue() {
+          let list = this.cwQueue;
+          if (this.cwFilter === 'adb_only')  list = list.filter(p => p.identity_state === 'ADB-only');
+          if (this.cwFilter === 'gis_only')  list = list.filter(p => p.identity_state === 'GIS-only');
+          // 'mismatch' filter reserved for future name-mismatch state; shows all for now
+          const q = this.cwFilterQuery.trim().toLowerCase();
+          if (q) list = list.filter(p =>
+            (p.parcel_id  ||'').toLowerCase().includes(q) ||
+            (p.owner_name ||'').toLowerCase().includes(q) ||
+            (p.site_addr  ||'').toLowerCase().includes(q)
+          );
+          return list;
+        },
+        get cwCurrentParcel() { return this.cwFilteredQueue[this.cwIdx] || null; },
 
         // ── Computed — registry ─────────────────────────────────────────────
         get docTypes() {
@@ -3006,6 +4058,43 @@
             this.townAdjRequest = null;
           });
           this.loadAttrRegistry();
+          document.addEventListener('keydown', e => { if (e.key==='Escape' && this.pnExpandMode) this.pnExpandMode=null; });
+          // Campaign work queue keyboard shortcuts
+          document.addEventListener('keydown', e => {
+            if (this.activeTab !== 'campaigns' || this.campaignView !== 'work') return;
+            const tag = document.activeElement?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+            if (e.key === 'Escape')                    { this.cwChipOpen = false; return; }
+            if (e.key === 's' || e.key === 'S')        { e.preventDefault(); this.cwSkip(); return; }
+            if (e.key === 'Enter')                     { e.preventDefault(); this.cwSaveAndNext(); return; }
+            if (e.key === 'j' || e.key === 'J' || e.key === 'ArrowDown') { e.preventDefault(); this.cwAdvance(); return; }
+            if (e.key === 'k' || e.key === 'K' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              if (this.cwIdx > 0) this.cwSelectIdx(this.cwIdx - 1);
+              return;
+            }
+            if (['1','2','3','4'].includes(e.key) && this.cwParcelDetail) {
+              e.preventDefault();
+              const d = this.cwIdentityDecisions[parseInt(e.key) - 1];
+              if (d) {
+                const pid = this.cwParcelDetail.parcel.parcel_id;
+                this.cwDecisions = {...this.cwDecisions, [pid]: d.key};
+                this.cwChipOpen = false;
+              }
+            }
+          });
+          // Reload parcel detail when filter query changes
+          this.$watch('cwFilterQuery', () => {
+            if (this.campaignView !== 'work') return;
+            this.cwIdx = 0;
+            const q = this.cwFilteredQueue;
+            if (q.length > 0) this.loadCwParcelDetail(q[0]);
+            else this.cwParcelDetail = null;
+          });
+          this.$nextTick(() => {
+            this.updateParcelPageSize();
+            window.addEventListener('resize', () => { this.updateParcelPageSize(); });
+          });
           if (CURRENT_USER) {
             this.loadParcels();
             this.loadTags();
@@ -3017,8 +4106,10 @@
           if (!CURRENT_USER && tab !== 'overview') return;
           this.activeTab = tab;
           this.tagPickerOpen = null;
-          if (tab==='campaigns' && !this.campaignProgress && CURRENT_USER) this.loadCampaignProgress();
+          if (tab==='campaigns') { this.campaignView = 'inventory'; if (CURRENT_USER) { if (!this.campaignProgress) this.loadCampaignProgress(); if (!this.campaignMetaLoaded) this.loadCampaignMeta(); } }
+          if (tab==='parcels') this.$nextTick(() => this.updateParcelPageSize());
           if (tab==='assets' && !this.overviewData && !this.overviewLoading) this.loadOverview();
+          if (tab==='assets' && this.assetsSubtab === 'reports') this.loadReports();
           if (tab==='registry' && this.allRegistry.length===0) this.loadRegistry();
           if (tab==='town' && this.townDocList.length===0) this.loadTownDocs();
           if (tab==='admin') { this.loadAdminUsers(); this.loadUsage(); this.adminSection = 'users'; }
@@ -3036,6 +4127,15 @@
         },
 
         // ── Loaders ──────────────────────────────────────────────────────────
+        async loadReports() {
+          this.reportsLoading = true;
+          try {
+            const r = await fetch('/api/reports/identity');
+            if (r.ok) this.reportsData = await r.json();
+          } catch(e) { console.error('reports:', e); }
+          finally { this.reportsLoading = false; }
+        },
+
         async loadOverview() {
           this.overviewLoading = true;
           try {
@@ -3048,6 +4148,24 @@
             this.townDocsOverview = tdR.ok ? await tdR.json() : null;
           } catch(e) { console.error('overview:', e); }
           finally { this.overviewLoading = false; }
+        },
+
+        updateParcelPageSize() {
+          const el = document.getElementById('pn-list-scroll');
+          if (!el || el.clientHeight === 0) return;
+          const rowH = 46; // pn-lrow height (padding 7+7 + two text lines ~15+14 + border 1)
+          const size = Math.max(10, Math.floor(el.clientHeight / rowH));
+          if (size !== this.parcelPageSize) {
+            this.parcelPageSize = size;
+            this.parcelPage = Math.min(this.parcelPage, this.parcelTotalPages || 1);
+          }
+        },
+
+        pnShowMap() {
+          this.parcelSelectedDoc     = null;
+          this.parcelPdfUrl          = null;
+          this.parcelSelectedTownDoc = null;
+          this.parcelSelectedUpload  = null;
         },
 
         async loadAttrRegistry() {
@@ -3071,16 +4189,147 @@
           } catch(e) { console.error('campaign progress:', e); }
         },
 
-        async launchDimension(tag) {
-          this.switchTab('parcels');
-          const tagId = String(tag.tag_id);
-          if (!Object.prototype.hasOwnProperty.call(this.parcelTagFoldMaps, tagId)) {
-            const r = await fetch('/api/tagged/parcel?tag_ids=' + tagId);
-            if (r.ok) this.parcelTagFoldMaps = {...this.parcelTagFoldMaps, [tagId]: await r.json()};
+        async loadCampaignMeta() {
+          try {
+            const r = await fetch('/api/campaigns/meta');
+            if (r.ok) { this.campaignMetaByDim = await r.json(); this.campaignMetaLoaded = true; }
+          } catch(e) { console.error('campaign meta:', e); }
+        },
+
+        // ── Campaign work queue ──────────────────────────────────────────────
+        async launchCampaignWork(tag) {
+          this.selectedCampaignTag = tag;
+          this.campaignView        = 'work';
+          this.cwIdx               = 0;
+          this.cwDecisions         = {};
+          this.cwChipOpen          = false;
+          this.cwParcelDetail      = null;
+          this.cwFilter            = 'all';
+          this.cwFilterQuery       = '';
+          await this.loadCwQueue();
+        },
+
+        async loadCwQueue() {
+          this.cwQueueLoading = true;
+          try {
+            if (this.allTags.length === 0) await this.loadTags();
+            if (this.allParcels.length === 0) {
+              const r = await fetch('/api/parcels');
+              if (r.ok) this.allParcels = (await r.json()).map(p => ({...p, coverage_estimate: coverageEstimate(p)}));
+            }
+            this.cwQueue = this.allParcels.filter(p => p.identity_state !== 'OK');
+            // Pre-populate decisions from the existing fold state
+            const idTag = this.allTags.find(t => t.name === 'IdentityResolution');
+            if (idTag) {
+              try {
+                const r = await fetch('/api/folds/parcel?tag_id=' + idTag.tag_id);
+                if (r.ok) {
+                  const foldMap = await r.json();
+                  const dec = {};
+                  for (const [pid, state] of Object.entries(foldMap)) {
+                    if (state && state !== 'Unconfirmed') dec[pid] = state;
+                  }
+                  this.cwDecisions = dec;
+                }
+              } catch(_) {}
+            }
+            if (this.cwFilteredQueue.length > 0) {
+              await this.loadCwParcelDetail(this.cwFilteredQueue[0]);
+            }
+          } finally { this.cwQueueLoading = false; }
+        },
+
+        async loadCwParcelDetail(parcel) {
+          if (!parcel) return;
+          this.cwParcelDetail  = null;
+          this.cwDetailLoading = true;
+          this.cwDetailError   = null;
+          this.cwChipOpen      = false;
+          try {
+            const r = await fetch('/api/parcels/' + encodeURIComponent(parcel.parcel_id));
+            if (!r.ok) throw new Error(r.status);
+            this.cwParcelDetail = await r.json();
+            // Pick up any existing tag state not yet in cwDecisions
+            const tagInfo = this.cwParcelDetail.tags?.['IdentityResolution'];
+            if (tagInfo?.state && tagInfo.state !== 'Unconfirmed' && !this.cwDecisions[parcel.parcel_id]) {
+              this.cwDecisions = {...this.cwDecisions, [parcel.parcel_id]: tagInfo.state};
+            }
+            this.$nextTick(() => _updateCampaignMap(
+              parcel.parcel_id,
+              this.cwParcelDetail.parcel.centroid_lat,
+              this.cwParcelDetail.parcel.centroid_lon,
+              this.cwParcelDetail.gis,
+            ));
+          } catch(e) { this.cwDetailError = e.message; }
+          finally    { this.cwDetailLoading = false; }
+        },
+
+        async cwSelectIdx(i) {
+          if (i < 0 || i >= this.cwFilteredQueue.length) return;
+          this.cwIdx = i;
+          await this.loadCwParcelDetail(this.cwFilteredQueue[i]);
+        },
+
+        async cwSaveAndNext() {
+          const parcel   = this.cwCurrentParcel;
+          const decision = parcel ? this.cwDecisions[parcel.parcel_id] : null;
+          if (!parcel || !decision) return;
+          const idTag = this.allTags.find(t => t.name === 'IdentityResolution');
+          if (!idTag) return;
+          await this.applyTag('parcel', parcel.parcel_id, idTag.tag_id, decision);
+          this.loadCampaignProgress();
+          await this.cwAdvance();
+        },
+
+        cwSkip() { this.cwAdvance(); },
+
+        async cwAdvance() {
+          if (this.cwIdx < this.cwFilteredQueue.length - 1) {
+            await this.cwSelectIdx(this.cwIdx + 1);
           }
-          this.parcelLayerFilters = {};
-          this.parcelTagFilters   = {[tagId]: [tag.states_csv.split(',')[0]]};
-          this.parcelPage = 1;
+        },
+
+        async cwSetFilter(filter) {
+          this.cwFilter = filter;
+          this.cwIdx = 0;
+          const q = this.cwFilteredQueue;
+          if (q.length > 0) await this.loadCwParcelDetail(q[0]);
+          else this.cwParcelDetail = null;
+        },
+
+        cwSuggestion(parcel) {
+          if (!parcel) return null;
+          if (parcel.identity_state === 'ADB-only') return 'GIS Add';
+          if (parcel.identity_state === 'GIS-only') return 'ADB Add';
+          return null;
+        },
+
+        cwBasicInfoRows(parcel) {
+          if (!parcel) return [];
+          return [
+            { k: 'Use Code', v: parcel.use_code_desc || parcel.use_code_norm || '—' },
+            { k: 'Village',  v: parcel.village || '—' },
+            { k: 'Acres',    v: parcel.billingacres != null ? Number(parcel.billingacres).toFixed(2) + ' ac' : '—' },
+            { k: 'Public',   v: parcel.is_public ? 'Yes' : 'No' },
+            { k: 'Class',    v: parcel.property_class || '—' },
+          ];
+        },
+
+        cwOpenFullParcel(parcelId) {
+          const p = this.allParcels.find(x => x.parcel_id === parcelId);
+          this.switchTab('parcels');
+          if (p) this.$nextTick(() => this.selectParcel(p));
+        },
+
+        cwClearDecision(parcelId) {
+          const next = {...this.cwDecisions};
+          delete next[parcelId];
+          this.cwDecisions = next;
+        },
+
+        launchDimension(tag) {
+          this.selectedCampaignTag = tag;
+          this.campaignView = 'work';
         },
 
         async loadAdminCampaigns() {
@@ -3092,36 +4341,20 @@
           finally { this.adminCampaignsLoading = false; }
         },
 
-        async saveCampaign() {
-          const f = this.campaignForm;
-          f.err = ''; f.msg = '';
-          if (!f.campaign_id.trim() || !f.name.trim()) { f.err = 'ID and name required'; return; }
-          f.saving = true;
-          try {
-            const r = await fetch('/api/campaigns', {
-              method: 'POST', headers: {'Content-Type':'application/json'},
-              body: JSON.stringify({
-                campaign_id: f.campaign_id.trim(),
-                name:        f.name.trim(),
-                description: f.description.trim(),
-                dimensions:  f.dimensions,
-              }),
-            });
-            const d = await r.json();
-            if (!r.ok) { f.err = d.error || String(r.status); return; }
-            f.msg = 'Campaign created';
-            f.campaign_id = ''; f.name = ''; f.description = ''; f.dimensions = [];
-            await this.loadAdminCampaigns();
-          } catch(e) { f.err = 'Network error'; }
-          finally { f.saving = false; }
-        },
-
         async setCampaignStatus(campaign_id, status) {
           await fetch('/api/campaigns/' + encodeURIComponent(campaign_id) + '/status', {
             method: 'PATCH', headers: {'Content-Type':'application/json'},
             body: JSON.stringify({status}),
           });
           await this.loadAdminCampaigns();
+        },
+
+        async shiftCampaignPriority(campaign_id, direction) {
+          await fetch('/api/campaigns/' + encodeURIComponent(campaign_id) + '/priority', {
+            method: 'PATCH', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({direction}),
+          });
+          await Promise.all([this.loadAdminCampaigns(), this.loadCampaignMeta()]);
         },
 
         async loadParcels() {
@@ -3158,7 +4391,6 @@
           this.parcelSelectedTownDoc = null;
           this.parcelUploads         = [];
           this.parcelSelectedUpload  = null;
-          this.parcelGisOpen      = {};
           this.parcelDetailError  = null;
           this.parcelDetailLoading= true;
           this.parcelTagState     = {};
@@ -3174,6 +4406,13 @@
             this.parcelDetail   = await detailResp.json();
             this.parcelTownDocs = tdResp.ok ? await tdResp.json() : [];
             this.parcelUploads  = (uploadsResp && uploadsResp.ok) ? await uploadsResp.json() : [];
+            // Auto-load first available document into viewer
+            const _docs = this.parcelDetail.documents || [];
+            if (_docs.length > 0) {
+              this.selectParcelDoc(_docs[0]);
+            } else if (this.parcelUploads.length > 0) {
+              this.selectParcelUpload(this.parcelUploads[0]);
+            }
             this.parcelTagState = {};
             for (const info of Object.values(this.parcelDetail.tags || {})) {
               if (info && info.state !== null) this.parcelTagState[info.tag_id] = info.state;
@@ -3210,10 +4449,6 @@
           this.parcelSelectedDoc     = null;
           this.parcelSelectedTownDoc = null;
           this.parcelPdfUrl          = null;
-        },
-
-        toggleGis(key) {
-          this.parcelGisOpen = {...this.parcelGisOpen, [key]: !this.parcelGisOpen[key]};
         },
 
         // ── Actions — documents ──────────────────────────────────────────────
@@ -3542,11 +4777,19 @@
           this.tagPickerOpen = null;
           const stateMap  = targetType === 'parcel' ? 'parcelTagState' : 'docTagState';
           const prior     = this[stateMap][tagId];
-          // Optimistic update
-          this.tagPending  = {...this.tagPending, [tagId]: true};
-          const next       = {...this[stateMap]};
+          const priorFold = (targetType === 'parcel' && this.parcelTagFoldMaps[tagId])
+            ? this.parcelTagFoldMaps[tagId][targetId]
+            : undefined;
+          // Optimistic update — patch both the per-parcel display state and the filter fold map
+          this.tagPending = {...this.tagPending, [tagId]: true};
+          const next = {...this[stateMap]};
           if (state === null) { delete next[tagId]; } else { next[tagId] = state; }
-          this[stateMap]   = next;
+          this[stateMap] = next;
+          if (targetType === 'parcel' && this.parcelTagFoldMaps[tagId] !== undefined) {
+            const fm = {...this.parcelTagFoldMaps[tagId]};
+            if (state === null) { delete fm[targetId]; } else { fm[targetId] = state; }
+            this.parcelTagFoldMaps = {...this.parcelTagFoldMaps, [tagId]: fm};
+          }
           try {
             const r = await fetch('/api/tagging', {
               method: 'POST',
@@ -3555,10 +4798,15 @@
             });
             if (!r.ok) throw new Error(r.status);
           } catch(e) {
-            // revert
+            // revert both
             const reverted = {...this[stateMap]};
             if (prior == null) { delete reverted[tagId]; } else { reverted[tagId] = prior; }
             this[stateMap] = reverted;
+            if (targetType === 'parcel' && this.parcelTagFoldMaps[tagId] !== undefined) {
+              const fm = {...this.parcelTagFoldMaps[tagId]};
+              if (priorFold === undefined) { delete fm[targetId]; } else { fm[targetId] = priorFold; }
+              this.parcelTagFoldMaps = {...this.parcelTagFoldMaps, [tagId]: fm};
+            }
             console.error('tag apply failed:', e);
           } finally {
             this.tagPending = {...this.tagPending, [tagId]: false};
@@ -3638,14 +4886,7 @@
         },
 
         campaignMeta(tag) {
-          const META = {
-            'CoverageDetermination':    { label: 'Coverage',    scope: 'All parcels',                                   color: '#10b981' },
-            'IdentityResolution':       { label: 'Identity',    scope: 'Parcels where IdentityState ≠ OK',             color: '#f59e0b' },
-            'Article97Determination':   { label: 'Article 97',  scope: 'Documents with keyword score > 40%',           color: '#8b5cf6' },
-            'FarmingDetermination':     { label: 'Farming',     scope: 'All parcels',                                   color: '#84cc16' },
-            'AcquisitionDetermination': { label: 'Acquisition', scope: 'Parcels with Possible or Likely suitability',  color: '#3b82f6' },
-          };
-          return META[tag.name] || null;
+          return this.campaignMetaByDim[tag.name] || null;
         },
 
         async saveNewTag() {

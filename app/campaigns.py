@@ -6,6 +6,10 @@ and relevant document types.
 
 Progress (/api/campaigns/progress) returns fold state distribution for all
 non-deprecated dimensions — the authoritative measure of campaign completeness.
+
+The canonical campaign definitions live in CAMPAIGNS below. seed_campaigns()
+is called on app startup to upsert them into the DB with their metadata.
+Admin users can adjust status and display_order; other fields are code-owned.
 """
 
 from flask import Blueprint, jsonify, request, abort
@@ -16,6 +20,98 @@ from .db_utils import table_exists, FOLD as _FOLD
 from .dimensions import DIMENSIONS
 
 bp = Blueprint("campaigns", __name__, url_prefix="/api/campaigns")
+
+
+# ── Canonical campaign definitions ────────────────────────────────────────────
+
+CAMPAIGNS = [
+    {
+        "campaign_id": "coverage_determination",
+        "name":        "Coverage Determination",
+        "label":       "Coverage",
+        "description": "Determine whether each parcel falls within the conservation district's coverage area.",
+        "scope":       "All parcels",
+        "color":       "#10b981",
+        "display_order": 10,
+        "dimensions":  ["CoverageDetermination"],
+        "doc_types":   [],
+    },
+    {
+        "campaign_id": "farming_determination",
+        "name":        "Farming Determination",
+        "label":       "Farming",
+        "description": "Identify parcels with active agricultural use.",
+        "scope":       "All parcels",
+        "color":       "#84cc16",
+        "display_order": 20,
+        "dimensions":  ["FarmingDetermination"],
+        "doc_types":   [],
+    },
+    {
+        "campaign_id": "identity_resolution",
+        "name":        "Identity Resolution",
+        "label":       "Identity",
+        "description": "Resolve parcel identity where assessor and MassGIS records diverge.",
+        "scope":       "Parcels where IdentityState ≠ OK",
+        "color":       "#f59e0b",
+        "display_order": 30,
+        "dimensions":  ["IdentityResolution"],
+        "doc_types":   [],
+    },
+    {
+        "campaign_id": "acquisition_determination",
+        "name":        "Acquisition Determination",
+        "label":       "Acquisition",
+        "description": "Evaluate parcels for acquisition suitability.",
+        "scope":       "Parcels with Possible or Likely suitability",
+        "color":       "#3b82f6",
+        "display_order": 40,
+        "dimensions":  ["AcquisitionDetermination"],
+        "doc_types":   [],
+    },
+    {
+        "campaign_id": "article97_determination",
+        "name":        "Article 97 Determination",
+        "label":       "Article 97",
+        "description": "Flag registry documents referencing Article 97 protected land.",
+        "scope":       "Documents with keyword score > 40%",
+        "color":       "#8b5cf6",
+        "display_order": 50,
+        "dimensions":  ["Article97Determination"],
+        "doc_types":   ["registry"],
+    },
+]
+
+
+def seed_campaigns(db):
+    """Upsert canonical campaigns into the DB. Only touches is_system=1 rows."""
+    for c in CAMPAIGNS:
+        db.execute(
+            """INSERT INTO campaigns
+                 (campaign_id, name, description, label, scope, color, display_order, is_system)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+               ON CONFLICT(campaign_id) DO UPDATE SET
+                 name          = excluded.name,
+                 description   = excluded.description,
+                 label         = excluded.label,
+                 scope         = excluded.scope,
+                 color         = excluded.color,
+                 is_system     = 1
+               WHERE is_system = 1""",
+            (c["campaign_id"], c["name"], c["description"],
+             c["label"], c["scope"], c["color"], c["display_order"]),
+        )
+        for dim in c["dimensions"]:
+            db.execute(
+                "INSERT OR IGNORE INTO campaign_dimensions (campaign_id, dimension) VALUES (?, ?)",
+                (c["campaign_id"], dim),
+            )
+        for doc_type in c["doc_types"]:
+            db.execute(
+                "INSERT OR IGNORE INTO campaign_doc_types (campaign_id, doc_type) VALUES (?, ?)",
+                (c["campaign_id"], doc_type),
+            )
+    db.commit()
 
 
 # Applicable-set SQL per dimension. Reference.db is read-only; failures
@@ -31,7 +127,7 @@ _DIM_TOTAL_SQL = {
     ),
     "IdentityResolution": (
         "parcel",
-        "SELECT COUNT(*) FROM parcels WHERE join_status != 'BOTH'",
+        "SELECT COUNT(*) FROM parcels WHERE join_status != 'BOTH' AND parcel_class != 'special-feature'",
     ),
     "AcquisitionDetermination": (
         "parcel",
@@ -121,6 +217,39 @@ def progress():
     return jsonify(result)
 
 
+# ── Campaign meta (dimension → campaign display info) ─────────────────────────
+
+@bp.route("/meta")
+@login_required
+def campaign_meta():
+    """Return display metadata keyed by dimension name.
+
+    Used by the frontend campaignMeta(tag) helper to look up label/scope/color
+    for each tag dimension without hard-coding them in the JS.
+    """
+    db = get_db()
+    if not table_exists(db, "campaigns"):
+        db.close()
+        return jsonify({})
+    rows = db.execute(
+        "SELECT c.campaign_id, c.label, c.scope, c.color, c.display_order, cd.dimension"
+        " FROM campaigns c"
+        " JOIN campaign_dimensions cd ON cd.campaign_id = c.campaign_id"
+        " ORDER BY c.display_order",
+    ).fetchall()
+    db.close()
+    result = {}
+    for r in rows:
+        result[r["dimension"]] = {
+            "campaign_id":   r["campaign_id"],
+            "label":         r["label"],
+            "scope":         r["scope"],
+            "color":         r["color"],
+            "display_order": r["display_order"],
+        }
+    return jsonify(result)
+
+
 # ── Campaign CRUD ─────────────────────────────────────────────────────────────
 
 @bp.route("")
@@ -131,9 +260,9 @@ def list_campaigns():
         db.close()
         return jsonify([])
     rows = db.execute(
-        "SELECT campaign_id, name, description, status, created_at"
+        "SELECT campaign_id, name, label, description, status, color, display_order, created_at"
         " FROM campaigns WHERE status != 'complete'"
-        " ORDER BY created_at DESC",
+        " ORDER BY display_order, created_at",
     ).fetchall()
     db.close()
     return jsonify([dict(r) for r in rows])
@@ -148,8 +277,8 @@ def list_all_campaigns():
         db.close()
         return jsonify([])
     rows = db.execute(
-        "SELECT campaign_id, name, description, status, created_at"
-        " FROM campaigns ORDER BY created_at DESC",
+        "SELECT campaign_id, name, label, description, status, color, scope, display_order, is_system, created_at"
+        " FROM campaigns ORDER BY display_order, created_at",
     ).fetchall()
     db.close()
     return jsonify([dict(r) for r in rows])
@@ -186,46 +315,6 @@ def campaign_detail(campaign_id):
     return jsonify(result)
 
 
-@bp.route("", methods=["POST"])
-@login_required
-def create_campaign():
-    data        = request.get_json(force=True) or {}
-    campaign_id = str(data.get("campaign_id", "")).strip()
-    name        = str(data.get("name", "")).strip()
-    if not campaign_id or not name:
-        abort(400, "campaign_id and name are required")
-    db = get_db()
-    try:
-        db.execute(
-            "INSERT INTO campaigns (campaign_id, name, description) VALUES (?, ?, ?)",
-            (campaign_id, name, data.get("description", "")),
-        )
-        for dim in data.get("dimensions", []):
-            db.execute(
-                "INSERT OR IGNORE INTO campaign_dimensions"
-                " (campaign_id, dimension) VALUES (?, ?)",
-                (campaign_id, dim),
-            )
-        for i, attr_id in enumerate(data.get("attributes", [])):
-            db.execute(
-                "INSERT OR IGNORE INTO campaign_attributes"
-                " (campaign_id, attr_id, display_order) VALUES (?, ?, ?)",
-                (campaign_id, attr_id, i * 10),
-            )
-        for doc_type in data.get("doc_types", []):
-            db.execute(
-                "INSERT OR IGNORE INTO campaign_doc_types"
-                " (campaign_id, doc_type) VALUES (?, ?)",
-                (campaign_id, doc_type),
-            )
-        db.commit()
-    except Exception as e:
-        db.close()
-        abort(400, str(e))
-    db.close()
-    return jsonify({"campaign_id": campaign_id}), 201
-
-
 @bp.route("/<campaign_id>/status", methods=["PATCH"])
 @login_required
 def update_status(campaign_id):
@@ -244,3 +333,44 @@ def update_status(campaign_id):
         abort(404)
     db.close()
     return jsonify({"campaign_id": campaign_id, "status": status})
+
+
+@bp.route("/<campaign_id>/priority", methods=["PATCH"])
+@login_required
+def update_priority(campaign_id):
+    """Swap display_order with the adjacent campaign (direction: up or down)."""
+    data      = request.get_json(force=True) or {}
+    direction = data.get("direction", "")
+    if direction not in ("up", "down"):
+        abort(400, "direction must be up or down")
+
+    db = get_db()
+    campaigns = db.execute(
+        "SELECT campaign_id, display_order FROM campaigns ORDER BY display_order, created_at",
+    ).fetchall()
+    ids = [r["campaign_id"] for r in campaigns]
+    orders = {r["campaign_id"]: r["display_order"] for r in campaigns}
+
+    try:
+        idx = ids.index(campaign_id)
+    except ValueError:
+        db.close()
+        abort(404)
+
+    swap_idx = idx - 1 if direction == "up" else idx + 1
+    if swap_idx < 0 or swap_idx >= len(ids):
+        db.close()
+        return jsonify({"ok": False, "reason": "already at boundary"})
+
+    swap_id = ids[swap_idx]
+    db.execute(
+        "UPDATE campaigns SET display_order = ? WHERE campaign_id = ?",
+        (orders[swap_id], campaign_id),
+    )
+    db.execute(
+        "UPDATE campaigns SET display_order = ? WHERE campaign_id = ?",
+        (orders[campaign_id], swap_id),
+    )
+    db.commit()
+    db.close()
+    return jsonify({"ok": True})

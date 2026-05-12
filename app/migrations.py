@@ -397,4 +397,11 @@ CREATE TABLE IF NOT EXISTS campaign_doc_types (
     PRIMARY KEY (campaign_id, doc_type)
 );
 """),
+    (22, """
+ALTER TABLE campaigns ADD COLUMN color TEXT;
+ALTER TABLE campaigns ADD COLUMN label TEXT;
+ALTER TABLE campaigns ADD COLUMN scope TEXT;
+ALTER TABLE campaigns ADD COLUMN display_order INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE campaigns ADD COLUMN is_system INTEGER NOT NULL DEFAULT 0;
+"""),
 ]

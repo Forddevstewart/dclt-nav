@@ -1,5 +1,6 @@
 """Parcel backbone construction and owner/use-code normalization."""
 
+import math
 import re
 import pandas as pd
 
@@ -140,6 +141,16 @@ def build_parcels(engine) -> int:
     backbone = backbone.merge(unit_counts, on="parcel_id", how="left")
     backbone["condo_units"] = backbone["condo_units"].fillna(0).astype(int)
 
+    def _parcel_class(gisid) -> str:
+        g = str(gisid or "").strip()
+        if not g or g == "nan":
+            return "no-gisid"
+        if g.startswith("X_"):
+            return "special-feature"
+        return "standard"
+
+    backbone["parcel_class"] = backbone["gisid"].apply(_parcel_class)
+
     massgis = massgis.rename(columns={"map_par_id": "parcel_id"})
     massgis["_lot_num"] = pd.to_numeric(massgis["lot_size"], errors="coerce").fillna(0)
     layer_massgis = (
@@ -158,6 +169,71 @@ def build_parcels(engine) -> int:
         "right_only": "MASSGIS_ONLY",
     })
     parcels = parcels.drop(columns=["_merge"])
+
+    _gis_loc_ids     = set(layer_massgis["loc_id"].dropna())
+    # Raw massgis preserves all loc_ids including blank-map_par_id rows
+    # that layer_massgis deduplication would collapse to a single entry.
+    _gis_loc_ids_raw = set(massgis["loc_id"].dropna())
+    # parcel_id → current loc_id for distance calculation on drift parcels
+    _gis_par_to_loc  = dict(zip(
+        layer_massgis["parcel_id"].fillna(""),
+        layer_massgis["loc_id"].fillna(""),
+    ))
+
+    def _parse_f(fid: str):
+        try:
+            _, x, y = fid.split("_")
+            return float(x), float(y)
+        except Exception:
+            return None
+
+    def _drift_class(dist: float) -> str:
+        if dist < 10:  return "drift-minor"
+        if dist < 50:  return "drift-moderate"
+        return "drift-major"
+
+    def _gisid_status(row) -> str:
+        g = str(row.get("gisid") or "").strip()
+        if not g or g == "nan":
+            return "no-gisid"
+        if g.startswith("X_"):
+            return "special-feature"
+        js = row.get("join_status", "")
+        if js == "BOTH":
+            if g in _gis_loc_ids:
+                return "matches"
+            cur = _gis_par_to_loc.get(str(row.get("parcel_id") or ""), "")
+            old_c, new_c = _parse_f(g), _parse_f(cur)
+            if old_c and new_c:
+                return _drift_class(math.sqrt((old_c[0]-new_c[0])**2 + (old_c[1]-new_c[1])**2))
+            return "drift-major"
+        return "missing"
+
+    parcels["parcel_gisid_status"] = parcels.apply(_gisid_status, axis=1)
+    # MASSGIS_ONLY rows have no assessor record, so parcel_class is NaN from the merge
+    parcels["parcel_class"] = parcels["parcel_class"].fillna("no-gisid")
+
+    def _massgis_status(row) -> str:
+        pc = str(row.get("parcel_class") or "no-gisid")
+        js = row.get("join_status", "")
+        if pc == "special-feature":
+            return "special-feature"
+        if js == "MASSGIS_ONLY":
+            return "unmatched-polygon"
+        if js == "BOTH":
+            return "ok"
+        # ASSESSOR_ONLY
+        if pc == "no-gisid":
+            return "no-gisid"
+        # standard ASSESSOR_ONLY: gisid in raw GIS means map_par_id is blank/wrong;
+        # use raw massgis loc_ids because layer_massgis deduplication collapses
+        # blank-map_par_id rows to a single entry, losing other loc_ids.
+        g = str(row.get("gisid") or "").strip()
+        if g and g != "nan" and g in _gis_loc_ids_raw:
+            return "blank-map-par-id"
+        return "absent"
+
+    parcels["parcel_massgis_status"] = parcels.apply(_massgis_status, axis=1)
 
     def _use_code_norm(row) -> str:
         def _parse(v) -> str:
@@ -191,6 +267,7 @@ def build_parcels(engine) -> int:
     ).astype(int)
 
     parcels["use_code"] = parcels["use_code_norm"]
+    parcels = parcels.rename(columns={"gisid": "parcel_adb_gisid"})
 
     display_cols = [
         "parcel_id", "join_status", "backbone_source", "condo_units",
@@ -201,6 +278,7 @@ def build_parcels(engine) -> int:
         "use_code", "use_code_norm", "use_code_desc", "property_class", "is_public",
         "billingacres", "totalapprvalue", "zonedesc",
         "centroid_lat", "centroid_lon",
+        "parcel_adb_gisid", "parcel_class", "parcel_gisid_status", "parcel_massgis_status",
     ]
     keep = [c for c in display_cols if c in parcels.columns]
     parcels[keep].to_sql("parcels", engine, if_exists="replace", index=False)

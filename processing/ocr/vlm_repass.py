@@ -106,12 +106,18 @@ def is_candidate_page(page: dict, min_composite: float) -> bool:
 
 
 def already_scored(page: dict) -> bool:
-    """Return True if every keyword already has a non-null vlm_classifier score."""
+    """Return True if this page has already had a VLM pass.
+
+    The reliable signal is whether the "vlm_classifier" key exists in each
+    keyword's components dict — enrich_page always writes it (possibly as None
+    on parse/network errors or when exact_match==1.0).  Before any VLM pass the
+    key is absent entirely.
+    """
     scores = page.get("keyword_scores", {})
     if not scores:
         return False
     return all(
-        kw.get("components", {}).get("vlm_classifier") is not None
+        "vlm_classifier" in kw.get("components", {})
         for kw in scores.values()
     )
 
@@ -297,6 +303,30 @@ def main() -> None:
         and (p.with_suffix(".pdf").exists() or p.with_suffix(".PDF").exists())
     ]
     log.info("Found %d JSON files, %d pass document filter", len(json_files), len(candidates))
+
+    # Pre-scan: count already-done vs still-pending documents
+    log.info("Pre-scanning %d candidates to count completed documents ...", len(candidates))
+    n_done = 0
+    n_pending = 0
+    n_unreadable = 0
+    for p in candidates:
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            pages = data.get("pages", [])
+            needs_work = any(
+                not already_scored(pg) and is_candidate_page(pg, args.min_composite)
+                for pg in pages
+            )
+            if needs_work:
+                n_pending += 1
+            else:
+                n_done += 1
+        except Exception:
+            n_unreadable += 1
+    log.info(
+        "Pre-scan complete — already done: %d  pending: %d  unreadable: %d",
+        n_done, n_pending, n_unreadable,
+    )
 
     if args.dry_run:
         total_candidate_pages = 0

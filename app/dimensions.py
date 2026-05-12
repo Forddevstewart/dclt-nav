@@ -48,11 +48,11 @@ class _IdentityResolution(Dimension):
         if target_type != "parcel":
             return False, "IdentityResolution applies to parcels only"
         row = ref_db.execute(
-            "SELECT join_status FROM parcels WHERE parcel_id = ? LIMIT 1", (target_id,)
+            "SELECT join_status, parcel_class FROM parcels WHERE parcel_id = ? LIMIT 1", (target_id,)
         ).fetchone()
         if not row:
             return False, "parcel not found in reference data"
-        if row["join_status"] == "BOTH":
+        if row["join_status"] == "BOTH" or row["parcel_class"] == "special-feature":
             return (
                 False,
                 "IdentityResolution not applicable — parcel is present in both "
@@ -64,13 +64,17 @@ class _IdentityResolution(Dimension):
         if not self.transitions:
             return True, ""
         row = ref_db.execute(
-            "SELECT join_status FROM parcels WHERE parcel_id = ? LIMIT 1", (target_id,)
+            "SELECT join_status, parcel_class FROM parcels WHERE parcel_id = ? LIMIT 1", (target_id,)
         ).fetchone()
         if not row:
             return True, ""
-        identity_state = JOIN_STATUS_TO_IDENTITY_STATE.get(row["join_status"], "OK")
+        if row["parcel_class"] == "special-feature":
+            identity_state = "OK"
+        else:
+            identity_state = JOIN_STATUS_TO_IDENTITY_STATE.get(row["join_status"], "OK")
         allowed = self.transitions.get(identity_state)
-        if allowed is not None and new_state not in allowed:
+        default = self.states[0] if self.states else None
+        if allowed is not None and new_state != default and new_state not in allowed:
             return (
                 False,
                 f"State '{new_state}' is not allowed when IdentityState is "

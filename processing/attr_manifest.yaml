@@ -678,6 +678,29 @@ layers:
         display_order: 10
         value_type: presence
 
+  ParcelADBGISID:
+    attr_key: adb_gisid
+    class: External
+    node_type: parcel
+    db_table: parcels
+    build_stage: build_parcels
+    label: Assessor Database GIS ID
+    description: >
+      Raw GIS feature identifier from the Assessor Database (BT_Extract GISID field).
+      Carried through the parcel spine as hygiene data. Not used as a join key —
+      parcel_id (map-parcel) is the authoritative join key.
+    columns:
+      parcel_adb_gisid:
+        label: ADB GIS ID
+        description: >
+          Raw GISID from the Assessor Database. F_ prefix = standard parcel loc_id
+          (may reflect an older GIS vintage); X_ prefix = special feature
+          (road, easement, ROW).
+        display_group: Identity
+        display_order: 20
+        value_type: text
+        filterable: false
+
   # ── Derived Layers ───────────────────────────────────────────────────────────
 
   ParcelIdentityState:
@@ -689,17 +712,93 @@ layers:
     label: Identity State
     description: >
       Parcel presence across Assessor Database and MassGIS parcel layer.
-      Derived from join_status (BOTH / ASSESSOR_ONLY / MASSGIS_ONLY) and
-      exposed as a three-state coded value.
+      Derived from join_status and parcel_class. X_ (special-feature) records
+      are always OK — their absence from the GIS parcel layer is correct.
+      F_ and no-gisid records use parcel_id presence-in-both as the signal.
     columns:
       identity_state:
         label: Identity State
         description: >
-          OK = present in both Assessor and GIS;
+          OK = present in both Assessor and GIS, or special-feature (X_) parcel;
           ADB-only = Assessor only (no GIS polygon);
           GIS-only = MassGIS only (no Assessor record).
         display_group: Identity
         display_order: 10
+        value_type: coded
+
+  ParcelClass:
+    attr_key: parcel_class
+    class: Derived
+    node_type: parcel
+    db_table: parcels
+    build_stage: build_parcels
+    label: Parcel GIS Feature Class
+    description: >
+      Derived from the ADB GISID prefix. Determines whether GIS absence is
+      expected (special-feature) or a data gap (standard / no-gisid).
+    columns:
+      parcel_class:
+        label: Parcel Class
+        description: >
+          standard = regular parcel; GIS polygon expected (F_ gisid prefix);
+          special-feature = road / easement / ROW (X_ prefix; absent from parcel
+          GIS layer by design);
+          no-gisid = ADB record carries no GIS identifier.
+        display_group: Identity
+        display_order: 30
+        value_type: coded
+
+  ParcelGISIDStatus:
+    attr_key: gisid_status
+    class: Derived
+    node_type: parcel
+    db_table: parcels
+    build_stage: build_parcels
+    label: GIS ID Match Status
+    description: >
+      Hygiene signal comparing the ADB GISID against the current MassGIS loc_id.
+      Drift parcels (96% of non-matching) are centroid recalculation noise across
+      GIS vintages; classified by distance. Not an identity signal; parcel_id is
+      the join key.
+    columns:
+      parcel_gisid_status:
+        label: GIS ID Status
+        description: >
+          matches = gisid resolves to correct GIS loc_id row;
+          drift-minor = parcel_id in GIS, gisid stale, centroid shift < 10 ft;
+          drift-moderate = centroid shift 10–50 ft;
+          drift-major = centroid shift ≥ 50 ft (may indicate polygon reassignment);
+          missing = parcel_id not found in GIS (ASSESSOR_ONLY);
+          special-feature = X_ prefix (roads/easements/ROW, correctly absent);
+          no-gisid = ADB carries no GIS identifier.
+        display_group: Identity
+        display_order: 40
+        value_type: coded
+
+  ParcelMassGISStatus:
+    attr_key: massgis_status
+    class: Derived
+    node_type: parcel
+    db_table: parcels
+    build_stage: build_parcels
+    label: MassGIS Correction Status
+    description: >
+      GIS-side hygiene signal — symmetric to ParcelGISIDStatus (which is ADB-side).
+      Classifies what correction, if any, MassGIS needs to make for each parcel.
+      Feeds the MassGIS Correction Report; not used as an identity signal.
+    columns:
+      parcel_massgis_status:
+        label: MassGIS Status
+        description: >
+          ok = GIS has the parcel with correct map_par_id (BOTH join);
+          absent = ADB parcel has no GIS polygon (ASSESSOR_ONLY, standard);
+          blank-map-par-id = GIS has a polygon matching the ADB gisid but
+          map_par_id is empty or misassigned;
+          unmatched-polygon = GIS polygon with no ADB counterpart (MASSGIS_ONLY);
+          special-feature = X_ parcel, correctly absent from GIS parcel layer;
+          no-gisid = ADB record has no gisid, no basis for GIS lookup.
+        display_group: Identity
+        display_order: 50
         value_type: coded
 
   ParcelCoverageRatio:

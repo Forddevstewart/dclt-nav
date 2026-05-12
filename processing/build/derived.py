@@ -203,6 +203,7 @@ def compute_acquisition_suitability(engine) -> int:
                 p.coverage_ratio,
                 p.coverage_status,
                 p.join_status,
+                p.parcel_class,
                 g.bm3_ch_id,    g.bm3_ch_acres,
                 g.bm3_cnl_id,   g.bm3_cnl_acres,
                 g.bm3_wc_id,    g.bm3_wc_acres,
@@ -219,7 +220,7 @@ def compute_acquisition_suitability(engine) -> int:
         r = row._mapping
         cv = _as_conservation_value(r)
         dp = _as_development_pressure(r)
-        identity_ok = r.get("join_status") == "BOTH"
+        identity_ok = r.get("join_status") == "BOTH" or r.get("parcel_class") == "special-feature"
 
         if cv == 2 and dp == 0 and identity_ok:
             state = "Likely"

@@ -31,6 +31,7 @@ def create_app():
     from .notes import bp as notes_bp
     from .pwa import bp as pwa_bp
     from .campaigns import bp as campaigns_bp
+    from .reports import bp as reports_bp
 
     login_manager.init_app(app)
     app.register_blueprint(auth_bp)
@@ -46,6 +47,7 @@ def create_app():
     app.register_blueprint(notes_bp)
     app.register_blueprint(pwa_bp)
     app.register_blueprint(campaigns_bp)
+    app.register_blueprint(reports_bp)
 
     _SKIP_LOG = {"/api/admin/usage", "/api/items"}
 
@@ -69,6 +71,13 @@ def create_app():
     from .models import run_migrations
     run_migrations(app.config["DATABASE"])
     ensure_ford(app.config["DATABASE"])
+
+    from .campaigns import seed_campaigns
+    import sqlite3 as _sqlite3
+    _conn = _sqlite3.connect(app.config["DATABASE"])
+    _conn.row_factory = _sqlite3.Row
+    seed_campaigns(_conn)
+    _conn.close()
 
     return app
 

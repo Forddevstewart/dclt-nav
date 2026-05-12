@@ -111,10 +111,13 @@ def parcels_list():
                p.property_class, p.use_code_norm, p.use_code_desc,
                p.totalapprvalue, p.billingacres, p.village, p.is_public, p.condo_units,
                p.centroid_lat,
-               CASE p.join_status
-                 WHEN 'BOTH'          THEN 'OK'
-                 WHEN 'ASSESSOR_ONLY' THEN 'ADB-only'
-                 WHEN 'MASSGIS_ONLY'  THEN 'GIS-only'
+               p.parcel_class, p.parcel_gisid_status, p.parcel_massgis_status,
+               p.parcel_adb_gisid,
+               CASE
+                 WHEN p.parcel_class = 'special-feature' THEN 'OK'
+                 WHEN p.join_status = 'BOTH'             THEN 'OK'
+                 WHEN p.join_status = 'ASSESSOR_ONLY'    THEN 'ADB-only'
+                 WHEN p.join_status = 'MASSGIS_ONLY'     THEN 'GIS-only'
                  ELSE 'OK'
                END AS identity_state{cov_select}{usc_select}{farming_select}{acq_suit_select}
                {gis_select}{kw_select}{fs_select}
@@ -197,9 +200,11 @@ def parcel_detail(parcel_id):
         doc_list.append(rec)
 
     parcel_dict = _clean(dict(parcel), _PARCEL_SKIP)
-    parcel_dict["identity_state"] = JOIN_STATUS_TO_IDENTITY_STATE.get(
-        dict(parcel).get("join_status"), "OK"
-    )
+    p = dict(parcel)
+    if p.get("parcel_class") == "special-feature":
+        parcel_dict["identity_state"] = "OK"
+    else:
+        parcel_dict["identity_state"] = JOIN_STATUS_TO_IDENTITY_STATE.get(p.get("join_status"), "OK")
 
     return jsonify({
         "parcel":    parcel_dict,
