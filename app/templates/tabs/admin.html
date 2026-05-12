@@ -1,0 +1,452 @@
+    <div class="tab-panel" x-show="activeTab==='admin'" style="overflow:hidden;display:flex;flex-direction:column;">
+
+      <!-- Secondary tab bar -->
+      <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#fff;flex-shrink:0;padding:0 .75rem;">
+        <button class="admin-sec-tab" :class="{active:adminSection==='campaigns'}" @click="switchAdminSection('campaigns')">Campaigns</button>
+        <button class="admin-sec-tab" :class="{active:adminSection==='tags'}"     @click="switchAdminSection('tags')">Tag Maintenance</button>
+        <button class="admin-sec-tab" :class="{active:adminSection==='users'}"    @click="adminSection='users'">User Admin</button>
+        <button class="admin-sec-tab" :class="{active:adminSection==='usage'}"    @click="adminSection='usage'">Usage Log</button>
+      </div>
+
+      <!-- Section content -->
+      <div style="flex:1;overflow:hidden;display:flex;">
+
+        <!-- ── User Admin ──────────────────────────────────────────────────── -->
+        <div x-show="adminSection==='users'" class="tab-section">
+
+          <div class="col-left">
+            <div class="col-left-controls">
+              <template x-if="CURRENT_USER?.role === 'admin'">
+                <button class="rod-link" style="font-size:12px;padding:.3rem .75rem;width:100%;text-align:center;border:none;"
+                  @click="adminAction='add_user'; adminSelected=null; adminNewUser={username:'',full_name:'',password:'',role:'user',saving:false,msg:'',err:''}">
+                  + Add User
+                </button>
+              </template>
+            </div>
+            <div class="col-left-list">
+              <template x-if="adminUsersLoading">
+                <div class="loading-msg">Loading…</div>
+              </template>
+              <template x-if="!adminUsersLoading">
+                <div>
+                  <template x-for="u in adminUsers" :key="u.id">
+                    <div class="list-row" :class="{selected: adminSelected?.id === u.id}"
+                      @click="selectAdminUser(u)">
+                      <div style="display:flex;align-items:center;justify-content:space-between;gap:.4rem;">
+                        <span class="row-main" x-text="u.username"></span>
+                        <template x-if="CURRENT_USER?.role === 'admin'">
+                          <span class="badge"
+                            :class="u.role==='admin'?'badge-blue':u.role==='guest'?'badge-gray':'badge-green'"
+                            style="font-size:10px;padding:.1rem .35rem;flex-shrink:0;"
+                            x-text="u.role"></span>
+                        </template>
+                      </div>
+                      <div class="row-sub"
+                        x-text="u.last_login ? 'Last login ' + u.last_login.slice(0,16).replace('T',' ') : 'Never logged in'">
+                      </div>
+                    </div>
+                  </template>
+                  <template x-if="adminUsers.length === 0">
+                    <div class="empty-state" style="height:100px;">No users</div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="col-mid">
+            <div class="col-mid-inner">
+              <template x-if="!adminSelected && adminAction !== 'add_user'">
+                <div class="empty-state" style="height:60vh;">
+                  <span class="empty-icon">👤</span>
+                  <span>Select a user</span>
+                </div>
+              </template>
+              <template x-if="adminAction === 'add_user' && CURRENT_USER?.role === 'admin'">
+                <div>
+                  <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:1.25rem;">Add User</div>
+                  <div class="section">
+                    <div style="display:flex;flex-direction:column;gap:.6rem;max-width:320px;">
+                      <input class="search-input" type="text" placeholder="Username"
+                        x-model="adminNewUser.username" autocomplete="off">
+                      <input class="search-input" type="text" placeholder="Full Name"
+                        x-model="adminNewUser.full_name" autocomplete="off">
+                      <input class="search-input" type="password" placeholder="Password"
+                        x-model="adminNewUser.password" autocomplete="new-password">
+                      <select class="ctrl-select" x-model="adminNewUser.role">
+                        <option value="guest">Guest — view only</option>
+                        <option value="user">User — can change own password</option>
+                        <option value="admin">Admin — full access</option>
+                      </select>
+                      <template x-if="adminNewUser.err">
+                        <div style="font-size:12px;color:#dc2626;" x-text="adminNewUser.err"></div>
+                      </template>
+                      <template x-if="adminNewUser.msg">
+                        <div style="font-size:12px;color:#16a34a;" x-text="adminNewUser.msg"></div>
+                      </template>
+                      <button class="rod-link" style="width:fit-content;font-size:13px;border:none;"
+                        @click="addAdminUser()" :disabled="adminNewUser.saving"
+                        x-text="adminNewUser.saving ? 'Adding…' : 'Add User'"></button>
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <template x-if="adminSelected && adminAction === 'change_pw'">
+                <div>
+                  <div style="margin-bottom:1.25rem;">
+                    <div style="font-size:18px;font-weight:700;color:#0f172a;" x-text="adminSelected.full_name || adminSelected.username"></div>
+                    <div style="font-size:13px;color:#64748b;margin-top:3px;"
+                      x-text="(adminSelected.role) + ' · ' + (adminSelected.last_login ? 'Last login ' + adminSelected.last_login.slice(0,16).replace('T',' ') : 'Never logged in')">
+                    </div>
+                  </div>
+                  <template x-if="canChangePassword(adminSelected.id)">
+                    <div class="section">
+                      <div class="section-title">Full Name</div>
+                      <div style="display:flex;flex-direction:column;gap:.6rem;max-width:320px;">
+                        <input class="search-input" type="text" placeholder="Full Name"
+                          x-model="adminName.full_name" autocomplete="off"
+                          @keydown.enter="changeAdminFullName()">
+                        <template x-if="adminName.err">
+                          <div style="font-size:12px;color:#dc2626;" x-text="adminName.err"></div>
+                        </template>
+                        <template x-if="adminName.msg">
+                          <div style="font-size:12px;color:#16a34a;" x-text="adminName.msg"></div>
+                        </template>
+                        <button class="rod-link" style="width:fit-content;font-size:13px;border:none;"
+                          @click="changeAdminFullName()" :disabled="adminName.saving"
+                          x-text="adminName.saving ? 'Saving…' : 'Update Name'"></button>
+                      </div>
+                    </div>
+                  </template>
+                  <template x-if="canChangePassword(adminSelected.id)">
+                    <div class="section">
+                      <div class="section-title">Change Password</div>
+                      <div style="display:flex;flex-direction:column;gap:.6rem;max-width:320px;">
+                        <input class="search-input" type="password" placeholder="New password"
+                          x-model="adminPw.password" autocomplete="new-password">
+                        <input class="search-input" type="password" placeholder="Confirm password"
+                          x-model="adminPw.confirm" autocomplete="new-password"
+                          @keydown.enter="changeAdminPassword()">
+                        <template x-if="adminPw.err">
+                          <div style="font-size:12px;color:#dc2626;" x-text="adminPw.err"></div>
+                        </template>
+                        <template x-if="adminPw.msg">
+                          <div style="font-size:12px;color:#16a34a;" x-text="adminPw.msg"></div>
+                        </template>
+                        <button class="rod-link" style="width:fit-content;font-size:13px;border:none;"
+                          @click="changeAdminPassword()" :disabled="adminPw.saving"
+                          x-text="adminPw.saving ? 'Saving…' : 'Update Password'"></button>
+                      </div>
+                    </div>
+                  </template>
+                  <template x-if="!canChangePassword(adminSelected.id)">
+                    <div style="font-size:13px;color:#94a3b8;margin-top:.5rem;">
+                      You do not have permission to change this user's password.
+                    </div>
+                  </template>
+                  <template x-if="CURRENT_USER?.role === 'admin' && adminSelected.id !== CURRENT_USER.id">
+                    <div class="section">
+                      <div class="section-title">Change Role</div>
+                      <div style="display:flex;flex-direction:column;gap:.6rem;max-width:320px;">
+                        <select class="ctrl-select" x-model="adminRole.role">
+                          <option value="guest">Guest — view only</option>
+                          <option value="user">User — can change own password</option>
+                          <option value="admin">Admin — full access</option>
+                        </select>
+                        <template x-if="adminRole.err">
+                          <div style="font-size:12px;color:#dc2626;" x-text="adminRole.err"></div>
+                        </template>
+                        <template x-if="adminRole.msg">
+                          <div style="font-size:12px;color:#16a34a;" x-text="adminRole.msg"></div>
+                        </template>
+                        <button class="rod-link" style="width:fit-content;font-size:13px;border:none;"
+                          @click="changeAdminRole()" :disabled="adminRole.saving"
+                          x-text="adminRole.saving ? 'Saving…' : 'Update Role'"></button>
+                      </div>
+                    </div>
+                  </template>
+                  <template x-if="CURRENT_USER?.role === 'admin' && adminSelected.id !== CURRENT_USER.id">
+                    <div class="section" style="margin-top:1.5rem;border-top:1px solid #fee2e2;padding-top:1rem;">
+                      <div class="section-title" style="color:#dc2626;">Delete User</div>
+                      <div style="display:flex;flex-direction:column;gap:.6rem;max-width:320px;">
+                        <template x-if="!adminDeleteConfirm">
+                          <button class="rod-link" style="width:fit-content;font-size:13px;border:none;color:#dc2626;"
+                            @click="adminDeleteConfirm = true">Delete User</button>
+                        </template>
+                        <template x-if="adminDeleteConfirm">
+                          <div style="display:flex;flex-direction:column;gap:.5rem;">
+                            <div style="font-size:13px;color:#dc2626;">Delete <strong x-text="adminSelected.username"></strong>? This cannot be undone.</div>
+                            <div style="display:flex;gap:.5rem;">
+                              <button class="rod-link" style="font-size:13px;border:none;color:#dc2626;"
+                                @click="deleteAdminUser()">Confirm Delete</button>
+                              <button class="rod-link" style="font-size:13px;border:none;color:#64748b;"
+                                @click="adminDeleteConfirm = false">Cancel</button>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+
+        </div><!-- /users section -->
+
+        <!-- ── Usage Log ───────────────────────────────────────────────────── -->
+        <div x-show="adminSection==='usage'" class="tab-section" style="flex-direction:column;">
+          <div class="col-right-header" style="display:flex;align-items:center;gap:.5rem;">
+            <span>Usage Log</span>
+            <span x-show="!usageLoading" style="font-size:10px;color:#94a3b8;font-weight:400;text-transform:none;letter-spacing:0;"
+              x-text="filteredUsage.length.toLocaleString() + (usageSearch ? ' of ' + usageLog.length.toLocaleString() : '') + ' events'"></span>
+            <a :href="usageExportUrl" download
+              style="margin-left:auto;padding:.1rem .45rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:12px;color:#64748b;text-decoration:none;">↓ CSV</a>
+            <button @click="loadUsage()"
+              style="padding:.1rem .45rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:12px;color:#64748b;"
+              title="Refresh">↻</button>
+          </div>
+          <div style="padding:.4rem .6rem;border-bottom:1px solid #e2e8f0;flex-shrink:0;">
+            <input class="search-input" x-model="usageSearch"
+              placeholder="Search username, event, path, IP…" type="search" autocomplete="off">
+          </div>
+          <div style="flex:1;overflow:auto;">
+            <template x-if="usageLoading">
+              <div class="loading-msg">Loading…</div>
+            </template>
+            <template x-if="!usageLoading">
+              <table class="doc-table" style="font-size:11px;min-width:860px;">
+                <thead>
+                  <tr>
+                    <template x-for="col in usageCols" :key="col.key">
+                      <th @click="sortUsage(col.key)" style="cursor:pointer;white-space:nowrap;user-select:none;">
+                        <span x-text="col.label"></span>
+                        <span style="color:#3b82f6;" x-text="usageSort===col.key ? (usageSortDir==='asc'?'↑':'↓') : ''"></span>
+                      </th>
+                    </template>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="r in filteredUsage" :key="r.seq">
+                    <tr>
+                      <td style="white-space:nowrap;color:#64748b;" x-text="r.ts ? r.ts.replace('T',' ') : ''"></td>
+                      <td style="font-weight:500;" x-text="r.username || '—'"></td>
+                      <td style="font-family:monospace;font-size:10px;color:#94a3b8;" x-text="r.session_id || ''"></td>
+                      <td>
+                        <span class="badge"
+                          :class="r.event_type==='login'?'badge-green':r.event_type==='logout'?'badge-gray':r.event_type&&r.event_type.startsWith('admin')?'badge-orange':r.event_type==='adjudication'?'badge-purple':'badge-blue'"
+                          style="font-size:10px;padding:.05rem .3rem;"
+                          x-text="r.event_type || '—'"></span>
+                      </td>
+                      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" :title="r.api_call" x-text="r.api_call || ''"></td>
+                      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b;" :title="r.details" x-text="r.details || ''"></td>
+                      <td style="white-space:nowrap;font-family:monospace;font-size:10px;" x-text="r.ip || ''"></td>
+                      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#94a3b8;" :title="r.user_agent" x-text="r.user_agent || ''"></td>
+                    </tr>
+                  </template>
+                  <template x-if="filteredUsage.length === 0">
+                    <tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:2rem;">No events</td></tr>
+                  </template>
+                </tbody>
+              </table>
+            </template>
+          </div>
+        </div><!-- /usage section -->
+
+        <!-- ── Tag Maintenance ─────────────────────────────────────────────── -->
+        <div x-show="adminSection==='tags'" class="tab-section">
+
+          <div class="col-left">
+            <div class="col-left-controls">
+              <template x-if="CURRENT_USER?.role === 'admin'">
+                <button class="rod-link" style="font-size:12px;padding:.3rem .75rem;width:100%;text-align:center;border:none;"
+                  @click="startNewTag()">+ Add Tag</button>
+              </template>
+            </div>
+            <div class="col-left-list">
+              <template x-if="adminTagsLoading">
+                <div class="loading-msg">Loading…</div>
+              </template>
+              <template x-if="!adminTagsLoading">
+                <div>
+                  <template x-for="t in allAdminTags" :key="t.tag_id">
+                    <div class="tag-list-row"
+                      :class="{selected: selectedTag?.tag_id===t.tag_id, deprecated: t.deprecated_at}"
+                      @click="selectTag(t)">
+                      <div style="display:flex;align-items:center;gap:.4rem;">
+                        <span class="row-main" x-text="t.name"></span>
+                        <template x-if="t.deprecated_at">
+                          <span class="badge badge-gray" style="font-size:9px;padding:.05rem .3rem;">deprecated</span>
+                        </template>
+                      </div>
+                      <div class="tag-states-preview" x-text="'[' + t.states_csv + ']'"></div>
+                      <div class="tag-usage-preview" x-text="tagUsageLine(t)"></div>
+                    </div>
+                  </template>
+                  <template x-if="allAdminTags.length === 0">
+                    <div class="empty-state" style="height:100px;">No tags</div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="col-mid">
+            <div class="col-mid-inner">
+              <div x-show="!selectedTag && !tagEditForm.isNew" class="empty-state" style="height:60vh;">
+                <span class="empty-icon">🏷</span>
+                <span>Select a tag</span>
+              </div>
+              <div x-show="tagEditForm.isNew">
+                <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:1.25rem;">New Tag</div>
+                <div style="display:flex;flex-direction:column;gap:.6rem;">
+                  <input class="search-input" type="text" placeholder="Tag name (e.g. status)"
+                    x-model="tagEditForm.name" autocomplete="off">
+                  <input class="search-input" type="text" placeholder="States, comma-separated (e.g. new,reviewed)"
+                    x-model="tagEditForm.statesRaw" autocomplete="off">
+                  <template x-if="tagEditForm.err">
+                    <div style="font-size:12px;color:#dc2626;" x-text="tagEditForm.err"></div>
+                  </template>
+                  <button class="rod-link" style="width:fit-content;font-size:13px;border:none;"
+                    @click="saveNewTag()" :disabled="tagEditForm.saving"
+                    x-text="tagEditForm.saving ? 'Saving…' : 'Create Tag'"></button>
+                </div>
+              </div>
+              <div x-show="selectedTag && !tagEditForm.isNew">
+                <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:.3rem;" x-text="selectedTag?.name"></div>
+                <div style="font-size:12px;color:#94a3b8;margin-bottom:1.25rem;" x-text="selectedTag?.deprecated_at ? 'Deprecated' : 'Active'"></div>
+                <div class="section">
+                  <div class="section-title">Name</div>
+                  <input class="search-input" type="text" x-model="tagEditForm.name" autocomplete="off">
+                </div>
+                <div class="section" style="margin-top:.75rem;">
+                  <div class="section-title">States <span style="font-weight:400;text-transform:none;font-size:10px;color:#94a3b8;">(first = default)</span></div>
+                  <template x-for="(s, i) in tagEditForm.states" :key="i">
+                    <div class="tag-state-row">
+                      <span class="tag-state-handle">☰</span>
+                      <span class="tag-state-name" x-text="s"></span>
+                      <template x-if="i===0"><span class="tag-state-default">default</span></template>
+                      <button style="padding:.1rem .3rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;"
+                        :disabled="i===0" @click="moveTagState(i,-1)">↑</button>
+                      <button style="padding:.1rem .3rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;"
+                        :disabled="i===tagEditForm.states.length-1" @click="moveTagState(i,1)">↓</button>
+                      <button style="padding:.1rem .3rem;border:1px solid #e2e8f0;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;color:#dc2626;"
+                        @click="removeTagState(i)">✕</button>
+                    </div>
+                  </template>
+                  <div style="display:flex;gap:.35rem;margin-top:.5rem;">
+                    <input class="search-input" type="text" placeholder="New state…"
+                      x-model="tagEditForm.newState" style="flex:1;" @keydown.enter="addTagState()">
+                    <button style="padding:.3rem .6rem;border:1px solid #cbd5e1;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;"
+                      @click="addTagState()">Add</button>
+                  </div>
+                </div>
+                <div class="section" style="margin-top:.75rem;">
+                  <div class="section-title">Display Order</div>
+                  <input class="search-input" type="number" x-model.number="tagEditForm.displayOrder" style="max-width:120px;">
+                </div>
+                <div class="section" style="margin-top:.75rem;">
+                  <label style="display:flex;align-items:center;gap:.4rem;font-size:12px;cursor:pointer;">
+                    <input type="checkbox" x-model="tagEditForm.deprecated">
+                    <span>Deprecated (hidden from picker)</span>
+                  </label>
+                </div>
+                <template x-if="tagEditForm.err">
+                  <div style="font-size:12px;color:#dc2626;margin-top:.5rem;" x-text="tagEditForm.err"></div>
+                </template>
+                <template x-if="tagEditForm.msg">
+                  <div style="font-size:12px;color:#16a34a;margin-top:.5rem;" x-text="tagEditForm.msg"></div>
+                </template>
+                <div style="display:flex;gap:.5rem;margin-top:1rem;flex-wrap:wrap;">
+                  <button class="rod-link" style="font-size:13px;border:none;"
+                    @click="saveTag()" :disabled="tagEditForm.saving"
+                    x-text="tagEditForm.saving ? 'Saving…' : 'Save'"></button>
+                  <template x-if="CURRENT_USER?.role==='admin'">
+                    <button style="padding:.3rem .7rem;border:1px solid #fca5a5;border-radius:4px;background:#fff;color:#dc2626;cursor:pointer;font-size:12px;"
+                      @click="confirmDeleteTag()" :disabled="tagEditForm.deleting"
+                      x-text="tagEditForm.deleting ? 'Deleting…' : 'Delete tag'"></button>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /tags section -->
+
+        <!-- ── Campaigns Admin ────────────────────────────────────────────── -->
+        <div x-show="adminSection==='campaigns'" class="tab-section" style="flex-direction:column;gap:1.5rem;overflow-y:auto;padding:1.25rem;">
+
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:.25rem;">Campaigns</div>
+            <div style="font-size:11px;color:#64748b;margin-bottom:.75rem;">Campaigns are defined in code. Use this screen to set status and adjust display order.</div>
+            <template x-if="adminCampaignsLoading">
+              <div style="font-size:12px;color:#94a3b8;">Loading…</div>
+            </template>
+            <template x-if="!adminCampaignsLoading && adminCampaigns.length === 0">
+              <div style="font-size:12px;color:#94a3b8;">No campaigns found.</div>
+            </template>
+            <template x-if="!adminCampaignsLoading && adminCampaigns.length > 0">
+              <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead>
+                  <tr style="border-bottom:1px solid #e2e8f0;color:#64748b;">
+                    <th style="text-align:left;padding:.3rem .5rem;width:1.5rem;"></th>
+                    <th style="text-align:left;padding:.3rem .5rem;">Campaign</th>
+                    <th style="text-align:left;padding:.3rem .5rem;">Scope</th>
+                    <th style="text-align:left;padding:.3rem .5rem;">Status</th>
+                    <th style="padding:.3rem .5rem;"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(c, ci) in adminCampaigns" :key="c.campaign_id">
+                    <tr style="border-bottom:1px solid #f1f5f9;">
+                      <!-- color swatch -->
+                      <td style="padding:.35rem .5rem;">
+                        <div :style="'width:10px;height:10px;border-radius:50%;background:' + (c.color || '#94a3b8')"></div>
+                      </td>
+                      <!-- name + label -->
+                      <td style="padding:.35rem .5rem;">
+                        <div style="font-weight:600;" x-text="c.label || c.name"></div>
+                        <div style="font-size:10px;color:#94a3b8;font-family:monospace;" x-text="c.campaign_id"></div>
+                      </td>
+                      <!-- scope -->
+                      <td style="padding:.35rem .5rem;color:#475569;max-width:200px;" x-text="c.scope || c.description || '—'"></td>
+                      <!-- status badge -->
+                      <td style="padding:.35rem .5rem;">
+                        <span :style="c.status==='active' ? 'color:#166534;background:#dcfce7;' : c.status==='paused' ? 'color:#92400e;background:#fef3c7;' : 'color:#64748b;background:#f1f5f9;'"
+                              style="font-size:10px;font-weight:700;padding:.1rem .4rem;border-radius:3px;text-transform:uppercase;"
+                              x-text="c.status"></span>
+                      </td>
+                      <!-- actions -->
+                      <td style="padding:.35rem .5rem;">
+                        <div style="display:flex;gap:.3rem;align-items:center;flex-wrap:nowrap;">
+                          <!-- priority arrows -->
+                          <button style="border:1px solid #e2e8f0;background:#fff;border-radius:3px;padding:.1rem .3rem;cursor:pointer;font-size:10px;color:#64748b;"
+                                  :disabled="ci === 0"
+                                  @click="shiftCampaignPriority(c.campaign_id,'up')">▲</button>
+                          <button style="border:1px solid #e2e8f0;background:#fff;border-radius:3px;padding:.1rem .3rem;cursor:pointer;font-size:10px;color:#64748b;"
+                                  :disabled="ci === adminCampaigns.length - 1"
+                                  @click="shiftCampaignPriority(c.campaign_id,'down')">▼</button>
+                          <!-- status controls -->
+                          <template x-if="c.status !== 'active'">
+                            <button class="rod-link" style="font-size:10px;padding:.15rem .4rem;" @click="setCampaignStatus(c.campaign_id,'active')">Activate</button>
+                          </template>
+                          <template x-if="c.status === 'active'">
+                            <button class="rod-link" style="font-size:10px;padding:.15rem .4rem;" @click="setCampaignStatus(c.campaign_id,'paused')">Pause</button>
+                          </template>
+                          <template x-if="c.status !== 'complete'">
+                            <button class="rod-link" style="font-size:10px;padding:.15rem .4rem;color:#dc2626;" @click="setCampaignStatus(c.campaign_id,'complete')">Complete</button>
+                          </template>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </template>
+          </div>
+
+        </div><!-- /campaigns section -->
+
+      </div>
+
+    </div><!-- /admin tab -->

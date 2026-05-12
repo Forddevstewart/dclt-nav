@@ -1,0 +1,515 @@
+    <div class="tab-panel" x-show="activeTab==='parcels'" style="overflow:hidden;">
+    <div class="pn-nav" :class="{'pn-exp-map': pnExpandMode==='map', 'pn-exp-doc': pnExpandMode==='doc'}">
+
+      <!-- ── Left rail ──────────────────────────────────────────────────────── -->
+      <div class="pn-left">
+
+        <!-- Search -->
+        <div style="padding:9px 12px;border-bottom:1px solid var(--pn-rule);flex-shrink:0;">
+          <input class="pn-sinput" x-model.debounce.200ms="parcelSearch"
+            placeholder="Search id, owner, address…" type="search" autocomplete="off"
+            @input="parcelPage=1">
+          <template x-if="activeCampaign">
+            <div style="background:var(--pn-undec-bg);border:1px solid var(--pn-undec);padding:4px 8px;font-size:11px;display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:6px;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--pn-undec);" x-text="activeCampaign.name"></span>
+              <button @click="deactivateCampaign()" style="border:none;background:none;color:var(--pn-undec);cursor:pointer;font-size:12px;padding:0;">✕</button>
+            </div>
+          </template>
+        </div>
+
+        <!-- Campaigns / Decisions accordion -->
+        <div class="pn-lsec">
+          <div class="pn-lsec-hdr" @click="pnCampaignsOpen = !pnCampaignsOpen">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="pn-lsec-title">Campaigns</span>
+              <template x-if="Object.values(parcelTagFilters).some(v=>v.length>0)">
+                <span class="pn-filter-dot"></span>
+              </template>
+            </div>
+            <span class="pn-lsec-caret" x-text="pnCampaignsOpen ? '▲' : '▼'"></span>
+          </div>
+          <div x-show="pnCampaignsOpen" class="pn-lsec-body">
+            <template x-if="allParcelTagOptions.length">
+              <div class="filter-chips">
+                <template x-for="tag in allParcelTagOptions" :key="tag.tag_id">
+                  <div class="filter-chip-wrap">
+                    <button class="filter-chip"
+                      :class="{active: parcelTagFilters[tag.tag_id]?.length > 0, 'user-tag': true}"
+                      @click.stop="toggleFilterChipPicker('pt:' + tag.tag_id)"
+                      x-text="parcelTagChipLabel(tag)">
+                    </button>
+                    <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'pt:' + tag.tag_id" @click.stop>
+                      <template x-for="s in tag.states_csv.split(',')" :key="s">
+                        <label class="filter-chip-opt">
+                          <input type="checkbox" :checked="parcelTagFilters[tag.tag_id]?.includes(s)" @change="toggleParcelTagState(tag.tag_id, s)">
+                          <span x-text="s"></span>
+                        </label>
+                      </template>
+                      <template x-if="parcelTagFilters[tag.tag_id]?.length > 0">
+                        <div class="filter-chip-clear" @click="clearParcelTagFilter(tag.tag_id)">Clear</div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+            <template x-if="!allParcelTagOptions.length">
+              <span style="font-size:11px;color:var(--pn-ink-4);">No dimensions defined</span>
+            </template>
+          </div>
+        </div>
+
+        <!-- Attributes accordion (closed by default) -->
+        <div class="pn-lsec">
+          <div class="pn-lsec-hdr" @click="pnAttrsOpen = !pnAttrsOpen">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="pn-lsec-title">Attributes</span>
+              <template x-if="Object.values(parcelLayerFilters).some(v=>v.length>0)">
+                <span class="pn-filter-dot"></span>
+              </template>
+            </div>
+            <span class="pn-lsec-caret" x-text="pnAttrsOpen ? '▲' : '▼'"></span>
+          </div>
+          <div x-show="pnAttrsOpen" class="pn-lsec-body">
+            <template x-for="group in parcelLayerChipGroups" :key="group.display_group">
+              <div>
+                <div class="filter-group-label" x-text="group.display_group"></div>
+                <div class="filter-chips">
+                  <template x-for="chip in group.chips" :key="chip.col">
+                    <div class="filter-chip-wrap">
+                      <button class="filter-chip"
+                        :class="{active: parcelLayerFilters[chip.col]?.length > 0, 'layer-attr': true}"
+                        @click.stop="toggleFilterChipPicker('pl:' + chip.col)"
+                        x-text="parcelLayerChipLabel(chip)">
+                      </button>
+                      <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'pl:' + chip.col" @click.stop>
+                        <template x-for="v in chip.values" :key="v">
+                          <label class="filter-chip-opt">
+                            <input type="checkbox" :checked="parcelLayerFilters[chip.col]?.includes(v)" @change="toggleParcelLayerValue(chip.col, v)">
+                            <span x-text="v === 1 ? 'Present' : String(v)"></span>
+                          </label>
+                        </template>
+                        <template x-if="parcelLayerFilters[chip.col]?.length > 0">
+                          <div class="filter-chip-clear" @click="clearParcelLayerFilter(chip.col)">Clear</div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Clear all filters -->
+        <template x-if="Object.values(parcelLayerFilters).some(v=>v.length>0) || Object.values(parcelTagFilters).some(v=>v.length>0)">
+          <div style="padding:6px 12px;border-bottom:1px solid var(--pn-rule);flex-shrink:0;">
+            <button style="font-size:10px;color:var(--pn-accent);background:none;border:none;padding:0;cursor:pointer;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.04em;"
+              @click="parcelLayerFilters={}; parcelTagFilters={}; parcelTagFoldMaps={}; parcelPage=1;">
+              Clear all filters
+            </button>
+          </div>
+        </template>
+        <!-- List metadata -->
+        <div class="pn-lmeta">
+          <span><span class="pn-lcount" x-text="parcelFilteredCount.toLocaleString()"></span>
+            <span x-text="' parcel'+(parcelFilteredCount!==1?'s':'')+(parcelSearch.trim()?' found':'')"></span>
+          </span>
+          <div style="display:flex;align-items:center;gap:3px;">
+            <button class="paging-btn" @click="parcelPage=Math.max(1,parcelPage-1)" :disabled="parcelPage===1" style="font-size:11px;padding:1px 5px;">‹</button>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--pn-ink-3);" x-text="parcelPage+'/'+parcelTotalPages"></span>
+            <button class="paging-btn" @click="parcelPage=Math.min(parcelTotalPages,parcelPage+1)" :disabled="parcelPage>=parcelTotalPages" style="font-size:11px;padding:1px 5px;">›</button>
+            <a :href="parcelExportUrl" style="font-size:10px;color:var(--pn-ink-4);text-decoration:none;font-family:'IBM Plex Mono',monospace;margin-left:2px;" download title="Export CSV">↓</a>
+          </div>
+        </div>
+
+        <!-- Parcel list — paginated to fit viewport -->
+        <div id="pn-list-scroll" style="flex:1;overflow:hidden;">
+          <template x-if="parcelsLoading">
+            <div style="padding:1rem;font-size:12px;color:var(--pn-ink-4);font-family:'IBM Plex Mono',monospace;">Loading…</div>
+          </template>
+          <template x-if="!parcelsLoading">
+            <div>
+              <template x-for="p in pagedParcels" :key="String(p.parcel_id||'')">
+                <div class="pn-lrow" :class="{'pn-sel': selectedParcelId===p.parcel_id}" @click="selectParcel(p)">
+                  <div class="pn-lid" x-text="p.parcel_id"></div>
+                  <div style="min-width:0;">
+                    <div class="pn-laddr" x-text="p.site_addr||'(no address)'"></div>
+                    <div class="pn-lname" x-text="p.owner_name||'—'"></div>
+                  </div>
+                  <div class="pn-dots">
+                    <template x-for="dot in pnTagDots(p)" :key="dot.t">
+                      <span class="pn-dot" :class="{on: dot.on, attn: dot.attn}" :title="dot.t"></span>
+                    </template>
+                  </div>
+                </div>
+              </template>
+              <template x-if="pagedParcels.length===0">
+                <div style="padding:2rem 1rem;text-align:center;font-size:12px;color:var(--pn-ink-4);">No results</div>
+              </template>
+            </div>
+          </template>
+        </div>
+
+      </div><!-- /pn-left -->
+
+      <!-- ── Center ──────────────────────────────────────────────────────────── -->
+      <div class="pn-center">
+
+        <!-- Empty state -->
+        <template x-if="!selectedParcelId">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--pn-ink-4);padding:3rem;">
+            <svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="24" height="24" rx="1"/><path d="M4 12h24M12 12v16"/></svg>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;">Select a parcel</span>
+          </div>
+        </template>
+
+        <!-- Loading -->
+        <template x-if="selectedParcelId && parcelDetailLoading">
+          <div style="padding:2rem;font-size:12px;color:var(--pn-ink-4);font-family:'IBM Plex Mono',monospace;">Loading…</div>
+        </template>
+
+        <!-- Error -->
+        <template x-if="selectedParcelId && !parcelDetailLoading && parcelDetailError">
+          <div style="padding:2rem;color:#dc2626;font-size:12px;" x-text="parcelDetailError"></div>
+        </template>
+
+        <!-- Detail -->
+        <template x-if="selectedParcelId && !parcelDetailLoading && parcelDetail">
+          <div>
+
+            <!-- ── 1. Parcel Info ──────────────────────────────────────── -->
+            <div class="pn-head">
+              <div class="pn-eyebrow">Parcel</div>
+              <div class="pn-htitle">
+                <span class="pn-hid" x-text="parcelDetail?.parcel.parcel_id"></span>
+                <span class="pn-haddr" x-text="parcelDetail?.parcel.site_addr"></span>
+                <span class="pn-hvill" x-text="parcelDetail?.parcel.village"></span>
+              </div>
+              <div class="pn-hsub">
+                <span class="pn-chip pn-chip-plain" x-text="parcelDetail?.parcel.property_class||'Unknown'"></span>
+                <template x-if="parcelDetail?.parcel.is_public">
+                  <span class="pn-chip pn-chip-plain">Public</span>
+                </template>
+                <template x-if="parcelDetail?.parcel.is_undeveloped_state_code">
+                  <span class="pn-chip pn-chip-plain">Undeveloped SC</span>
+                </template>
+                <template x-if="(parcelDetail?.parcel.condo_units||0)>0">
+                  <span class="pn-chip pn-chip-plain" x-text="parcelDetail?.parcel.condo_units+' condo units'"></span>
+                </template>
+                <template x-if="parcelDetail?.parcel.billingacres">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--pn-ink-3);" x-text="Number(parcelDetail?.parcel.billingacres).toFixed(2)+' ac'"></span>
+                </template>
+              </div>
+            </div>
+            <!-- Parcel info rows -->
+            <div class="pn-section" style="padding-top:10px;padding-bottom:10px;">
+              <template x-for="row in pnParcelInfoRows(parcelDetail?.parcel)" :key="row.k">
+                <div class="pn-arow">
+                  <div class="pn-ak" x-text="row.k"></div>
+                  <div class="pn-av" :class="{mono: row.mono}" x-text="row.v"></div>
+                  <div class="pn-aprov"><span class="pn-pdot m"></span><span x-text="row.src"></span></div>
+                </div>
+              </template>
+            </div>
+
+            <!-- ── 2. Decisions ───────────────────────────────────────── -->
+            <template x-if="CURRENT_USER && allParcelTagOptions.length">
+              <div>
+                <div style="display:flex;align-items:baseline;justify-content:space-between;padding:12px 22px 0;">
+                  <span class="pn-eyebrow">Decisions</span>
+                  <template x-if="tagsLoading">
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--pn-ink-4);">Loading…</span>
+                  </template>
+                </div>
+                <div class="pn-decisions">
+                  <template x-for="tag in allParcelTagOptions" :key="tag.tag_id">
+                    <div class="pn-dcard"
+                      :class="pnDecisionStatus(tag, parcelDetail)"
+                      :title="parcelDetail?.tags?.[tag.name]?.applicable === false ? (parcelDetail?.tags[tag.name].reason || 'Not applicable') : ''"
+                      @click.stop="parcelDetail?.tags?.[tag.name]?.applicable !== false && toggleTagPicker('parcel', tag.tag_id)">
+                      <div class="pn-dcard-h">
+                        <span class="pn-dcard-lbl" x-text="campaignMeta(tag)?.label || tag.name"></span>
+                        <span class="pn-chip"
+                          :class="'pn-chip-'+pnDecisionStatus(tag,parcelDetail)"
+                          x-text="pnDecisionStatus(tag,parcelDetail)">
+                        </span>
+                      </div>
+                      <div class="pn-dcard-val"
+                        :class="{'not-applicable': parcelDetail?.tags?.[tag.name]?.applicable === false}"
+                        x-text="parcelTagState[tag.tag_id] ?? tag.states_csv.split(',')[0]">
+                      </div>
+                      <!-- Inline tag picker -->
+                      <div x-show="tagPickerOpen === 'parcel:'+tag.tag_id" @click.stop
+                        style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #cbd5e1;box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:30;padding:3px 0;min-width:140px;">
+                        <template x-for="(s, i) in parcelTagStates(tag, parcelDetail?.parcel)" :key="s">
+                          <div class="tag-dd-item"
+                            :class="{current: parcelTagState[tag.tag_id]===s, 'default-state': i===0 && parcelTagState[tag.tag_id]==null}"
+                            @click="applyTag('parcel', selectedParcelId, tag.tag_id, s)"
+                            x-text="s"></div>
+                        </template>
+                        <template x-if="parcelTagState[tag.tag_id] != null">
+                          <div>
+                            <hr class="tag-dd-divider">
+                            <div class="tag-dd-item tag-dd-remove"
+                              @click="applyTag('parcel', selectedParcelId, tag.tag_id, null)">
+                              Remove tag
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                      <div class="pn-dcard-foot">
+                        <span class="pn-dcard-scope" x-text="campaignMeta(tag)?.scope || tag.target_entity"></span>
+                        <span style="color:var(--pn-ink-5);font-size:10px;">→</span>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- ── 3. Identity Attributes ────────────────────────────── -->
+            <template x-if="pnIdentityRows(parcelDetail?.parcel).length">
+              <div class="pn-section">
+                <div class="pn-section-h"><span class="pn-eyebrow">Identity</span></div>
+                <template x-for="row in pnIdentityRows(parcelDetail?.parcel)" :key="row.k">
+                  <div class="pn-arow">
+                    <div class="pn-ak" x-text="row.k"></div>
+                    <div class="pn-av" :class="{mono: row.mono}" x-text="row.v"></div>
+                    <div class="pn-aprov"><span class="pn-pdot m"></span><span x-text="row.src"></span></div>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+            <!-- ── 4. Links ───────────────────────────────────────────── -->
+            <div class="pn-section">
+              <div class="pn-section-h">
+                <span class="pn-eyebrow">Links</span>
+                <button class="pn-expand-btn" @click="pnShowMap()"
+                  title="Show map" style="font-size:11px;font-family:'IBM Plex Mono',monospace;">
+                  ⊙ map
+                </button>
+              </div>
+
+              <!-- Registry docs -->
+              <div class="pn-link-sub">
+                <span>Registry</span>
+                <span style="color:var(--pn-ink-4);" x-text="(parcelDetail?.documents||[]).length"></span>
+              </div>
+              <template x-if="(parcelDetail?.documents||[]).length===0">
+                <div style="font-size:11px;color:var(--pn-ink-4);padding:3px 0;">No records found</div>
+              </template>
+              <template x-for="doc in (parcelDetail?.documents||[]).slice(0,6)" :key="doc.doc_rank">
+                <div class="pn-link-row"
+                  :class="{active: parcelSelectedDoc && parcelSelectedDoc.doc_rank===doc.doc_rank}"
+                  @click="selectParcelDoc(doc)">
+                  <span style="font-size:14px;">📄</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;" x-text="'Bk '+doc.book+'/'+doc.page"></span>
+                  <span style="color:var(--pn-ink-3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" x-text="doc.instrument_type||'—'"></span>
+                  <span style="color:var(--pn-ink-5);font-size:10px;font-family:'IBM Plex Mono',monospace;" x-text="doc.recorded_date?doc.recorded_date.slice(0,4):''"></span>
+                  <template x-if="doc.scan_cached"><span class="pn-chip pn-chip-decided" style="font-size:8px;padding:0 4px;">●</span></template>
+                </div>
+              </template>
+              <template x-if="(parcelDetail?.documents||[]).length > 6">
+                <div style="font-size:10px;color:var(--pn-ink-4);padding:2px 0;font-family:'IBM Plex Mono',monospace;"
+                  x-text="'+ '+((parcelDetail?.documents||[]).length - 6)+' more'"></div>
+              </template>
+
+              <!-- Town docs -->
+              <template x-if="parcelTownDocs && parcelTownDocs.length">
+                <div>
+                  <div class="pn-link-sub">
+                    <span>Town Docs</span>
+                    <span style="color:var(--pn-ink-4);" x-text="parcelTownDocs.length"></span>
+                  </div>
+                  <template x-for="td in parcelTownDocs.slice(0,4)" :key="td.link_id">
+                    <div class="pn-link-row"
+                      :class="{active: parcelSelectedTownDoc && parcelSelectedTownDoc.link_id===td.link_id}"
+                      @click="selectParcelTownDoc(td)">
+                      <span style="font-size:14px;">📋</span>
+                      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" x-text="(td.committee||'').replace(/_/g,' ')"></span>
+                      <span style="color:var(--pn-ink-4);font-size:10px;font-family:'IBM Plex Mono',monospace;" x-text="td.meeting_date||''"></span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+
+              <!-- Field docs (photos, notes) -->
+              <template x-if="parcelUploads.length">
+                <div>
+                  <div class="pn-link-sub">
+                    <span>Field</span>
+                    <span style="color:var(--pn-ink-4);" x-text="parcelUploads.length"></span>
+                  </div>
+                  <template x-for="u in parcelUploads.slice(0,4)" :key="u.upload_id">
+                    <div class="pn-link-row"
+                      :class="{active: parcelSelectedUpload && parcelSelectedUpload.upload_id===u.upload_id}"
+                      @click="selectParcelUpload(u)">
+                      <span style="font-size:14px;">
+                        <template x-if="u.mime_type && u.mime_type.startsWith('image/')">📷</template>
+                        <template x-if="u.doc_type==='note'">📝</template>
+                        <template x-if="u.mime_type==='application/pdf'">📄</template>
+                      </span>
+                      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;" x-text="u.note_text||u.filename||'—'"></span>
+                      <span style="color:var(--pn-ink-4);font-size:10px;font-family:'IBM Plex Mono',monospace;" x-text="u.username"></span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+
+            <!-- ── 5. Conservation ────────────────────────────────────── -->
+            <template x-if="pnConservationRows(parcelDetail?.parcel, parcelDetail?.gis).length">
+              <div class="pn-section">
+                <div class="pn-section-h"><span class="pn-eyebrow">Conservation</span></div>
+                <div class="pn-compact-grid">
+                  <template x-for="row in pnConservationRows(parcelDetail?.parcel, parcelDetail?.gis)" :key="row.k">
+                    <div class="pn-compact-cell">
+                      <div class="pn-compact-k" x-text="row.k"></div>
+                      <div class="pn-compact-v" :class="{mono:row.mono}" x-text="row.v"></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- ── 6. Suitability ──────────────────────────────────────── -->
+            <template x-if="pnSuitabilityRows(parcelDetail?.parcel).length">
+              <div class="pn-section">
+                <div class="pn-section-h"><span class="pn-eyebrow">Suitability</span></div>
+                <div class="pn-compact-grid">
+                  <template x-for="row in pnSuitabilityRows(parcelDetail?.parcel)" :key="row.k">
+                    <div class="pn-compact-cell">
+                      <div class="pn-compact-k" x-text="row.k"></div>
+                      <div class="pn-compact-v" :class="{mono:row.mono}" x-text="row.v"></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+            <!-- ── 7. GIS Layers (flat, alpha) ────────────────────────── -->
+            <template x-if="parcelDetail?.gis">
+              <div class="pn-section">
+                <div class="pn-section-h"><span class="pn-eyebrow">GIS Layers</span></div>
+                <div class="gis-llist">
+                  <template x-for="g in gisGroupsSorted(parcelDetail?.gis, parcelDetail?.soil)" :key="g.key">
+                    <div class="gis-lrow">
+                      <div class="gis-lrow-hd">
+                        <span class="gis-lname" :class="{absent:!g.present}" x-text="g.label"></span>
+                        <template x-if="!g.present">
+                          <span class="gis-nodata">no data</span>
+                        </template>
+                      </div>
+                      <template x-if="g.present">
+                        <div class="gis-lfields">
+                          <template x-for="[lbl,val] in g.fields.filter(f=>f[1]!==null&&f[1]!==undefined&&f[1]!=='')" :key="lbl">
+                            <div class="gis-lf"><b x-text="lbl+': '"></b><span x-text="val"></span></div>
+                          </template>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+
+          </div>
+        </template>
+
+      </div><!-- /pn-center -->
+
+      <!-- ── Right rail ──────────────────────────────────────────────────────── -->
+      <div class="pn-right">
+
+        <!-- Map -->
+        <div class="pn-map-wrap">
+          <div class="pn-rail-hdr">
+            <span x-text="selectedParcelId ? 'Map · ' + selectedParcelId : 'Map'"></span>
+            <button class="pn-expand-btn" @click="pnExpandMode = pnExpandMode==='map' ? null : 'map'"
+              :title="pnExpandMode==='map' ? 'Collapse map (Esc)' : 'Expand map'"
+              x-text="pnExpandMode==='map' ? '↙' : '↗'">
+            </button>
+          </div>
+          <div id="parcel-map" x-show="selectedParcelId" style="position:absolute;inset:32px 0 0 0;"></div>
+          <template x-if="!selectedParcelId">
+            <div style="position:absolute;inset:32px 0 0 0;display:flex;align-items:center;justify-content:center;color:var(--pn-ink-5);font-size:11px;font-family:'IBM Plex Mono',monospace;">Select a parcel</div>
+          </template>
+        </div>
+
+        <!-- Document / upload strip -->
+        <template x-if="parcelDetail">
+          <div class="pn-strip">
+            <div class="pn-rail-hdr">
+              <span>Attached
+                <span style="color:var(--pn-ink-4);margin-left:4px;" x-text="'· '+((parcelDetail?.documents||[]).length + parcelUploads.length)"></span>
+              </span>
+            </div>
+            <div class="pn-strip-row">
+              <template x-for="doc in (parcelDetail?.documents||[]).slice(0,8)" :key="doc.doc_rank">
+                <div class="pn-thumb" :class="{active: parcelSelectedDoc && parcelSelectedDoc.doc_rank===doc.doc_rank}" @click="selectParcelDoc(doc)">
+                  <div class="pn-tart" style="font-size:16px;">📄</div>
+                  <div class="pn-tname" x-text="doc.book+'/'+doc.page"></div>
+                </div>
+              </template>
+              <template x-for="u in parcelUploads.slice(0,4)" :key="u.upload_id">
+                <div class="pn-thumb" :class="{active: parcelSelectedUpload && parcelSelectedUpload.upload_id===u.upload_id}" @click="selectParcelUpload(u)">
+                  <div class="pn-tart">
+                    <template x-if="u.mime_type && u.mime_type.startsWith('image/')"><span>📷</span></template>
+                    <template x-if="u.doc_type==='note'"><span>📝</span></template>
+                    <template x-if="u.mime_type==='application/pdf'"><span>📄</span></template>
+                  </div>
+                  <div class="pn-tname" x-text="u.note_text||u.filename||'—'"></div>
+                </div>
+              </template>
+              <template x-if="(parcelDetail?.documents||[]).length===0 && parcelUploads.length===0">
+                <span style="font-size:11px;color:var(--pn-ink-4);font-family:'IBM Plex Mono',monospace;padding:4px 0;">No attachments</span>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <!-- Viewer -->
+        <div class="pn-viewer">
+          <div class="pn-rail-hdr">
+            <span x-text="parcelSelectedUpload ? 'Field Document' : parcelSelectedTownDoc ? 'Town Document' : parcelSelectedDoc ? ('Doc · ' + (parcelSelectedDoc.book||'') + '/' + (parcelSelectedDoc.page||'')) : 'Document View'"></span>
+            <button class="pn-expand-btn" @click="pnExpandMode = pnExpandMode==='doc' ? null : 'doc'"
+              :title="pnExpandMode==='doc' ? 'Collapse document (Esc)' : 'Expand document'"
+              x-text="pnExpandMode==='doc' ? '↙' : '↗'">
+            </button>
+          </div>
+          <div x-show="!parcelSelectedDoc && !parcelSelectedTownDoc && !parcelSelectedUpload"
+            style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--pn-ink-5);font-size:11px;font-family:'IBM Plex Mono',monospace;">
+            Select a document
+          </div>
+          <div x-show="parcelSelectedDoc && !parcelPdfUrl" class="no-scan-panel">
+            <div class="rod-doc-meta" x-text="parcelSelectedDoc ? (parcelSelectedDoc.instrument_type||'Document')+' · Book '+parcelSelectedDoc.book+', Page '+parcelSelectedDoc.page : ''"></div>
+            <div style="font-size:12px;color:var(--pn-ink-3);">No local scan</div>
+            <button class="rod-link" @click="parcelPdfUrl='/api/documents/'+parcelSelectedDoc.book+'/'+parcelSelectedDoc.page+'/rod'">
+              Read from Registry of Deeds
+            </button>
+          </div>
+          <iframe x-show="parcelSelectedDoc && parcelPdfUrl" :src="parcelPdfUrl || ''" style="flex:1;width:100%;height:100%;border:none;"></iframe>
+          <iframe x-show="parcelSelectedTownDoc" :src="parcelSelectedTownDoc ? '/api/town-docs/pdf/'+parcelSelectedTownDoc.doc_id : ''" style="flex:1;width:100%;height:100%;border:none;"></iframe>
+          <div x-show="parcelSelectedUpload && parcelSelectedUpload.mime_type && parcelSelectedUpload.mime_type.startsWith('image/')"
+               style="flex:1;display:flex;align-items:center;justify-content:center;background:#0f172a;overflow:hidden;">
+            <img :src="parcelSelectedUpload ? '/api/uploads/'+parcelSelectedUpload.upload_id+'/file' : ''"
+                 style="max-width:100%;max-height:100%;object-fit:contain;" loading="lazy">
+          </div>
+          <iframe x-show="parcelSelectedUpload && parcelSelectedUpload.mime_type === 'application/pdf'"
+                  :src="parcelSelectedUpload && parcelSelectedUpload.mime_type === 'application/pdf' ? '/api/uploads/'+parcelSelectedUpload.upload_id+'/file' : ''"
+                  style="flex:1;width:100%;height:100%;border:none;"></iframe>
+          <div x-show="parcelSelectedUpload && parcelSelectedUpload.doc_type === 'note'"
+               style="flex:1;padding:1.25rem;overflow-y:auto;">
+            <div style="font-size:11px;color:var(--pn-ink-4);font-family:'IBM Plex Mono',monospace;margin-bottom:.6rem;"
+                 x-text="parcelSelectedUpload ? parcelSelectedUpload.username+' · '+new Date(parcelSelectedUpload.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : ''"></div>
+            <div style="font-size:13px;color:var(--pn-ink);white-space:pre-wrap;line-height:1.6;font-family:'IBM Plex Serif',Georgia,serif;"
+                 x-text="parcelSelectedUpload ? parcelSelectedUpload.note_text : ''"></div>
+          </div>
+        </div>
+
+      </div><!-- /pn-right -->
+
+    </div><!-- /pn-nav -->
+    </div><!-- /parcels tab -->

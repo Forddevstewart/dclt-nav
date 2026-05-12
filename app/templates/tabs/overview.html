@@ -1,0 +1,140 @@
+    <div class="tab-panel" x-show="activeTab==='overview'" style="overflow:hidden;">
+      <div class="ov-page">
+
+        <!-- Hero -->
+        <div class="ov-hero">
+          <div class="ov-hero-eyebrow">Dennis Conservation Land Trust</div>
+          <h1 class="ov-hero-title">DCLT Navigator</h1>
+          <p class="ov-hero-lead">A private research portal that consolidates parcel records from the Town of Dennis, deed documents from the Barnstable Registry of Deeds, geographic data from MassGIS, and information gathered directly by DCLT — bringing it all into one searchable tool for land conservation decision support and exportable analysis.</p>
+        </div>
+
+        <!-- Two-column body -->
+        <div class="ov-layout">
+
+          <div class="ov-main">
+
+            <!-- What's in the portal -->
+            <section>
+              <div class="ov-eyebrow">What's in the portal</div>
+              <h2 class="ov-section-title">Four kinds of information</h2>
+              <p class="ov-section-lead">Every record in DCLT Navigator belongs to one of four categories. Understanding them helps you know where to look and what each piece of data represents.</p>
+              <div class="ov-cards">
+
+                <div class="ov-card">
+                  <div class="ov-badge ov-badge-p">P</div>
+                  <div>
+                    <div class="ov-card-title">Parcels</div>
+                    <p class="ov-card-text">The foundation of everything in this portal. A parcel is a single, legally-defined plot of land identified by the Town of Dennis Assessing Department. Every deed record, GIS overlay, and annotation in the system links back to one or more parcels. Start here when you want to know about a specific piece of land — who owns it, what it's assessed at, whether it carries any restrictions, and whether it's currently on the market.</p>
+                  </div>
+                </div>
+
+                <div class="ov-card">
+                  <div class="ov-badge ov-badge-d">D</div>
+                  <div>
+                    <div class="ov-card-title">Documents</div>
+                    <p class="ov-card-text">Legal instruments recorded with the Barnstable Registry of Deeds: warranty deeds, conservation restrictions, deed restrictions, Chapter 61 agreements, easements, and more. Documents tell the ownership and encumbrance history of land. Where deed scans are available locally, the portal processes them with optical character recognition to automatically score language relevant to conservation — restrictions, Article 97 protections, agricultural preservation, and similar terms.</p>
+                  </div>
+                </div>
+
+                <div class="ov-card">
+                  <div class="ov-badge ov-badge-l">L</div>
+                  <div>
+                    <div class="ov-card-title">Layers</div>
+                    <p class="ov-card-text">Data assembled from external sources and computed from those sources — everything in the portal that isn't a human determination. External layers include MassGIS environmental overlays, Town of Dennis assessor records, deed OCR keyword scores from the Registry, and real estate listings. Derived layers join those sources together: the parcel backbone, GIS presence flags, identity status when assessor and GIS records disagree. Dynamic layers combine external data with staff determinations to produce up-to-date rollups: current development coverage inventory, Article 97 progress across the portfolio. If a value comes from a feed or a calculation, it's a Layer.</p>
+                  </div>
+                </div>
+
+                <div class="ov-card">
+                  <div class="ov-badge ov-badge-t">T</div>
+                  <div>
+                    <div class="ov-card-title">Tags</div>
+                    <p class="ov-card-text">Staff decisions recorded alongside the data. Each tag dimension is a question DCLT needs to answer about parcels or documents: How developed is this parcel? Does this deed restrict land under Article 97? A tag records a staff member's determination — with a full history of who decided what and when. Machine signals from OCR scores and GIS overlays surface candidate records; the tag is the verdict. Tags are always staff-authored: if a value comes from a feed or a calculation, it's a Layer, not a Tag. Combine tag dimensions to build focused shortlists: every underdeveloped parcel, every unconfirmed Article 97 document.</p>
+                  </div>
+                </div>
+
+              </div>
+            </section>
+
+            <!-- How the data gets here -->
+            <section>
+              <div class="ov-eyebrow">How the data gets here</div>
+              <h2 class="ov-section-title">Three steps from source to screen</h2>
+              <p class="ov-section-lead">The information in this portal isn't pulled from a single place. It's assembled in three stages, each building on the last.</p>
+              <div class="ov-steps">
+
+                <div class="ov-step">
+                  <div class="ov-step-num">1</div>
+                  <div class="ov-step-body">
+                    <div class="ov-step-title">Collection</div>
+                    <p class="ov-step-text">Raw data is gathered from external sources: parcel and assessor records from the Town of Dennis, deed documents from the Barnstable Registry of Deeds ALIS system, environmental layers from MassGIS, real estate listings, and other inputs DCLT collects directly. Collection runs on a DCLT workstation and writes files to a shared drive — it never touches the live portal directly.</p>
+                  </div>
+                </div>
+
+                <div class="ov-connector"></div>
+
+                <div class="ov-step">
+                  <div class="ov-step-num">2</div>
+                  <div class="ov-step-body">
+                    <div class="ov-step-title">Processing</div>
+                    <p class="ov-step-text">Collected files are normalized, cross-referenced, and compiled into a single reference database. Registry documents with available scans are processed with OCR and scored for conservation-relevant keywords. Parcel records are joined to GIS overlays, assessor attributes, and listing data. The resulting database is then deployed to the portal server as the read-only foundation the app queries against.</p>
+                  </div>
+                </div>
+
+                <div class="ov-connector"></div>
+
+                <div class="ov-step">
+                  <div class="ov-step-num">3</div>
+                  <div class="ov-step-body">
+                    <div class="ov-step-title">The portal</div>
+                    <p class="ov-step-text">What you're viewing right now. Authenticated users can search and filter parcels and documents, review OCR keyword scores, apply tags to track items of interest, and export filtered results as CSV reports. Staff can also enter information directly — notes, tags, and curated data that supplement the automated sources. The portal is hosted on a private server and access is controlled.</p>
+                  </div>
+                </div>
+
+              </div>
+            </section>
+
+          </div><!-- /ov-main -->
+
+          <!-- Sidebar -->
+          <aside class="ov-sidebar">
+
+            <div class="ov-sb-card" style="border-top:3px solid #2d6a4f;">
+              <div class="ov-sb-title">Access is restricted</div>
+              <p class="ov-sb-text">DCLT Navigator is a private tool for DCLT staff and authorized partners. It is not a public-facing portal.</p>
+              <p class="ov-sb-text" style="margin-top:.55rem;">If you believe you should have access — as a DCLT volunteer, board member, partner organization, or municipal contact — please reach out directly.</p>
+              <a href="mailto:info@dennisconservationlandtrust.org" class="ov-sb-btn ov-sb-btn-green">Contact DCLT →</a>
+              <template x-if="!CURRENT_USER">
+                <div style="margin-top:.85rem;padding-top:.85rem;border-top:1px solid #e2e8f0;">
+                  <p class="ov-sb-text" style="margin-bottom:.35rem;">Already have access?</p>
+                  <a href="/login" class="ov-sb-btn ov-sb-btn-light">Sign in →</a>
+                </div>
+              </template>
+            </div>
+
+            <div class="ov-sb-card">
+              <div class="ov-sb-title">Navigator conversation</div>
+              <p class="ov-sb-text">Background discussion doc for working sessions — covers goals, scope, and open questions.</p>
+              <a href="/docs/navigator-conversation" target="_blank" rel="noopener" class="ov-sb-btn ov-sb-btn-light">Open PDF ↗</a>
+            </div>
+
+            <div class="ov-sb-card">
+              <div class="ov-sb-title">About DCLT</div>
+              <p class="ov-sb-text">The Dennis Conservation Land Trust is a 501(c)(3) nonprofit dedicated to protecting and stewarding natural lands in Dennis, Massachusetts for the benefit of present and future generations.</p>
+              <a href="https://dennisconservationlandtrust.org" target="_blank" rel="noopener"
+                 style="display:inline-block;margin-top:.7rem;font-size:12px;font-weight:600;color:#2d6a4f;text-decoration:none;">
+                dennisconservationlandtrust.org ↗
+              </a>
+            </div>
+
+            <template x-if="CURRENT_USER">
+              <div class="ov-sb-card" style="background:#f0fdf4;border-color:#bbf7d0;">
+                <div style="font-size:12px;font-weight:600;color:#166534;margin-bottom:.3rem;">Signed in as <span x-text="CURRENT_USER.username"></span></div>
+                <p class="ov-sb-text" style="color:#166534;">You have full access to Parcels, Registry, and the rest of the portal.</p>
+              </div>
+            </template>
+
+          </aside>
+
+        </div><!-- /ov-layout -->
+      </div><!-- /ov-page -->
+    </div>

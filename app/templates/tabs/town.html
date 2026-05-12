@@ -1,0 +1,194 @@
+    <div class="tab-panel" x-show="activeTab==='town'" style="overflow:hidden;display:flex;flex-direction:column;">
+
+      <!-- Sub-tab bar -->
+      <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#fff;flex-shrink:0;padding:0 .75rem;">
+        <button class="admin-sec-tab" :class="{active:townSection==='town_doc_links'}" @click="townSection='town_doc_links'">Town Doc Links</button>
+        <button class="admin-sec-tab" :class="{active:townSection==='for_sale'}"       @click="townSection='for_sale'">For Sale</button>
+      </div>
+
+        <!-- ── Town Doc Links ──────────────────────────────────────────────── -->
+        <div class="tab-section" x-show="townSection==='town_doc_links'">
+
+          <!-- Left: doc list -->
+          <div class="col-left">
+            <div class="col-left-controls">
+              <select x-model="townCommitteeFilter" @change="townDocPage=1" class="ctrl-select">
+                <option value="">All committees</option>
+                <template x-for="c in townDocCommittees" :key="c">
+                  <option :value="c" x-text="c.replace(/_/g,' ')"></option>
+                </template>
+              </select>
+              <select x-model="townStatusFilter" @change="loadTownDocs()" class="ctrl-select">
+                <option value="">All with links</option>
+                <option value="candidate">Has candidates</option>
+                <option value="confirmed">Has confirmed</option>
+                <option value="rejected">Has rejected</option>
+              </select>
+            </div>
+            <div class="col-left-footer">
+              <span x-text="filteredTownDocs.length.toLocaleString()+' docs'"></span>
+              <div style="display:flex;gap:.3rem;align-items:center;">
+                <button class="sort-dir-btn" :disabled="townDocPage<=1" @click="townDocPage--">&#8249;</button>
+                <span x-text="townDocPage+'/'+townDocTotalPages"></span>
+                <button class="sort-dir-btn" :disabled="townDocPage>=townDocTotalPages" @click="townDocPage++">&#8250;</button>
+              </div>
+            </div>
+            <div class="col-left-list">
+              <template x-if="townDocListLoading">
+                <div class="loading-msg">Loading…</div>
+              </template>
+              <template x-if="!townDocListLoading && filteredTownDocs.length===0">
+                <div class="empty-state" style="height:100px;">No documents</div>
+              </template>
+              <template x-for="doc in pagedTownDocs" :key="doc.doc_id">
+                <div class="list-row" :class="{selected: selectedTownDocId===doc.doc_id}" @click="selectTownDoc(doc)">
+                  <div class="row-main" x-text="doc.committee.replace(/_/g,' ')"></div>
+                  <div class="row-sub">
+                    <span x-text="doc.doc_type"></span>
+                    <span x-text="doc.meeting_date ? ' · ' + doc.meeting_date : ''"></span>
+                  </div>
+                  <div style="display:flex;gap:.3rem;margin-top:.25rem;flex-wrap:wrap;">
+                    <span x-show="doc.n_candidate>0" style="font-size:10px;padding:.1rem .35rem;border-radius:3px;background:#fef9c3;color:#854d0e;font-weight:600;" x-text="doc.n_candidate+' pending'"></span>
+                    <span x-show="doc.n_confirmed>0" style="font-size:10px;padding:.1rem .35rem;border-radius:3px;background:#dcfce7;color:#166534;font-weight:600;" x-text="doc.n_confirmed+' confirmed'"></span>
+                    <span x-show="doc.n_rejected>0"  style="font-size:10px;padding:.1rem .35rem;border-radius:3px;background:#fee2e2;color:#991b1b;font-weight:600;" x-text="doc.n_rejected+' rejected'"></span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Middle: OCR text → picker → candidates (narrowed) -->
+          <div class="col-mid" style="flex:0 0 560px;border-right:1px solid #e2e8f0;">
+            <div x-show="!selectedTownDocId" class="empty-state" style="height:100%;">Select a document to adjudicate</div>
+            <div x-show="townDetailLoading" class="loading-msg">Loading…</div>
+            <div x-show="selectedTownDocId && !townDetailLoading && townDocDetail" class="col-mid-inner">
+
+                <!-- Doc header -->
+                <div style="margin-bottom:.75rem;">
+                  <div style="font-size:14px;font-weight:700;color:#0f172a;" x-text="townDocDetail && townDocDetail.doc.committee.replace(/_/g,' ')"></div>
+                  <div style="font-size:11px;color:#64748b;margin-top:2px;">
+                    <span x-text="townDocDetail && townDocDetail.doc.doc_type"></span>
+                    <span x-text="townDocDetail && townDocDetail.doc.meeting_date ? ' · ' + townDocDetail.doc.meeting_date : ''"></span>
+                  </div>
+                </div>
+
+                <!-- OCR text -->
+                <div style="margin-bottom:.75rem;border-bottom:1px solid #e2e8f0;padding-bottom:.75rem;">
+                  <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:.3rem;display:flex;justify-content:space-between;align-items:center;text-transform:uppercase;letter-spacing:.05em;">
+                    <span>OCR Text</span>
+                    <button @click="townOcrOpen=!townOcrOpen"
+                      style="font-size:11px;color:#94a3b8;background:none;border:none;cursor:pointer;padding:.1rem .3rem;text-transform:none;"
+                      x-text="townOcrOpen ? 'Hide' : 'Show'"></button>
+                  </div>
+                  <div x-show="townOcrOpen"
+                    style="font-size:11px;line-height:1.6;color:#374151;white-space:pre-wrap;word-break:break-word;max-height:260px;overflow-y:auto;background:#f8fafc;border-radius:4px;padding:.5rem .6rem;border:1px solid #e2e8f0;"
+                    x-text="townDocDetail && townDocDetail.doc.full_text"></div>
+                </div>
+
+                <!-- Parcel picker -->
+                <div style="margin-bottom:.75rem;border-bottom:1px solid #e2e8f0;padding-bottom:.75rem;">
+                  <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.05em;">Add Parcel</div>
+                  <div style="position:relative;">
+                    <input class="search-input" x-model.debounce.150ms="pickerQuery"
+                      placeholder="Address or parcel ID" type="search" autocomplete="off"
+                      style="font-size:12px;" @keydown.escape="pickerQuery=''">
+                    <div x-show="pickerQuery.trim() && pickerSuggestions.length"
+                      style="position:absolute;top:100%;left:0;right:0;z-index:30;background:#fff;border:1px solid #e2e8f0;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.1);max-height:200px;overflow-y:auto;">
+                      <template x-for="p in pickerSuggestions" :key="p.parcel_id">
+                        <div style="padding:.35rem .6rem;cursor:pointer;font-size:11.5px;border-bottom:1px solid #f8fafc;"
+                          @mousedown.prevent="addManualLink(p)">
+                          <div style="font-weight:600;color:#0f172a;" x-text="p.parcel_id"></div>
+                          <div style="color:#64748b;font-size:11px;" x-text="p.site_addr||''"></div>
+                          <div x-show="p.owner_name" style="color:#94a3b8;font-size:10px;" x-text="p.owner_name||''"></div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Candidates list placeholder (actual list rendered via x-if below, outside x-show) -->
+                <div>
+                  <div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em;">Parcel References</div>
+                  <div x-show="visibleTownLinks.length===0"
+                    style="font-size:12px;color:#94a3b8;"
+                    x-text="townDocDetail && townDocDetail.links.length===0 ? 'No candidates detected by OCR.' : 'All links adjudicated for this filter.'"></div>
+                </div>
+
+            </div><!-- /col-mid-inner (no x-for inside) -->
+
+            <!-- Candidates: simple assignment in @click (the only thing that works in
+                 x-if scope); $watch in init() handles the actual work. -->
+            <template x-if="townDocDetail">
+              <div style="padding:0 1.1rem 1rem;"
+                @click="townAdjRequest = ($event.target.closest('button[name]')?.name || '') + ':' + ($event.target.closest('.lk-card')?.querySelector('.lk-pid')?.textContent?.trim() || '')">
+                <template x-for="lk in visibleTownLinks" :key="lk.link_id">
+                  <div :style="lk.status!=='candidate' ? 'opacity:.5' : ''" style="margin-bottom:.35rem;">
+                    <div class="lk-card" style="display:grid;grid-template-columns:1fr auto;align-items:start;gap:.5rem;padding:.45rem .55rem;border-radius:5px;border:1px solid #e2e8f0;background:#fff;">
+                      <div>
+                        <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;margin-bottom:.2rem;">
+                          <span class="lk-pid" style="font-size:11.5px;font-weight:700;color:#0f172a;" x-text="lk.parcel_id"></span>
+                          <span style="font-size:10px;padding:.1rem .3rem;border-radius:3px;"
+                            :style="lk.match_type==='ocr_map_lot'?'background:#dcfce7;color:#166534;':lk.match_type==='ocr_address'?'background:#dbeafe;color:#1d4ed8;':'background:#fef9c3;color:#854d0e;'"
+                            x-text="lk.match_type==='ocr_map_lot'?'Map/Lot':lk.match_type==='ocr_address'?'Address':'Manual'"></span>
+                        </div>
+                        <div style="font-size:11px;color:#374151;" x-text="(allParcels.find(p=>p.parcel_id===lk.parcel_id)||{}).site_addr||''"></div>
+                        <div style="font-size:10px;color:#94a3b8;" x-text="(allParcels.find(p=>p.parcel_id===lk.parcel_id)||{}).owner_name||''"></div>
+                        <div x-show="lk.match_text" style="font-size:10px;color:#94a3b8;margin-top:.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" :title="lk.match_text" x-text="lk.match_text"></div>
+                        <div x-show="lk.confidence" style="display:flex;align-items:center;gap:.35rem;margin-top:.2rem;">
+                          <div style="height:3px;background:#e2e8f0;border-radius:2px;width:80px;">
+                            <div style="height:3px;border-radius:2px;background:#3b82f6;" :style="'width:'+Math.round((lk.confidence||0)*100)+'%'"></div>
+                          </div>
+                          <span style="font-size:10px;color:#94a3b8;" x-text="Math.round((lk.confidence||0)*100)+'%'"></span>
+                        </div>
+                      </div>
+                      <!-- :style works on initial creation; :class does not in this
+                           Alpine 3.14 x-for/x-if context. Use inline style for states. -->
+                      <div style="display:flex;flex-direction:column;gap:.25rem;">
+                        <button type="button" name="confirmed" class="adj-btn"
+                          :style="lk.status==='confirmed' ? 'background:#dcfce7;border-color:#86efac;color:#166534;' : ''"
+                          style="font-size:11px;cursor:pointer;">Confirm</button>
+                        <button type="button" name="rejected" class="adj-btn"
+                          :style="lk.status==='rejected' ? 'background:#fee2e2;border-color:#fca5a5;color:#991b1b;' : ''"
+                          style="font-size:11px;cursor:pointer;">Reject</button>
+                        <button type="button" name="del" class="adj-btn"
+                          x-show="lk.match_type==='user_manual'"
+                          style="font-size:11px;cursor:pointer;color:#dc2626;border-color:#fca5a5;">Remove</button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+
+          </div><!-- /col-mid -->
+
+          <!-- Right: PDF (flex:1 so it fills remaining space) -->
+          <div class="col-right" style="flex:1;width:auto;">
+            <div class="col-right-header">Document View</div>
+            <div class="col-right-body">
+              <div x-show="!selectedTownDocId" class="empty-state">
+                <span class="empty-icon">📄</span><span>Click a document</span>
+              </div>
+              <iframe x-show="selectedTownDocId && townPdfUrl"
+                :src="townPdfUrl || ''"
+                style="flex:1;width:100%;height:100%;border:none;"></iframe>
+              <div x-show="selectedTownDocId && !townPdfUrl && !townDetailLoading"
+                class="empty-state">
+                <span style="color:#94a3b8;font-size:13px;">PDF not available locally</span>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /town_doc_links section -->
+
+        <!-- ── For Sale stub ───────────────────────────────────────────────── -->
+        <div class="tab-section" x-show="townSection==='for_sale'"
+          style="align-items:center;justify-content:center;color:#94a3b8;">
+          <div style="text-align:center;">
+            <div style="font-size:28px;margin-bottom:.5rem;opacity:.5;">$</div>
+            <div style="font-size:14px;font-weight:600;color:#475569;">For Sale Ingestion</div>
+            <div style="font-size:12px;margin-top:.35rem;">Manual for-sale data entry and parcel linkage — coming soon</div>
+          </div>
+        </div>
+
+    </div><!-- /town tab -->

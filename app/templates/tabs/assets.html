@@ -1,0 +1,422 @@
+    <div class="tab-panel" x-show="activeTab==='assets'" style="overflow:hidden;display:flex;flex-direction:column;">
+
+      <!-- ── Assets sub-navigation ──────────────────────────────────────────── -->
+      <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#fff;flex-shrink:0;padding:0 .75rem;">
+        <button class="admin-sec-tab" :class="{active:assetsSubtab==='reference'}" @click="assetsSubtab='reference'">Reference DB</button>
+        <button class="admin-sec-tab" :class="{active:assetsSubtab==='reports'}"   @click="assetsSubtab='reports'; loadReports()">Reports</button>
+      </div>
+
+      <!-- ── Reference DB panel ─────────────────────────────────────────────── -->
+      <div class="overview-page" x-show="assetsSubtab==='reference'">
+
+        <template x-if="overviewLoading">
+          <div class="loading-msg">Loading…</div>
+        </template>
+
+        <template x-if="!overviewLoading && overviewData">
+          <div>
+            <div class="overview-hdr">
+              <h2>DCLT Navigator</h2>
+              <p x-text="overviewData.pipeline.last_run
+                ? 'Reference database last built ' + overviewData.pipeline.last_run.run_at.slice(0,10)
+                : 'Reference database build date unknown'"></p>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;align-items:start;">
+
+              <!-- ── Parcels ────────────────────────────────────────────────── -->
+              <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <div class="overview-section-hdr" style="grid-column:unset;">Parcels</div>
+                <div class="stat-card">
+                  <div class="stat-card-title">Parcels</div>
+                  <div class="stat-primary">
+                    <span class="stat-big" x-text="overviewData.parcels.total.toLocaleString()"></span>
+                    <span class="stat-unit">parcels</span>
+                  </div>
+                  <div>
+                    <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">By property class</div>
+                    <div class="brk-list">
+                      <template x-for="row in overviewData.parcels.by_class" :key="row.property_class">
+                        <div>
+                          <div class="brk-row">
+                            <span class="brk-label" x-text="row.property_class || 'Other'"></span>
+                            <span class="brk-count" x-text="row.n.toLocaleString()"></span>
+                          </div>
+                          <div class="brk-bar-wrap">
+                            <div class="brk-bar" :style="'width:'+Math.min(100,row.n/overviewData.parcels.total*100)+'%'"></div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-card-title">Town Meeting Warrants</div>
+                  <div class="stat-primary">
+                    <span class="stat-big" x-text="overviewData.warrants.total.toLocaleString()"></span>
+                    <span class="stat-unit">articles</span>
+                  </div>
+                  <div class="stat-subs">
+                    <div class="stat-sub">
+                      <span>Year range</span>
+                      <span class="stat-sub-val"
+                        x-text="overviewData.warrants.year_range.min_year + ' – ' + overviewData.warrants.year_range.max_year">
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">By result</div>
+                    <div class="brk-list">
+                      <template x-for="row in overviewData.warrants.by_result" :key="row.result">
+                        <div>
+                          <div class="brk-row">
+                            <span class="brk-label" x-text="row.result"></span>
+                            <span class="brk-count" x-text="row.n.toLocaleString()"></span>
+                          </div>
+                          <div class="brk-bar-wrap">
+                            <div class="brk-bar" :style="'width:'+Math.min(100,row.n/overviewData.warrants.total*100)+'%'"></div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+                <template x-if="townDocsOverview && townDocsOverview.total > 0">
+                  <div class="stat-card">
+                    <div class="stat-card-title">Town Documents</div>
+                    <div class="stat-primary">
+                      <span class="stat-big" x-text="townDocsOverview.total.toLocaleString()"></span>
+                      <span class="stat-unit">documents</span>
+                    </div>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:.4rem;">Agendas, minutes, and packets from 60+ committees. Parcel links are adjudicated in the Town tab.</div>
+                    <div>
+                      <div style="font-size:11px;color:#94a3b8;font-weight:600;margin:.6rem 0 .3rem;">By type</div>
+                      <div class="brk-list">
+                        <template x-for="row in townDocsOverview.by_doc_type.slice(0,6)" :key="row.doc_type">
+                          <div>
+                            <div class="brk-row">
+                              <span class="brk-label" x-text="row.doc_type"></span>
+                              <span class="brk-count" x-text="row.n.toLocaleString()"></span>
+                            </div>
+                            <div class="brk-bar-wrap">
+                              <div class="brk-bar" :style="'width:'+Math.min(100,row.n/townDocsOverview.total*100)+'%'"></div>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <!-- ── Documents ──────────────────────────────────────────────── -->
+              <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <div class="overview-section-hdr" style="grid-column:unset;">Documents</div>
+                <div class="stat-card">
+                  <div class="stat-card-title">Registry of Deeds</div>
+                  <div class="stat-primary">
+                    <span class="stat-big" x-text="overviewData.registry.documents.toLocaleString()"></span>
+                    <span class="stat-unit">documents</span>
+                  </div>
+                  <div class="stat-subs">
+                    <div class="stat-sub">
+                      <span>Local scans</span>
+                      <span class="stat-sub-val"
+                        x-text="overviewData.registry.scan_cached.toLocaleString()
+                          + ' (' + Math.round(overviewData.registry.scan_cached/overviewData.registry.documents*100) + '%)'">
+                      </span>
+                    </div>
+                    <div class="stat-sub">
+                      <span>OCR processed</span>
+                      <span class="stat-sub-val" x-text="overviewData.registry.ocr.toLocaleString()"></span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">By instrument type</div>
+                    <table class="layer-table" style="font-size:11px;">
+                      <thead>
+                        <tr>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Type</td>
+                          <td style="text-align:right;color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Enumerated</td>
+                          <td style="text-align:right;color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Downloaded</td>
+                          <td style="text-align:right;color:#94a3b8;font-weight:600;padding-bottom:.3rem;">OCR'd</td>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="row in overviewData.registry.by_type" :key="row.instrument_type">
+                          <tr>
+                            <td style="color:#475569;" x-text="row.instrument_type || '(blank)'"></td>
+                            <td style="text-align:right;font-weight:600;" x-text="row.enumerated.toLocaleString()"></td>
+                            <td style="text-align:right;" x-text="row.downloaded ? row.downloaded.toLocaleString() : '—'"></td>
+                            <td style="text-align:right;" x-text="row.ocr ? row.ocr.toLocaleString() : '—'"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ── Layers ─────────────────────────────────────────────────── -->
+              <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <div class="overview-section-hdr" style="grid-column:unset;">Layers</div>
+                <div class="stat-card">
+                  <div class="stat-card-title">GIS Overlay</div>
+                  <div class="stat-primary">
+                    <span class="stat-big" x-text="overviewData.gis.total_parcels.toLocaleString()"></span>
+                    <span class="stat-unit">parcels with overlay</span>
+                  </div>
+                  <div>
+                    <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:.4rem;">Layer coverage</div>
+                    <table class="layer-table">
+                      <template x-for="row in overviewData.gis.layer_coverage" :key="row.layer">
+                        <tr>
+                          <td>
+                            <span class="layer-dot" x-show="row.n > 0"></span>
+                            <span x-text="row.layer"></span>
+                          </td>
+                          <td x-text="row.n.toLocaleString()"></td>
+                        </tr>
+                      </template>
+                    </table>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-card-title">Assessor &amp; MassGIS</div>
+                  <div class="stat-subs">
+                    <div class="stat-sub">
+                      <span>Assessor records (incl. condo units)</span>
+                      <span class="stat-sub-val" x-text="overviewData.assessor.records.toLocaleString()"></span>
+                    </div>
+                    <div class="stat-sub">
+                      <span>MassGIS parcel features (raw)</span>
+                      <span class="stat-sub-val" x-text="overviewData.massgis.raw.toLocaleString()"></span>
+                    </div>
+                    <div class="stat-sub">
+                      <span>MassGIS normalized (1 per parcel)</span>
+                      <span class="stat-sub-val" x-text="overviewData.massgis.normalized.toLocaleString()"></span>
+                    </div>
+                    <div class="stat-sub">
+                      <span>GIS data sources</span>
+                      <span class="stat-sub-val" x-text="overviewData.gis.sources"></span>
+                    </div>
+                    <div class="stat-sub">
+                      <span>Land use codes</span>
+                      <span class="stat-sub-val" x-text="overviewData.reference.use_codes"></span>
+                    </div>
+                    <div class="stat-sub">
+                      <span>Attributes registered</span>
+                      <span class="stat-sub-val" x-text="overviewData.reference.layer_attributes"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ── Tags ───────────────────────────────────────────────────── -->
+              <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <div class="overview-section-hdr" style="grid-column:unset;">Tags</div>
+                <div class="stat-card">
+                  <div class="stat-card-title">Tag Dimensions</div>
+                  <template x-if="allTags.length === 0">
+                    <div style="font-size:12px;color:#94a3b8;">No dimensions defined</div>
+                  </template>
+                  <template x-if="allTags.length > 0">
+                    <div style="display:flex;flex-wrap:wrap;gap:.3rem;">
+                      <template x-for="tag in allTags" :key="tag.tag_id">
+                        <span style="display:inline-flex;align-items:center;gap:.25rem;padding:.18rem .55rem;border-radius:12px;font-size:11px;font-weight:500;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;">
+                          <span x-text="tag.name"></span>
+                          <span style="font-size:9px;opacity:.65;" x-text="tag.target_entity==='document'?'doc':tag.target_entity==='parcel'?'parcel':''"></span>
+                        </span>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+            </div><!-- /columns -->
+          </div>
+        </template>
+
+      </div><!-- /reference panel -->
+
+      <!-- ── Reports panel ──────────────────────────────────────────────────── -->
+      <div class="overview-page" x-show="assetsSubtab==='reports'">
+
+        <template x-if="reportsLoading">
+          <div class="loading-msg">Loading reports…</div>
+        </template>
+        <template x-if="!reportsLoading && reportsData">
+          <div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start;">
+
+              <!-- ── Assessor Report ──────────────────────────────────────── -->
+              <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <div class="stat-card"
+                  x-data="{
+                    get minor()    { return reportsData.assessor.gisid_refresh.filter(r=>r.drift_class==='drift-minor'); },
+                    get moderate() { return reportsData.assessor.gisid_refresh.filter(r=>r.drift_class==='drift-moderate'); },
+                    get major()    { return reportsData.assessor.gisid_refresh.filter(r=>r.drift_class==='drift-major'); },
+                    open: 'major'
+                  }">
+                  <div class="stat-card-title">Assessor — GISID Refresh</div>
+                  <p style="font-size:11px;color:#64748b;margin:.25rem 0 .6rem;">
+                    ADB GISID column is stale — MassGIS centroid shifted between dataset
+                    vintages. Parcel identity is unaffected; this is a hygiene update to
+                    BT_Extract. Major drift (≥ 50 ft) may indicate polygon reassignment
+                    and warrants manual review.
+                  </p>
+                  <div style="display:flex;gap:.75rem;margin-bottom:.75rem;">
+                    <template x-for="[cls,label,color] in [['major','Major ≥ 50 ft','#dc2626'],['moderate','Moderate 10–50 ft','#d97706'],['minor','Minor < 10 ft','#16a34a']]" :key="cls">
+                      <div @click="open=cls"
+                        :style="`cursor:pointer;flex:1;padding:.4rem .6rem;border-radius:4px;border:1px solid ${open===cls ? color : '#e2e8f0'};background:${open===cls ? '#fafafa' : 'transparent'};`">
+                        <div :style="`font-size:10px;font-weight:600;color:${color};text-transform:uppercase;`" x-text="label"></div>
+                        <div style="font-size:18px;font-weight:700;color:#0f172a;line-height:1.3;"
+                          x-text="cls==='major'?major.length:cls==='moderate'?moderate.length:minor.length"></div>
+                      </div>
+                    </template>
+                  </div>
+                  <div x-data="{expanded:false}" x-effect="expanded=false">
+                    <table class="layer-table" style="font-size:11px;width:100%;">
+                      <thead>
+                        <tr>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Parcel</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Address</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Stale GIS ID</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Correct loc_id</td>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="r in (expanded ? (open==='major'?major:open==='moderate'?moderate:minor) : (open==='major'?major:open==='moderate'?moderate:minor).slice(0,10))" :key="r.parcel_id">
+                          <tr>
+                            <td style="font-family:monospace;" x-text="r.parcel_id"></td>
+                            <td x-text="r.site_addr||'—'"></td>
+                            <td style="font-family:monospace;color:#dc2626;font-size:10px;" x-text="r.adb_gisid"></td>
+                            <td style="font-family:monospace;color:#16a34a;font-size:10px;" x-text="r.current_loc_id"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                    <template x-if="(open==='major'?major:open==='moderate'?moderate:minor).length > 10">
+                      <button @click="expanded=!expanded"
+                        style="margin-top:.4rem;font-size:11px;color:#3b82f6;background:none;border:none;cursor:pointer;padding:0;"
+                        x-text="expanded ? '▲ Show fewer' : '▼ Show all ' + (open==='major'?major:open==='moderate'?moderate:minor).length.toLocaleString() + ' parcels'">
+                      </button>
+                    </template>
+                  </div>
+                </div>
+
+                <div class="stat-card">
+                  <div class="stat-card-title">Assessor — Identity Campaign Verdicts</div>
+                  <p style="font-size:11px;color:#64748b;margin:.25rem 0 .6rem;">
+                    IdentityResolution campaign decisions where the Assessor has the action.
+                  </p>
+                  <template x-if="reportsData.assessor.identity_verdicts.length === 0">
+                    <div style="font-size:12px;color:#94a3b8;">No verdicts recorded yet.</div>
+                  </template>
+                  <template x-if="reportsData.assessor.identity_verdicts.length > 0">
+                    <table class="layer-table" style="font-size:11px;width:100%;">
+                      <thead>
+                        <tr>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Parcel</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Address</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Owner</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Verdict</td>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="r in reportsData.assessor.identity_verdicts" :key="r.parcel_id">
+                          <tr>
+                            <td style="font-family:monospace;" x-text="r.parcel_id"></td>
+                            <td x-text="r.site_addr||'—'"></td>
+                            <td x-text="r.owner_name||'—'"></td>
+                            <td style="font-weight:600;" x-text="r.verdict"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </template>
+                </div>
+              </div>
+
+              <!-- ── GIS Report ───────────────────────────────────────────── -->
+              <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <div class="stat-card">
+                  <div class="stat-card-title">MassGIS — Corrections</div>
+                  <p style="font-size:11px;color:#64748b;margin:.25rem 0 .6rem;">
+                    Parcels requiring GIS layer corrections:
+                    <strong>absent</strong> = polygon missing from GIS;
+                    <strong>blank-map-par-id</strong> = polygon exists (by loc_id) but map_par_id is empty or misassigned;
+                    <strong>unmatched-polygon</strong> = GIS polygon with no ADB counterpart.
+                  </p>
+                  <template x-if="reportsData.gis.corrections.length === 0">
+                    <div style="font-size:12px;color:#94a3b8;">No corrections needed.</div>
+                  </template>
+                  <template x-if="reportsData.gis.corrections.length > 0">
+                    <table class="layer-table" style="font-size:11px;width:100%;">
+                      <thead>
+                        <tr>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Parcel</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Address</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Status</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">ADB GIS ID</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">GIS map_par_id</td>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="r in reportsData.gis.corrections" :key="(r.parcel_id||'')+(r.adb_gisid||'')">
+                          <tr>
+                            <td style="font-family:monospace;" x-text="r.parcel_id||'—'"></td>
+                            <td x-text="r.site_addr||'—'"></td>
+                            <td>
+                              <span :style="r.status==='absent'?'color:#dc2626;font-weight:600':r.status==='blank-map-par-id'?'color:#d97706;font-weight:600':'color:#7c3aed;font-weight:600'"
+                                x-text="r.status"></span>
+                            </td>
+                            <td style="font-family:monospace;font-size:10px;" x-text="r.adb_gisid||'—'"></td>
+                            <td style="font-family:monospace;" x-text="r.gis_map_par_id||'—'"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </template>
+                </div>
+
+                <div class="stat-card">
+                  <div class="stat-card-title">MassGIS — Identity Campaign Verdicts</div>
+                  <p style="font-size:11px;color:#64748b;margin:.25rem 0 .6rem;">
+                    IdentityResolution campaign decisions where MassGIS has the action.
+                  </p>
+                  <template x-if="reportsData.gis.identity_verdicts.length === 0">
+                    <div style="font-size:12px;color:#94a3b8;">No verdicts recorded yet.</div>
+                  </template>
+                  <template x-if="reportsData.gis.identity_verdicts.length > 0">
+                    <table class="layer-table" style="font-size:11px;width:100%;">
+                      <thead>
+                        <tr>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Parcel</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Address</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Owner</td>
+                          <td style="color:#94a3b8;font-weight:600;padding-bottom:.3rem;">Verdict</td>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="r in reportsData.gis.identity_verdicts" :key="r.parcel_id">
+                          <tr>
+                            <td style="font-family:monospace;" x-text="r.parcel_id"></td>
+                            <td x-text="r.site_addr||'—'"></td>
+                            <td x-text="r.owner_name||'—'"></td>
+                            <td style="font-weight:600;" x-text="r.verdict"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </template>
+                </div>
+              </div>
+
+            </div><!-- /reports grid -->
+          </div>
+        </template>
+
+      </div><!-- /reports panel -->
+
+    </div><!-- /assets tab -->

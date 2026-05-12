@@ -1,0 +1,318 @@
+    <div class="tab-panel three-col" x-show="activeTab==='registry'">
+
+      <!-- Left: document list -->
+      <div class="col-left">
+        <div class="col-left-controls">
+          <input class="search-input" x-model.debounce.300ms="docSearch"
+            placeholder="Grantor, grantee, address, parcel…" type="search" autocomplete="off">
+          <div>
+            <div class="filter-section">Filter by attribute</div>
+            <!-- Instrument type chip (ungrouped) -->
+            <div class="filter-chips">
+              <div class="filter-chip-wrap">
+                <button class="filter-chip layer-attr"
+                  :class="{active: docTypeFilters.length > 0}"
+                  @click.stop="toggleFilterChipPicker('doc:type')"
+                  x-text="docTypeChipLabel()">
+                </button>
+                <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'doc:type'" @click.stop>
+                  <template x-for="t in docTypes" :key="t">
+                    <label class="filter-chip-opt">
+                      <input type="checkbox" :checked="docTypeFilters.includes(t)" @change="toggleDocType(t)">
+                      <span x-text="t"></span>
+                    </label>
+                  </template>
+                  <template x-if="docTypeFilters.length > 0">
+                    <div class="filter-chip-clear" @click="clearDocTypeFilter()">Clear</div>
+                  </template>
+                </div>
+              </div>
+            </div>
+            <!-- Keyword score chips grouped by display_group -->
+            <template x-for="group in docLayerChipGroups" :key="group.display_group">
+              <div>
+                <div class="filter-group-label" x-text="group.display_group"></div>
+                <div class="filter-chips">
+                  <template x-for="chip in group.chips" :key="chip.key">
+                    <div class="filter-chip-wrap">
+                      <button class="filter-chip"
+                        :class="{active: (docLayerFilters[chip.key]||[]).length > 0, 'layer-attr': true}"
+                        @click.stop="toggleFilterChipPicker('dl:' + chip.key)"
+                        x-text="docLayerChipLabel(chip)">
+                      </button>
+                      <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'dl:' + chip.key" @click.stop>
+                        <template x-for="b in ['0%','0–20%','20–40%','40–60%','60–80%','80–100%']" :key="b">
+                          <label class="filter-chip-opt">
+                            <input type="checkbox"
+                              :checked="(docLayerFilters[chip.key]||[]).includes(b)"
+                              @change="toggleDocLayerBucket(chip.key, b)">
+                            <span x-text="b"></span>
+                          </label>
+                        </template>
+                        <template x-if="(docLayerFilters[chip.key]||[]).length > 0">
+                          <div class="filter-chip-clear" @click="clearDocLayerFilter(chip.key)">Clear</div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+          <template x-if="allDocTagOptions.length">
+            <div>
+              <div class="filter-section">Filter by tag</div>
+              <div class="filter-chips">
+                <template x-for="tag in allDocTagOptions" :key="tag.tag_id">
+                  <div class="filter-chip-wrap">
+                    <button class="filter-chip"
+                      :class="{active: docTagFilters[tag.tag_id]?.length > 0, 'user-tag': true}"
+                      @click.stop="toggleFilterChipPicker('dt:' + tag.tag_id)"
+                      x-text="docTagChipLabel(tag)">
+                    </button>
+                    <div class="filter-chip-picker" x-show="filterChipPickerOpen === 'dt:' + tag.tag_id" @click.stop>
+                      <template x-for="s in tag.states_csv.split(',')" :key="s">
+                        <label class="filter-chip-opt">
+                          <input type="checkbox"
+                            :checked="docTagFilters[tag.tag_id]?.includes(s)"
+                            @change="toggleDocTagState(tag.tag_id, s)">
+                          <span x-text="s"></span>
+                        </label>
+                      </template>
+                      <template x-if="docTagFilters[tag.tag_id]?.length > 0">
+                        <div class="filter-chip-clear" @click="clearDocTagFilter(tag.tag_id)">Clear</div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+          <div class="sort-row">
+            <span class="sort-label">Sort</span>
+            <select class="ctrl-select" x-model="docSort">
+              <option value="recorded_date">Date</option>
+              <option value="instrument_type">Type</option>
+              <option value="address">Address</option>
+              <option value="grantor">Grantor</option>
+              <option value="kw_conservation_restriction">↑ CR Score</option>
+              <option value="kw_article_97">↑ A97 Score</option>
+              <option value="kw_deed_restriction">↑ DR Score</option>
+              <option value="kw_perpetual_restriction">↑ PR Score</option>
+            </select>
+            <button class="sort-dir-btn" @click="docSortDir=docSortDir==='asc'?'desc':'asc'"
+              :title="docSortDir==='asc'?'Ascending':'Descending'">
+              <span x-text="docSortDir==='asc'?'↑':'↓'"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="col-left-footer">
+          <span x-text="regFilteredCount.toLocaleString()+' doc'+(regFilteredCount!==1?'s':'')"></span>
+          <a :href="docExportUrl" class="paging-btn" style="text-decoration:none;" download>↓ CSV</a>
+          <div class="paging-btns">
+            <button class="paging-btn" @click="regPage=1"            :disabled="regPage===1">«</button>
+            <button class="paging-btn" @click="regPage--"            :disabled="regPage===1">‹</button>
+            <span   class="paging-page" x-text="regPage+' / '+regTotalPages"></span>
+            <button class="paging-btn" @click="regPage++"            :disabled="regPage>=regTotalPages">›</button>
+            <button class="paging-btn" @click="regPage=regTotalPages" :disabled="regPage>=regTotalPages">»</button>
+          </div>
+        </div>
+
+        <div class="col-left-list">
+          <template x-if="regLoading"><div class="loading-msg">Loading…</div></template>
+          <template x-if="!regLoading && allRegistry.length===0">
+            <div class="empty-state"><span class="empty-icon">📁</span><span>No documents loaded</span></div>
+          </template>
+          <template x-if="!regLoading && allRegistry.length>0">
+            <div>
+              <template x-for="d in pagedRegistry" :key="d.book+'_'+d.page">
+                <div class="list-row"
+                  :class="{selected: docSelectedBP && docSelectedBP.book===d.book && docSelectedBP.page===d.page}"
+                  @click="selectDoc(d)">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span class="badge" :class="instrBadge(d.instrument_type)" style="font-size:10px;padding:.1rem .35rem;" x-text="d.instrument_type||'—'"></span>
+                    <span class="row-id" x-text="d.recorded_date?d.recorded_date.slice(0,10):''"></span>
+                  </div>
+                  <div class="row-main" x-text="d.address||(d.grantor?d.grantor.split(';')[0].trim():'')"></div>
+                  <div class="row-sub" x-text="'Book '+d.book+' / '+d.page+(d.parcel_id?' · '+d.parcel_id:'')"></div>
+                  <div class="row-kws">
+                    <template x-for="kw in docBadges(d)" :key="kw.key">
+                      <span class="kw-badge" :class="kw.cls" x-text="kw.abbr+' '+kw.score"></span>
+                    </template>
+                    <template x-if="d.scan_cached">
+                      <span class="kw-badge" style="background:#f0fdf4;color:#166534;">PDF</span>
+                    </template>
+                  </div>
+                </div>
+              </template>
+              <template x-if="pagedRegistry.length===0">
+                <div class="empty-state" style="height:100px;">No results</div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Middle: document detail + keywords + OCR -->
+      <div class="col-mid">
+        <div class="col-mid-inner">
+
+          <template x-if="!docSelectedBP">
+            <div class="empty-state" style="height:60vh;">
+              <span class="empty-icon">📋</span><span>Select a document</span>
+            </div>
+          </template>
+          <template x-if="docSelectedBP && docDetailLoading">
+            <div class="loading-msg">Loading…</div>
+          </template>
+          <template x-if="docSelectedBP && !docDetailLoading && docDetailError">
+            <div class="empty-state" style="color:#dc2626;">
+              <span class="empty-icon">⚠</span><span x-text="docDetailError"></span>
+            </div>
+          </template>
+
+          <template x-if="docSelectedBP && !docDetailLoading && docDetail">
+            <div>
+              <!-- Header -->
+              <div style="margin-bottom:1rem;">
+                <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+                  <span class="badge" :class="instrBadge(docDetail?.document.instrument_type)" x-text="docDetail?.document.instrument_type||'Document'"></span>
+                  <span style="font-size:15px;font-weight:700;color:#0f172a;"
+                    x-text="'Book '+docDetail?.document.book+', Page '+docDetail?.document.page"></span>
+                </div>
+                <div style="font-size:13px;color:#64748b;margin-top:.3rem;">
+                  <span x-text="docDetail?.document.recorded_date?'Recorded '+docDetail?.document.recorded_date.slice(0,10):''"></span>
+                  <template x-if="docDetail?.document.doc_amount">
+                    <span x-text="' · $'+Number(docDetail?.document.doc_amount.replace(/,/g,'')).toLocaleString()"></span>
+                  </template>
+                  <template x-if="docDetail?.document.parcel_id">
+                    <span x-text="' · Parcel '+docDetail?.document.parcel_id"></span>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Parties -->
+              <div class="section">
+                <div class="section-title">Parties</div>
+                <table class="attr-table">
+                  <tr><td class="attr-label">Grantor</td><td class="attr-value" x-text="docDetail?.document.grantor||'—'"></td></tr>
+                  <tr><td class="attr-label">Grantee</td><td class="attr-value" x-text="docDetail?.document.grantee||'—'"></td></tr>
+                  <tr x-show="docDetail?.document.address"><td class="attr-label">Address</td><td class="attr-value" x-text="docDetail?.document.address"></td></tr>
+                  <tr x-show="docDetail?.document.description"><td class="attr-label">Description</td><td class="attr-value" x-text="docDetail?.document.description"></td></tr>
+                  <tr x-show="docDetail?.document.pages_in_doc"><td class="attr-label">Pages</td><td class="attr-value" x-text="docDetail?.document.pages_in_doc"></td></tr>
+                </table>
+              </div>
+
+              <!-- Keyword Scores + Adjudication -->
+              <template x-if="docDetail?.ocr">
+                <div class="section">
+                  <div class="section-title">Keyword Scores</div>
+                  <div>
+                    <template x-for="kw in KW_ORDER" :key="kw.key">
+                      <div style="margin-bottom:.55rem;">
+                        <div class="kw-score-row">
+                          <span x-text="kw.label" style="color:#475569;"></span>
+                          <div class="kw-bar-track">
+                            <div class="kw-bar-fill"
+                              :class="'kw-'+kw.cls"
+                              :style="'width:'+Math.min(100,(docDetail?.ocr?.['kw_'+kw.key]||0)*100)+'%;background:currentColor;'">
+                            </div>
+                          </div>
+                          <span class="kw-val" x-text="((docDetail?.ocr?.['kw_'+kw.key]||0)).toFixed(3)"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                  <div style="font-size:11px;color:#94a3b8;margin-top:.4rem;"
+                    x-text="'OCR: '+docDetail?.ocr?.page_count+' page'+(docDetail?.ocr?.page_count!==1?'s':'')+' · '+docDetail?.ocr?.pipeline_version">
+                  </div>
+                </div>
+              </template>
+
+              <!-- OCR Text -->
+              <template x-if="docDetail?.ocr && docDetail?.ocr.full_text">
+                <div class="section">
+                  <div class="section-title">OCR Text</div>
+                  <div class="ocr-text" x-text="docDetail?.ocr?.full_text"></div>
+                </div>
+              </template>
+
+              <template x-if="!docDetail?.ocr">
+                <div style="font-size:13px;color:#94a3b8;margin-bottom:1rem;">No OCR data for this document</div>
+              </template>
+
+              <!-- Tags -->
+              <template x-if="CURRENT_USER">
+                <div class="section">
+                  <div class="section-title">Tags</div>
+                  <template x-if="tagsLoading">
+                    <div style="font-size:12px;color:#94a3b8;">Loading…</div>
+                  </template>
+                  <div class="tag-chips">
+                    <template x-for="tag in allDocTagOptions" :key="tag.tag_id">
+                      <div class="tag-chip"
+                        :class="{
+                          applied:  docTagState[tag.tag_id] != null,
+                          pending:  tagPending[tag.tag_id],
+                          'retired-state': docTagState[tag.tag_id] != null && !tag.states_csv.split(',').includes(docTagState[tag.tag_id])
+                        }"
+                        @click.stop="toggleTagPicker('doc', tag.tag_id)">
+                        <span x-text="docTagState[tag.tag_id] != null ? tag.name + ' : ' + docTagState[tag.tag_id] : tag.name"></span>
+                        <div class="tag-dropdown" x-show="tagPickerOpen === 'doc:'+tag.tag_id" @click.stop>
+                          <template x-for="(s, i) in tag.states_csv.split(',')" :key="s">
+                            <div class="tag-dd-item"
+                              :class="{current: docTagState[tag.tag_id]===s, 'default-state': i===0 && docTagState[tag.tag_id]==null}"
+                              @click="applyTag('document', docSelectedBP.book+'/'+docSelectedBP.page, tag.tag_id, s)">
+                              <span x-text="s"></span>
+                            </div>
+                          </template>
+                          <template x-if="docTagState[tag.tag_id] != null">
+                            <div>
+                              <hr class="tag-dd-divider">
+                              <div class="tag-dd-item tag-dd-remove"
+                                @click="applyTag('document', docSelectedBP.book+'/'+docSelectedBP.page, tag.tag_id, null)">
+                                Remove tag
+                              </div>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                    <template x-if="allDocTagOptions.length === 0 && !tagsLoading">
+                      <span style="font-size:12px;color:#94a3b8;">No dimensions defined</span>
+                    </template>
+                  </div>
+                </div>
+              </template>
+
+            </div>
+          </template>
+
+        </div>
+      </div>
+
+      <!-- Right: PDF viewer -->
+      <div class="col-right">
+        <div class="col-right-header">Document View</div>
+        <div class="col-right-body">
+          <template x-if="!docSelectedBP">
+            <div class="empty-state"><span class="empty-icon">📄</span><span>Click a document</span></div>
+          </template>
+          <template x-if="docSelectedBP && !docPdfUrl">
+            <div class="no-scan-panel">
+              <div class="rod-doc-meta" x-text="docDetail ? (docDetail?.document.instrument_type||'Document')+' · Book '+docDetail?.document.book+', Page '+docDetail?.document.page : ''"></div>
+              <div style="font-size:13px;color:#64748b;">No local scan</div>
+              <button class="rod-link"
+                @click="docPdfUrl='/api/documents/'+docSelectedBP.book+'/'+docSelectedBP.page+'/rod'">
+                Read from Registry of Deeds
+              </button>
+            </div>
+          </template>
+          <template x-if="docSelectedBP && docPdfUrl">
+            <iframe :src="docPdfUrl" style="flex:1;width:100%;height:100%;border:none;"></iframe>
+          </template>
+        </div>
+      </div>
+
+    </div><!-- /registry tab -->
