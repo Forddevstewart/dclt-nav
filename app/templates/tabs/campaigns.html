@@ -7,25 +7,24 @@
           <h1 class="ov-hero-title">Campaigns</h1>
           <p class="ov-hero-lead" style="color:#bfdbfe;">Each Campaign drives a single Tag dimension to terminus — the point where no records remain in the work queue. Campaigns are the canonical place for staff to work through determinations.</p>
         </div>
-        <div style="padding:2rem 2.5rem;max-width:860px;display:flex;flex-direction:column;gap:1rem;">
+        <div style="padding:2rem 2.5rem;max-width:900px;display:flex;flex-direction:column;gap:1.25rem;">
           <template x-for="tag in campaignSortedTags" :key="tag.tag_id">
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1.25rem 1.5rem;"
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;"
                  :style="'border-left:4px solid ' + (campaignMeta(tag)?.color || '#94a3b8')">
 
               <!-- Header row -->
-              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;">
+              <div style="padding:1.5rem 1.75rem 1.1rem 2.25rem;display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;">
                 <div>
                   <div style="font-size:15px;font-weight:700;color:#0f172a;" x-text="campaignMeta(tag)?.label || tag.name"></div>
-                  <div style="font-size:12px;color:#64748b;margin-top:2px;" x-text="campaignMeta(tag)?.scope || ('Target: ' + (tag.target_entity || 'any'))"></div>
+                  <div style="font-size:12px;color:#64748b;margin-top:.25rem;" x-text="campaignMeta(tag)?.scope || ('Target: ' + (tag.target_entity || 'any'))"></div>
                 </div>
                 <button @click="launchCampaignWork(tag)"
-                  style="font-size:11px;font-weight:600;padding:.25rem .65rem;border:1px solid;border-radius:4px;cursor:pointer;flex-shrink:0;white-space:nowrap;"
-                  :style="'border-color:' + (campaignMeta(tag)?.color||'#94a3b8') + ';color:' + (campaignMeta(tag)?.color||'#64748b') + ';background:#fff;'">
+                  :style="'font-size:14px;font-weight:600;padding:.6rem 1.4rem;border:none;border-radius:8px;cursor:pointer;flex-shrink:0;white-space:nowrap;color:#fff;line-height:1.5;font-family:inherit;background:' + (campaignMeta(tag)?.color||'#64748b')">
                   Work queue →
                 </button>
               </div>
 
-              <!-- Progress (real data) -->
+              <!-- Progress + stat strip (real data) -->
               <template x-if="campaignProgress && campaignProgress[tag.name]">
                 <div x-data="{
                   get prog()     { return campaignProgress[tag.name]; },
@@ -34,26 +33,28 @@
                   get total()    { return this.prog.total; },
                   get resolved() { return this.total - (this.prog.by_state.find(b => b.state === this.states[0])?.n || 0); },
                   get pct()      { return this.total ? (this.resolved / this.total * 100) : 0; }
-                }" style="margin-top:.85rem;">
-                  <!-- Progress bar -->
-                  <div style="height:5px;border-radius:3px;background:#f1f5f9;overflow:hidden;">
-                    <div :style="'height:100%;width:' + pct.toFixed(1) + '%;background:' + (meta?.color||'#94a3b8') + ';transition:width .4s'"></div>
+                }" style="display:block;width:100%;">
+                  <!-- Progress bar + resolved summary -->
+                  <div style="padding:0 1.75rem .9rem 2.25rem;display:flex;align-items:center;gap:.75rem;">
+                    <div style="flex:1;height:6px;border-radius:3px;background:#f1f5f9;overflow:hidden;">
+                      <div :style="'height:100%;width:' + pct.toFixed(1) + '%;background:' + (meta?.color||'#94a3b8') + ';transition:width .4s'"></div>
+                    </div>
+                    <div style="font-size:12px;color:#64748b;white-space:nowrap;flex-shrink:0;">
+                      <span style="font-weight:700;" :style="'color:' + (meta?.color||'#64748b')" x-text="resolved.toLocaleString()"></span>
+                      <span x-text="' of ' + total.toLocaleString() + ' resolved'"></span>
+                      <span style="color:#94a3b8;" x-text="' (' + pct.toFixed(0) + '%)'"></span>
+                    </div>
                   </div>
-                  <!-- Resolved summary -->
-                  <div style="display:flex;align-items:baseline;gap:.3rem;margin-top:.4rem;">
-                    <span style="font-size:13px;font-weight:700;" :style="'color:' + (meta?.color||'#64748b')" x-text="resolved.toLocaleString()"></span>
-                    <span style="font-size:12px;color:#64748b;" x-text="'of ' + total.toLocaleString() + ' resolved'"></span>
-                    <span style="font-size:11px;color:#94a3b8;margin-left:.25rem;" x-text="'(' + pct.toFixed(0) + '%)'"></span>
-                  </div>
-                  <!-- State breakdown -->
-                  <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.6rem;">
+                  <!-- Stat strip: full card width, edge-to-edge -->
+                  <div :style="'display:grid;grid-template-columns:repeat(' + states.length + ',1fr);border-top:1px solid #d1d5db;'">
                     <template x-for="(s, i) in states" :key="s">
-                      <span style="font-size:11px;padding:.15rem .5rem;border-radius:3px;border:1px solid #e2e8f0;color:#475569;"
-                            :style="i===0 ? 'background:#f1f5f9;' : 'background:#fff;'">
-                        <span x-text="s"></span>
-                        <span style="color:#94a3b8;margin-left:.25rem;"
-                              x-text="(prog.by_state.find(b => b.state === s)?.n || 0).toLocaleString()"></span>
-                      </span>
+                      <div :style="'padding:.75rem .5rem;display:flex;flex-direction:column;align-items:center;' + (i < states.length-1 ? 'border-right:1px solid #d1d5db;' : '') + (i===0 ? 'background:#f1f5f9;' : '')">
+                        <div style="font-size:17px;font-weight:700;line-height:1;"
+                             :style="i===0 ? ('color:' + (meta?.color||'#64748b')) : 'color:#0f172a;'"
+                             x-text="(prog.by_state.find(b => b.state === s)?.n || 0).toLocaleString()"></div>
+                        <div style="font-size:10px;color:#64748b;margin-top:.35rem;letter-spacing:.01em;"
+                             x-text="s"></div>
+                      </div>
                     </template>
                   </div>
                 </div>
@@ -61,11 +62,13 @@
 
               <!-- Loading / no data yet -->
               <template x-if="!campaignProgress || !campaignProgress[tag.name]">
-                <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.85rem;">
+                <div :style="'display:grid;grid-template-columns:repeat(' + tag.states_csv.split(',').length + ',1fr);border-top:1px solid #d1d5db;'">
                   <template x-for="(s, i) in tag.states_csv.split(',')" :key="s">
-                    <span style="font-size:11px;padding:.15rem .45rem;border-radius:3px;border:1px solid #e2e8f0;color:#475569;"
-                          :style="i===0 ? 'background:#f1f5f9;' : 'background:#fff;'"
-                          x-text="s"></span>
+                    <div :style="'padding:.75rem .5rem;display:flex;flex-direction:column;align-items:center;' + (i < tag.states_csv.split(',').length-1 ? 'border-right:1px solid #d1d5db;' : '') + (i===0 ? 'background:#f1f5f9;' : '')">
+                      <div style="font-size:17px;font-weight:700;color:#cbd5e1;line-height:1;">—</div>
+                      <div style="font-size:10px;color:#64748b;margin-top:.35rem;letter-spacing:.01em;"
+                           x-text="s"></div>
+                    </div>
                   </template>
                 </div>
               </template>
