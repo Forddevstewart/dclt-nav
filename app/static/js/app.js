@@ -1,423 +1,3 @@
-    // ── Layer attribute filter chips (read from External/Derived Layer columns) ─
-    // values: available picker options. 1 = boolean "Present"; otherwise exact column values.
-    // attr_id links each chip to layer_attributes for display_group lookup.
-    // col/key is the field name in the API response (may differ from DB col_name).
-    const _PARCEL_LAYER_CHIPS = [
-      {attr_id: 'identity.identity_state',          label: 'Identity State',          col: 'identity_state',            values: ['OK','ADB-only','GIS-only']},
-      {attr_id: 'gis.zone1_type',                   label: 'Zone 1 WHP',              col: 'has_zone1',                 values: [1]},
-      {attr_id: 'gis.zone2_id',                     label: 'Zone 2 WHP',              col: 'has_zone2',                 values: [1]},
-      {attr_id: 'gis.prihab_id',                    label: 'Priority Habitat',        col: 'has_prihab',                values: [1]},
-      {attr_id: 'gis.esthab_id',                    label: 'Est. Habitat',            col: 'has_esthab',                values: [1]},
-      {attr_id: 'gis.natcomm_id',                   label: 'Nat. Community',          col: 'has_natcomm',               values: [1]},
-      {attr_id: 'gis.bm3_ch_id',                    label: 'BioMap3',                 col: 'has_bm3',                   values: [1]},
-      {attr_id: 'gis.os_site_name',                 label: 'Open Space',              col: 'has_openspace',             values: [1]},
-      {attr_id: 'gis.wetlands_code',                label: 'Wetlands',                col: 'has_wetlands',              values: [1]},
-      {attr_id: 'for_sale.for_sale',                label: 'For Sale',                col: 'for_sale',                  values: [1]},
-      {attr_id: 'usc.is_undeveloped_state_code',    label: 'Undeveloped SC',          col: 'is_undeveloped_state_code', values: [1]},
-      {attr_id: 'farming.farming_suitability',      label: 'Farming Suitability',     col: 'farming_suitability',       values: ['Not suitable','Possible','Suitable']},
-      {attr_id: 'acquisition.acquisition_suitability', label: 'Acquisition Suitability', col: 'acquisition_suitability', values: ['Not suitable','Possible','Likely']},
-      {attr_id: null, display_group: 'Coverage',   label: 'Coverage Estimate',       col: 'coverage_estimate',         values: ['Missing values','Out of range','Underdeveloped','Developed']},
-    ];
-
-    const _DOC_LAYER_CHIPS = [
-      {attr_id: 'ocr.kw_conservation_restriction',              label: 'Conservation Restriction', key: 'kw_conservation_restriction'},
-      {attr_id: 'ocr.kw_article_97',                            label: 'Article 97',               key: 'kw_article_97'},
-      {attr_id: 'ocr.kw_deed_restriction',                      label: 'Deed Restriction',         key: 'kw_deed_restriction'},
-      {attr_id: 'ocr.kw_chapter_61',                            label: 'Chapter 61',               key: 'kw_chapter_61'},
-      {attr_id: 'ocr.kw_agricultural_preservation_restriction', label: 'Ag. Pres. Restriction',    key: 'kw_agricultural_preservation_restriction'},
-      {attr_id: 'ocr.kw_perpetual_restriction',                 label: 'Perpetual Restriction',    key: 'kw_perpetual_restriction'},
-      {attr_id: 'ocr.kw_ccr',                                   label: 'CC&R',                     key: 'kw_ccr'},
-    ];
-
-    // ── Keyword metadata (priority order, for detail view score bars) ─────────
-    const KW_ORDER = [
-      { key:'conservation_restriction',             label:'Conservation Restriction', abbr:'CR',  cls:'cr'  },
-      { key:'article_97',                           label:'Article 97',               abbr:'A97', cls:'a97' },
-      { key:'deed_restriction',                     label:'Deed Restriction',         abbr:'DR',  cls:'dr'  },
-      { key:'chapter_61',                           label:'Chapter 61',               abbr:'C61', cls:'c61' },
-      { key:'agricultural_preservation_restriction',label:'Ag. Preservation',         abbr:'APR', cls:'apr' },
-      { key:'perpetual_restriction',                label:'Perpetual Restriction',    abbr:'PR',  cls:'pr'  },
-      { key:'ccr',                                  label:'CC&R',                     abbr:'CCR', cls:'ccr' },
-    ];
-    const KW_THRESHOLD = 0.4;
-
-    // ── Pure helpers (no `this`) ──────────────────────────────────────────────
-    // ── Parcel Navigator helpers ──────────────────────────────────────────────
-
-    function pnDecisionStatus(tag, pd) {
-      if (!pd || !pd.tags) return 'undecided';
-      const info = pd.tags[tag.name];
-      if (info && info.applicable === false) return 'na';
-      const state = info ? info.state : null;
-      const def   = tag.states_csv.split(',')[0];
-      return (state != null && state !== def) ? 'decided' : 'undecided';
-    }
-
-    function pnParcelInfoRows(parcel) {
-      if (!parcel) return [];
-      const f = v => v !== null && v !== undefined && String(v).trim() !== '';
-      const cur = v => f(v) ? String(v) : null;
-      const usd = v => f(v) ? '$' + Number(v).toLocaleString() : null;
-      const ac  = v => f(v) ? Number(v).toFixed(2) + ' ac' : null;
-      return [
-        { k:'Owner',    v:cur(parcel.owner_name),     src:'Assessor' },
-        { k:'Category', v:cur(parcel.owner_category), src:'Assessor' },
-        { k:'Use Code', v:parcel.use_code_norm?(parcel.use_code_norm+(parcel.use_code_desc?' — '+parcel.use_code_desc:'')):null, src:'Assessor' },
-        { k:'Zone',     v:cur(parcel.zonedesc),        src:'Assessor' },
-        { k:'Village',  v:cur(parcel.village),         src:'Assessor' },
-        { k:'Acres',    v:ac(parcel.billingacres),     src:'Assessor', mono:true },
-        { k:'Value',    v:usd(parcel.totalapprvalue),  src:'Assessor', mono:true },
-      ].filter(r=>r.v!==null);
-    }
-
-    function pnIdentityRows(parcel) {
-      if (!parcel) return [];
-      const f = v => v !== null && v !== undefined && String(v).trim() !== '';
-      const cur = v => f(v) ? String(v) : null;
-      const gs = parcel.parcel_gisid_status;
-      const ms = parcel.parcel_massgis_status;
-      return [
-        { k:'Identity State',    v:cur(parcel.identity_state),   src:'GIS / ADB' },
-        { k:'Parcel Class',      v:(parcel.parcel_class && parcel.parcel_class !== 'standard') ? cur(parcel.parcel_class) : null, src:'Derived' },
-        { k:'GIS ID Status',     v:(gs && gs !== 'matches') ? cur(gs) : null, src:'Derived' },
-        { k:'MassGIS Status',    v:(ms && ms !== 'ok')      ? cur(ms) : null, src:'Derived' },
-        { k:'ADB GIS ID',        v:(parcel.parcel_adb_gisid && parcel.parcel_adb_gisid !== '') ? cur(parcel.parcel_adb_gisid) : null, src:'Assessor', mono:true },
-        { k:'Deed Ref.',         v:(parcel.booklast&&parcel.pagelast)?'Bk '+parcel.booklast+' Pg '+parcel.pagelast:null, src:'Assessor', mono:true },
-        { k:'Public',            v:parcel.is_public?'Yes':(parcel.is_public===0?'No':null), src:'Assessor' },
-        { k:'Condo Units',       v:(parcel.condo_units>0)?String(parcel.condo_units):null, src:'Assessor' },
-      ].filter(r=>r.v!==null);
-    }
-
-    function pnConservationRows(parcel, gis) {
-      if (!parcel) return [];
-      const f = v => v !== null && v !== undefined && String(v).trim() !== '';
-      const ac = v => f(v) ? Number(v).toFixed(2)+' ac' : null;
-      return [
-        { k:'Open Space',       v:ac(parcel.os_acres),        src:'MassGIS', mono:true },
-        { k:'BioMap Core',      v:ac(parcel.bm3_core_acres),  src:'MassGIS', mono:true },
-        { k:'BioMap CNL',       v:ac(parcel.bm3_cnl_acres),   src:'MassGIS', mono:true },
-        { k:'BioMap Wetland',   v:ac(parcel.bm3_local_acres), src:'MassGIS', mono:true },
-        { k:'Zone 2 WHP',       v:ac(parcel.zone2_acres),     src:'MassDEP', mono:true },
-        { k:'Zone 1 WHP',       v:(gis&&f(gis.zone1_type))?gis.zone1_type:null, src:'MassDEP' },
-        { k:'Priority Habitat', v:parcel.phrs_present!=null?(parcel.phrs_present?'Present':'Not detected'):null, src:'NHESP' },
-        { k:'Vernal Pool',      v:parcel.vp_present!=null?(parcel.vp_present?'Present':'Not detected'):null,     src:'NHESP' },
-        { k:'Wetlands',         v:(gis&&f(gis.wetlands_code))?gis.wetlands_code:null, src:'MassDEP' },
-        { k:'Natural Community',v:(gis&&f(gis.natcomm_name))?gis.natcomm_name:null,   src:'NHESP' },
-      ].filter(r=>r.v!==null);
-    }
-
-    function pnSuitabilityRows(parcel) {
-      if (!parcel) return [];
-      const f = v => v !== null && v !== undefined && String(v).trim() !== '';
-      const cur = v => f(v) ? String(v) : null;
-      const pct = v => v!=null ? (v*100).toFixed(1)+'%' : null;
-      return [
-        { k:'Coverage Estimate',   v:cur(parcel.coverage_estimate),       src:'Derived' },
-        { k:'Coverage Ratio',      v:pct(parcel.coverage_ratio),          src:'Derived', mono:true },
-        { k:'Farming Suitability', v:cur(parcel.farming_suitability),     src:'NRCS SSURGO' },
-        { k:'Acq. Suitability',    v:cur(parcel.acquisition_suitability), src:'Scoring' },
-        { k:'Undeveloped SC',      v:parcel.is_undeveloped_state_code?'Yes':null, src:'Assessor' },
-      ].filter(r=>r.v!==null);
-    }
-
-    function pnAttrGroups(parcel, gis) {
-      if (!parcel) return [];
-      const f   = v => v !== null && v !== undefined && String(v).trim() !== '';
-      const cur = v => f(v) ? String(v) : null;
-      const usd = v => f(v) ? '$' + Number(v).toLocaleString() : null;
-      const ac  = v => f(v) ? Number(v).toFixed(2) + ' ac' : null;
-      const pct = v => v != null ? (v * 100).toFixed(1) + '%' : null;
-      const groups = [
-        { id:'identity', title:'Identity', rows: (() => {
-          const gs = parcel.parcel_gisid_status;
-          const ms = parcel.parcel_massgis_status;
-          return [
-            { k:'Owner',          v:cur(parcel.owner_name),     src:'Assessor' },
-            { k:'Owner Category', v:cur(parcel.owner_category), src:'Assessor' },
-            { k:'Village',        v:cur(parcel.village),        src:'Assessor' },
-            { k:'Zone',           v:cur(parcel.zonedesc),       src:'Assessor' },
-            { k:'Use Code',       v:parcel.use_code_norm?(parcel.use_code_norm+(parcel.use_code_desc?' — '+parcel.use_code_desc:'')):null, src:'Assessor' },
-            { k:'Identity State', v:cur(parcel.identity_state), src:'GIS / ADB' },
-            { k:'Parcel Class',   v:(parcel.parcel_class && parcel.parcel_class !== 'standard') ? cur(parcel.parcel_class) : null, src:'Derived' },
-            { k:'GIS ID Status',  v:(gs && gs !== 'matches') ? cur(gs) : null, src:'Derived' },
-            { k:'MassGIS Status', v:(ms && ms !== 'ok')      ? cur(ms) : null, src:'Derived' },
-            { k:'ADB GIS ID',     v:(parcel.parcel_adb_gisid && parcel.parcel_adb_gisid !== '') ? cur(parcel.parcel_adb_gisid) : null, src:'Assessor', mono:true },
-          ].filter(r=>r.v!==null);
-        })() },
-        { id:'valuation', title:'Valuation', rows: [
-          { k:'Appraised Value', v:usd(parcel.totalapprvalue), src:'Assessor', mono:true },
-          { k:'Billing Acres',   v:ac(parcel.billingacres),    src:'Assessor', mono:true },
-          { k:'Property Class',  v:cur(parcel.property_class), src:'Assessor' },
-          { k:'Condo Units',     v:(parcel.condo_units>0)?String(parcel.condo_units):null, src:'Assessor' },
-        ].filter(r=>r.v!==null) },
-        { id:'conservation', title:'Conservation', rows: [
-          { k:'Open Space',      v:ac(parcel.os_acres),        src:'MassGIS', mono:true },
-          { k:'BioMap Core',     v:ac(parcel.bm3_core_acres),  src:'MassGIS', mono:true },
-          { k:'BioMap CNL',      v:ac(parcel.bm3_cnl_acres),   src:'MassGIS', mono:true },
-          { k:'BioMap Wetland',  v:ac(parcel.bm3_local_acres), src:'MassGIS', mono:true },
-          { k:'Zone 2 WHP',      v:ac(parcel.zone2_acres),     src:'MassGIS', mono:true },
-          { k:'Priority Habitat',v:parcel.phrs_present!=null?(parcel.phrs_present?'Present':'Not detected'):null, src:'NHESP' },
-          { k:'Vernal Pool',     v:parcel.vp_present!=null?(parcel.vp_present?'Present':'Not detected'):null,     src:'NHESP' },
-          { k:'Wetlands',        v:(gis&&f(gis.wetlands_code))?gis.wetlands_code:null, src:'MassDEP' },
-        ].filter(r=>r.v!==null) },
-        { id:'suitability', title:'Suitability', rows: [
-          { k:'Coverage Estimate',  v:cur(parcel.coverage_estimate),       src:'Derived' },
-          { k:'Coverage Ratio',     v:pct(parcel.coverage_ratio),          src:'Derived', mono:true },
-          { k:'Farming Suitability',v:cur(parcel.farming_suitability),     src:'NRCS SSURGO' },
-          { k:'Acq. Suitability',   v:cur(parcel.acquisition_suitability), src:'Scoring' },
-        ].filter(r=>r.v!==null) },
-      ];
-      return groups.filter(g=>g.rows.length>0);
-    }
-
-    function pnTagDots(p) {
-      return [
-        { t:'Coverage',    on:p.coverage_estimate&&!['Missing values','Developed',null].includes(p.coverage_estimate), attn:false },
-        { t:'Identity',    on:false, attn:p.identity_state&&p.identity_state!=='OK' },
-        { t:'Farming',     on:p.farming_suitability&&p.farming_suitability!=='Not suitable', attn:false },
-        { t:'Acquisition', on:['Possible','Likely'].includes(p.acquisition_suitability), attn:false },
-      ];
-    }
-
-    function coverageEstimate(p) {
-      if (!p || p.coverage_status == null) return null;
-      if (p.coverage_status === 'no_acreage' || p.coverage_status === 'no_structure') return 'Missing values';
-      if (p.coverage_ratio != null && p.coverage_ratio > 0.9) return 'Out of range';
-      if (p.coverage_ratio != null && p.coverage_ratio < 0.1) return 'Underdeveloped';
-      return 'Developed';
-    }
-
-    function parcelAttrs(p) {
-      const cur  = v => (v !== null && v !== undefined && v !== '') ? v : null;
-      const usd  = v => v ? '$' + Number(v).toLocaleString() : null;
-      const ac   = v => v ? Number(v).toFixed(2) + ' ac' : null;
-      const covPct = p.coverage_ratio != null ? (p.coverage_ratio * 100).toFixed(1) + '%' : null;
-      return [
-        ['Owner',          cur(p.owner_name)],
-        ['Owner Category', cur(p.owner_category)],
-        ['Village',        cur(p.village)],
-        ['Use Code',       p.use_code_norm ? p.use_code_norm + (p.use_code_desc ? ' — ' + p.use_code_desc : '') : null],
-        ['Zone',           cur(p.zonedesc)],
-        ['IdentityState',  (p.identity_state && p.identity_state !== 'OK') ? p.identity_state : null],
-        ['Appraised Value',usd(p.totalapprvalue)],
-        ['Billing Acres',  ac(p.billingacres)],
-        ['CoverageEstimate', coverageEstimate(p)],
-        ['Coverage',         covPct],
-        ['Farming Suitability',     (p.farming_suitability     && p.farming_suitability     !== 'Not suitable') ? p.farming_suitability     : null],
-        ['Acq. Suitability',        (p.acquisition_suitability && p.acquisition_suitability !== 'Not suitable') ? p.acquisition_suitability : null],
-        ['Condo Units',        (p.condo_units > 0) ? p.condo_units : null],
-      ].filter(([,v]) => v !== null);
-    }
-
-    function conservationLayers(p) {
-      if (!p || p.acquisition_suitability == null) return null;
-      const ac   = v => v != null ? Number(v).toFixed(2) + ' ac' : '—';
-      const pres = v => v == null  ? '—' : v ? 'Present' : 'Not detected';
-      return [
-        ['Protected Open Space', ac(p.os_acres)],
-        ['BioMap Core Habitat',  ac(p.bm3_core_acres)],
-        ['BioMap CNL',           ac(p.bm3_cnl_acres)],
-        ['BioMap Local',         ac(p.bm3_local_acres)],
-        ['Priority Habitat',     pres(p.phrs_present)],
-        ['Zone II WHP',          ac(p.zone2_acres)],
-        ['Vernal Pool',          pres(p.vp_present)],
-      ];
-    }
-
-    function parcelTagStates(tag, parcel) {
-      if (tag.name === 'IdentityResolution' && parcel) {
-        const is = parcel.identity_state;
-        if (is === 'GIS-only') return ['Unconfirmed', 'ADB Add', 'GIS Remove'];
-        if (is === 'ADB-only') return ['Unconfirmed', 'GIS Add', 'ADB Remove'];
-      }
-      return tag.states_csv.split(',');
-    }
-
-    function gisGroups(gis, soil) {
-      if (!gis) return [];
-      const f  = v => v !== null && v !== undefined && v !== '';
-      const ac = v => (v != null && v !== '') ? Number(v).toFixed(2) + ' ac' : null;
-      const farmland = [];
-      if (soil) {
-        if (soil.prime)     farmland.push(['Prime Farmland',             'Yes']);
-        if (soil.statewide) farmland.push(['Farmland of Statewide Imp.','Yes']);
-        if (soil.unique)    farmland.push(['Farmland of Unique Imp.',   'Yes']);
-        if (soil.not_prime) farmland.push(['Not Prime Farmland',        'Yes']);
-      }
-      return [
-        { key:'zone1',   label:'Zone 1 WHP',              present:f(gis.zone1_type),    fields:[['Type',gis.zone1_type],['Site',gis.zone1_site],['Supplier',gis.zone1_supplier],['Buffer ft',gis.zone1_ft],['PWS ID',gis.zone1_pws_id]] },
-        { key:'zone2',   label:'Zone 2 WHP',              present:f(gis.zone2_id),       fields:[['ID',gis.zone2_id],['Supplier',gis.zone2_supplier],['Acres',ac(gis.zone2_acres)],['PWS ID',gis.zone2_pws_id]] },
-        { key:'prihab',  label:'Priority Habitat',        present:f(gis.prihab_id),     fields:[['ID',gis.prihab_id],['Version',gis.prihab_version]] },
-        { key:'esthab',  label:'Est. Habitat',            present:f(gis.esthab_id),     fields:[['ID',gis.esthab_id],['Version',gis.esthab_version]] },
-        { key:'natcomm', label:'Nat. Community',          present:f(gis.natcomm_id),    fields:[['Name',gis.natcomm_name],['Rank',gis.natcomm_rank],['Community',gis.natcomm_community],['Description',gis.natcomm_description]] },
-        { key:'bm3vp',   label:'BioMap3 VP',              present:f(gis.bm3_vp_id),    fields:[['ID',gis.bm3_vp_id],['Acres',ac(gis.bm3_vp_acres)]] },
-        { key:'bm3wc',   label:'BioMap3 Wetland',         present:f(gis.bm3_wc_id),    fields:[['ID',gis.bm3_wc_id],['Acres',ac(gis.bm3_wc_acres)],['Integrity',gis.bm3_wc_integrity],['Resilience',gis.bm3_wc_resilience]] },
-        { key:'bm3ch',   label:'BioMap3 Core',            present:f(gis.bm3_ch_id),    fields:[['ID',gis.bm3_ch_id],['Acres',ac(gis.bm3_ch_acres)],['Town Acres',ac(gis.bm3_ch_town_acres)]] },
-        { key:'bm3cnl',  label:'BioMap3 CNL',             present:f(gis.bm3_cnl_id),   fields:[['ID',gis.bm3_cnl_id],['Acres',ac(gis.bm3_cnl_acres)],['Town Acres',ac(gis.bm3_cnl_town_acres)]] },
-        { key:'os',      label:'Open Space',              present:f(gis.os_site_name),  fields:[['Site',gis.os_site_name],['Alt Name',gis.os_alt_name],['Owner',gis.os_owner],['Type',gis.os_type],['Purpose',gis.os_purpose],['Access',gis.os_public_access],['Protection',gis.os_protection_level],['Acres',ac(gis.os_acres)],['Manager',gis.os_manager],['Comments',gis.os_comments]] },
-        { key:'wetlands',label:'Wetlands',                present:f(gis.wetlands_code), fields:[['Code',gis.wetlands_code],['Description',gis.wetlands_val_desc],['Poly Code',gis.wetlands_poly_code],['Acres',ac(gis.wetlands_acres)]] },
-        { key:'struct',  label:'Structures',              present:(gis.struct_count||0)>0, fields:[['Count',gis.struct_count],['Total Sq Ft',gis.struct_total_sqft?Number(gis.struct_total_sqft).toLocaleString():null],['Has Archived',gis.struct_has_archived?'Yes':'No']] },
-        { key:'soil',    label:'Soil',                    present:f(gis.soil_name),     fields:[['Name',gis.soil_name],['Component',gis.soil_component],['Drainage',gis.soil_drainage_class],['Farmland Class',gis.soil_farmland_class],['Hydric Rating',gis.soil_hydric_rating],['Hydro Group',gis.soil_hydro_group],['Slope',gis.soil_slope],['Depth to WTbl',gis.soil_depth_to_water_table],['Flooding',gis.soil_flooding],['Ponding',gis.soil_ponding],['Septic',gis.soil_septic],...farmland] },
-      ];
-    }
-
-    function gisGroupsSorted(gis, soil) {
-      return gisGroups(gis, soil).slice().sort((a, b) => a.label.localeCompare(b.label));
-    }
-
-    // ── Parcel map (Leaflet, managed outside Alpine reactivity) ──────────────
-    const _WMS = 'https://gis-prod.digital.mass.gov/geoserver/wms';
-
-    // Maps parcels_gis column key → WMS config. Only layers with a WMS equivalent.
-    const _GIS_WMS = {
-      zone1_type:   { label: 'Zone 1 WHP',              wmsLayer: 'massgis:GISDATA.ZONE1_POLY_DISSOLVE' },
-      zone2_id:     { label: 'Zone 2 WHP',              wmsLayer: 'massgis:GISDATA.ZONE2_POLY_DISSOLVE' },
-      prihab_id:    { label: 'Priority Habitat',         wmsLayer: 'massgis:GISDATA.PRIHAB_POLY' },
-      esthab_id:    { label: 'Estimated Habitat',        wmsLayer: 'massgis:GISDATA.ESTHAB_POLY' },
-      natcomm_id:   { label: 'Natural Community',        wmsLayer: 'massgis:GISDATA.NATCOMM_POLY' },
-      bm3_vp_id:    { label: 'BioMap3 Vernal Pool',      wmsLayer: 'massgis:GISDATA.BM3_CH_VERNAL_POOLS_CORE' },
-      bm3_wc_id:    { label: 'BioMap3 Wetland Corridor', wmsLayer: 'massgis:GISDATA.BM3_LOCAL_WETLANDS' },
-      bm3_ch_id:    { label: 'BioMap3 Core Habitat',     wmsLayer: 'massgis:GISDATA.BM3_CORE_HABITAT' },
-      bm3_cnl_id:   { label: 'BioMap3 CNL',              wmsLayer: 'massgis:GISDATA.BM3_CRITICAL_NATURAL_LANDSCAPE' },
-      os_site_name: { label: 'Open Space',               wmsLayer: 'massgis:GISDATA.OPENSPACE_POLY' },
-      wetlands_code:{ label: 'Wetlands',                 wmsLayer: 'massgis:GISDATA.WETLANDSDEP_POLY',
-                      styles: 'GISDATA.WETLANDSDEP_POLY::General_Categories_Max_24000' },
-    };
-
-    let _lmap        = null;
-    let _lLayer      = null;
-    let _lWmsControl = null;
-    let _lWmsLayers  = {};
-
-    function _initParcelMap() {
-      if (_lmap) return;
-      _lmap = L.map('parcel-map', { zoomControl: true });
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 20,
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      }).addTo(_lmap);
-      new ResizeObserver(() => _lmap.invalidateSize()).observe(document.getElementById('parcel-map'));
-    }
-
-    function _clearWmsLayers() {
-      Object.values(_lWmsLayers).forEach(l => _lmap.removeLayer(l));
-      _lWmsLayers = {};
-      if (_lWmsControl) { _lWmsControl.remove(); _lWmsControl = null; }
-    }
-
-    async function _updateParcelMap(parcelId, centroidLat, centroidLon, gis) {
-      _initParcelMap();
-      // Wait for the browser to finish layout before measuring the container,
-      // so invalidateSize() sees the real dimensions before fitBounds() runs.
-      await new Promise(r => requestAnimationFrame(r));
-      _lmap.invalidateSize();
-
-      if (_lLayer) { _lmap.removeLayer(_lLayer); _lLayer = null; }
-      _clearWmsLayers();
-
-      // parcel polygon
-      try {
-        const resp = await fetch('/api/parcels/' + encodeURIComponent(parcelId) + '/geometry');
-        if (resp.ok) {
-          const feature = await resp.json();
-          _lLayer = L.geoJSON(feature, {
-            style: { color: '#2563eb', weight: 2, fillColor: '#3b82f6', fillOpacity: 0.2 },
-          }).addTo(_lmap);
-          _lmap.fitBounds(_lLayer.getBounds(), { maxZoom: 18, padding: [20, 20] });
-        }
-      } catch(_) {}
-
-      // fallback: centroid pin
-      if (!_lLayer && centroidLat && centroidLon) {
-        _lLayer = L.marker([centroidLat, centroidLon]).addTo(_lmap);
-        _lmap.setView([centroidLat, centroidLon], 17);
-      }
-
-      // no location at all — reset to Dennis town view
-      if (!_lLayer) {
-        _lmap.setView([41.7352, -70.1939], 13);
-      }
-
-      // WMS layers present on this parcel, listed but unchecked
-      const overlays = {};
-      for (const [key, cfg] of Object.entries(_GIS_WMS)) {
-        const val = gis && gis[key];
-        if (val === null || val === undefined || val === '' || val === 0) continue;
-        const opts = {
-          layers: cfg.wmsLayer, format: 'image/png',
-          transparent: true, version: '1.1.1', attribution: 'MassGIS',
-        };
-        if (cfg.styles) opts.styles = cfg.styles;
-        const layer = L.tileLayer.wms(_WMS, opts);
-        _lWmsLayers[key] = layer;
-        overlays[cfg.label] = layer;
-      }
-      if (Object.keys(overlays).length > 0) {
-        _lWmsControl = L.control.layers(null, overlays, { collapsed: false }).addTo(_lmap);
-      }
-    }
-
-    // ── Campaign work-queue map (separate Leaflet instance from parcel map) ──────
-    let _cmap        = null;
-    let _cLayer      = null;
-    let _cWmsControl = null;
-    let _cWmsLayers  = {};
-
-    function _initCampaignMap() {
-      if (_cmap) return;
-      _cmap = L.map('campaign-map', { zoomControl: true });
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 20,
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      }).addTo(_cmap);
-      new ResizeObserver(() => _cmap && _cmap.invalidateSize()).observe(
-        document.getElementById('campaign-map')
-      );
-    }
-
-    function _clearCwWmsLayers() {
-      Object.values(_cWmsLayers).forEach(l => _cmap.removeLayer(l));
-      _cWmsLayers = {};
-      if (_cWmsControl) { _cWmsControl.remove(); _cWmsControl = null; }
-    }
-
-    async function _updateCampaignMap(parcelId, centroidLat, centroidLon, gis) {
-      _initCampaignMap();
-      await new Promise(r => requestAnimationFrame(r));
-      _cmap.invalidateSize();
-      if (_cLayer) { _cmap.removeLayer(_cLayer); _cLayer = null; }
-      _clearCwWmsLayers();
-      try {
-        const resp = await fetch('/api/parcels/' + encodeURIComponent(parcelId) + '/geometry');
-        if (resp.ok) {
-          const feature = await resp.json();
-          _cLayer = L.geoJSON(feature, {
-            style: { color: '#2563eb', weight: 2, fillColor: '#3b82f6', fillOpacity: 0.2 },
-          }).addTo(_cmap);
-          _cmap.fitBounds(_cLayer.getBounds(), { maxZoom: 18, padding: [20, 20] });
-        }
-      } catch(_) {}
-      if (!_cLayer && centroidLat && centroidLon) {
-        _cLayer = L.marker([centroidLat, centroidLon]).addTo(_cmap);
-        _cmap.setView([centroidLat, centroidLon], 17);
-      }
-      if (!_cLayer) { _cmap.setView([41.7352, -70.1939], 13); }
-      // WMS overlays for GIS layers present on this parcel
-      const overlays = {};
-      for (const [key, cfg] of Object.entries(_GIS_WMS)) {
-        const val = gis && gis[key];
-        if (val === null || val === undefined || val === '' || val === 0) continue;
-        const opts = { layers: cfg.wmsLayer, format: 'image/png', transparent: true, version: '1.1.1', attribution: 'MassGIS' };
-        if (cfg.styles) opts.styles = cfg.styles;
-        const layer = L.tileLayer.wms(_WMS, opts);
-        _cWmsLayers[key] = layer;
-        overlays[cfg.label] = layer;
-      }
-      if (Object.keys(overlays).length > 0) {
-        _cWmsControl = L.control.layers(null, overlays, { collapsed: false }).addTo(_cmap);
-      }
-    }
-
     // ── Alpine component ──────────────────────────────────────────────────────
     function app() {
       return {
@@ -513,8 +93,6 @@
         docDetailLoading:  false,
         docDetailError:    null,
         docPdfUrl:         null,
-
-
 
         // admin — users
         adminUsers:        [],
@@ -632,12 +210,10 @@
         // ── Computed — parcels ──────────────────────────────────────────────
         get filteredParcels() {
           let list = this.allParcels;
-          // Layer attribute filters: col → [selectedValues]
           for (const [col, selected] of Object.entries(this.parcelLayerFilters)) {
             if (!selected || !selected.length) continue;
             list = list.filter(p => selected.some(s => s === 1 ? p[col] : p[col] === s));
           }
-          // Tag state filters: tagId → [selectedStates]
           for (const [tagId, states] of Object.entries(this.parcelTagFilters)) {
             if (!states || !states.length) continue;
             const foldMap = this.parcelTagFoldMaps[tagId] || {};
@@ -674,7 +250,6 @@
           let list = this.cwQueue;
           if (this.cwFilter === 'adb_only')  list = list.filter(p => p.identity_state === 'ADB-only');
           if (this.cwFilter === 'gis_only')  list = list.filter(p => p.identity_state === 'GIS-only');
-          // 'mismatch' filter reserved for future name-mismatch state; shows all for now
           const q = this.cwFilterQuery.trim().toLowerCase();
           if (q) list = list.filter(p =>
             (p.parcel_id  ||'').toLowerCase().includes(q) ||
@@ -702,7 +277,6 @@
             (d.book+'').includes(q) ||
             (d.page+'').includes(q));
           if (this.docTypeFilters.length) list = list.filter(d=>this.docTypeFilters.includes(d.instrument_type||''));
-          // Layer attribute filters: key → [selected buckets]
           for (const [key, buckets] of Object.entries(this.docLayerFilters)) {
             if (!buckets || !buckets.length) continue;
             list = list.filter(d => {
@@ -711,7 +285,6 @@
               return buckets.includes(b);
             });
           }
-          // Tag state filters: tagId → [selectedStates]
           for (const [tagId, states] of Object.entries(this.docTagFilters)) {
             if (!states || !states.length) continue;
             const foldMap = this.docTagFoldMaps[tagId] || {};
@@ -757,9 +330,6 @@
         get visibleTownLinks() {
           if (!this.townDocDetail) return [];
           const order = {candidate: 0, confirmed: 1, rejected: 2};
-          // Show all links sorted: pending first, then adjudicated (dimmed in UI).
-          // townStatusFilter controls which *docs* appear in the left list, not which
-          // links show here — items must stay visible so buttons can remain highlighted.
           return [...this.townDocDetail.links].sort((a, b) => (order[a.status]??0) - (order[b.status]??0));
         },
         get pickerSuggestions() {
@@ -794,20 +364,17 @@
 
         // ── Init ────────────────────────────────────────────────────────────
         async init() {
-          this.$watch('parcelSearch',        ()=>{ this.parcelPage=1; });
+          this.$watch('parcelSearch',    ()=>{ this.parcelPage=1; });
           this.$watch('parcelSort',      ()=>{ this.parcelPage=1; });
           this.$watch('parcelSortDir',   ()=>{ this.parcelPage=1; });
-          this.$watch('docSearch',   ()=>{ this.regPage=1; });
-          this.$watch('docSort',     ()=>{ this.regPage=1; });
+          this.$watch('docSearch',       ()=>{ this.regPage=1; });
+          this.$watch('docSort',         ()=>{ this.regPage=1; });
           this.$watch('docSortDir',      ()=>{ this.regPage=1; });
-          // when user closes a doc, the map re-appears — tell Leaflet to recalculate size
           this.$watch('parcelSelectedDoc', (val) => {
             if (!val && _lmap) this.$nextTick(() => _lmap.invalidateSize());
           });
-          // Town adjudication: the outer x-if div's @click sets townAdjRequest
-          // to "action:linkId" via a simple DOM expression (only pattern that works
-          // in Alpine x-if scope). This watcher runs in the component scope where
-          // updateLinkStatus / deleteTownLink are properly accessible.
+          // Town adjudication: outer x-if div @click sets townAdjRequest to "action:linkId".
+          // Watcher runs in component scope where updateLinkStatus/deleteTownLink are accessible.
           this.$watch('townAdjRequest', val => {
             if (!val || typeof val !== 'string') return;
             const colon = val.indexOf(':');
@@ -815,7 +382,6 @@
             const action   = val.slice(0, colon);
             const parcelId = val.slice(colon + 1);
             if (!action || !parcelId) return;
-            // Look up link_id by parcel_id — avoids any dynamic binding on buttons
             const link = this.townDocDetail?.links.find(l => l.parcel_id === parcelId);
             if (!link) return;
             if (action === 'del') this.deleteTownLink(link.link_id);
@@ -824,7 +390,6 @@
           });
           this.loadAttrRegistry();
           document.addEventListener('keydown', e => { if (e.key==='Escape' && this.pnExpandMode) this.pnExpandMode=null; });
-          // Campaign work queue keyboard shortcuts
           document.addEventListener('keydown', e => {
             if (this.activeTab !== 'campaigns' || this.campaignView !== 'work') return;
             const tag = document.activeElement?.tagName;
@@ -848,7 +413,6 @@
               }
             }
           });
-          // Reload parcel detail when filter query changes
           this.$watch('cwFilterQuery', () => {
             if (this.campaignView !== 'work') return;
             this.cwIdx = 0;
@@ -918,7 +482,7 @@
         updateParcelPageSize() {
           const el = document.getElementById('pn-list-scroll');
           if (!el || el.clientHeight === 0) return;
-          const rowH = 46; // pn-lrow height (padding 7+7 + two text lines ~15+14 + border 1)
+          const rowH = 46;
           const size = Math.max(10, Math.floor(el.clientHeight / rowH));
           if (size !== this.parcelPageSize) {
             this.parcelPageSize = size;
@@ -983,7 +547,6 @@
               if (r.ok) this.allParcels = (await r.json()).map(p => ({...p, coverage_estimate: coverageEstimate(p)}));
             }
             this.cwQueue = this.allParcels.filter(p => p.identity_state !== 'OK');
-            // Pre-populate decisions from the existing fold state
             const idTag = this.allTags.find(t => t.name === 'IdentityResolution');
             if (idTag) {
               try {
@@ -1014,7 +577,6 @@
             const r = await fetch('/api/parcels/' + encodeURIComponent(parcel.parcel_id));
             if (!r.ok) throw new Error(r.status);
             this.cwParcelDetail = await r.json();
-            // Pick up any existing tag state not yet in cwDecisions
             const tagInfo = this.cwParcelDetail.tags?.['IdentityResolution'];
             if (tagInfo?.state && tagInfo.state !== 'Unconfirmed' && !this.cwDecisions[parcel.parcel_id]) {
               this.cwDecisions = {...this.cwDecisions, [parcel.parcel_id]: tagInfo.state};
@@ -1171,7 +733,6 @@
             this.parcelDetail   = await detailResp.json();
             this.parcelTownDocs = tdResp.ok ? await tdResp.json() : [];
             this.parcelUploads  = (uploadsResp && uploadsResp.ok) ? await uploadsResp.json() : [];
-            // Auto-load first available document into viewer
             const _docs = this.parcelDetail.documents || [];
             if (_docs.length > 0) {
               this.selectParcelDoc(_docs[0]);
@@ -1250,12 +811,10 @@
         },
 
         // ── Filter chip picker ───────────────────────────────────────────────
-
         toggleFilterChipPicker(key) {
           this.filterChipPickerOpen = this.filterChipPickerOpen === key ? null : key;
         },
 
-        // Parcel layer attribute filter
         parcelLayerChipLabel(chip) {
           const sel = this.parcelLayerFilters[chip.col];
           if (sel && sel.length) {
@@ -1279,7 +838,6 @@
           this.parcelPage = 1;
         },
 
-        // Parcel tag state filter
         parcelTagChipLabel(tag) {
           const sel = this.parcelTagFilters[tag.tag_id];
           if (sel && sel.length) return tag.name + ': ' + sel.join(', ');
@@ -1310,7 +868,6 @@
           } catch(e) {}
         },
 
-        // Instrument type chip
         docTypeChipLabel() {
           if (!this.docTypeFilters.length) return 'Instrument Type';
           if (this.docTypeFilters.length === 1) return this.docTypeFilters[0];
@@ -1326,7 +883,6 @@
           this.regPage = 1;
         },
 
-        // Doc layer attribute filter (bucket multi-select)
         docLayerChipLabel(chip) {
           const sel = this.docLayerFilters[chip.key];
           if (sel && sel.length) return chip.label + ': ' + sel.join(', ');
@@ -1345,7 +901,6 @@
           this.regPage = 1;
         },
 
-        // Doc tag state filter
         docTagChipLabel(tag) {
           const sel = this.docTagFilters[tag.tag_id];
           if (sel && sel.length) return tag.name + ': ' + sel.join(', ');
@@ -1394,7 +949,6 @@
           this.townOcrOpen       = false;
           this.townDetailLoading = true;
           this.pickerQuery          = '';
-          // encode each path segment individually so slashes are preserved in the URL
           const encId = doc.doc_id.split('/').map(encodeURIComponent).join('/');
           try {
             const r = await fetch('/api/town-docs/'+encId);
@@ -1406,7 +960,6 @@
         },
 
         async updateLinkStatus(linkId, status) {
-          // Optimistic: mutate the reactive link object immediately so button highlights
           if (this.townDocDetail) {
             const lk = this.townDocDetail.links.find(l => l.link_id === linkId);
             if (lk) lk.status = status;
@@ -1422,7 +975,7 @@
             await this._reloadTownDetail();
           } catch(e) {
             console.error('update link:', e);
-            await this._reloadTownDetail(); // revert optimistic on error
+            await this._reloadTownDetail();
           }
           finally { this.townLinkPending = {...this.townLinkPending, [linkId]: false}; }
         },
@@ -1433,7 +986,6 @@
           const r = await fetch('/api/town-docs/'+encId);
           if (!r.ok) return;
           this.townDocDetail = await r.json();
-          // Sync left-panel count badges for this doc
           const docId = this.selectedTownDocId;
           const idx   = this.townDocList.findIndex(d => d.doc_id === docId);
           if (idx >= 0 && this.townDocDetail) {
@@ -1485,7 +1037,6 @@
           finally { this.tagsLoading = false; }
         },
 
-
         toggleTagPicker(ns, tagId) {
           const key = ns + ':' + tagId;
           this.tagPickerOpen = this.tagPickerOpen === key ? null : key;
@@ -1498,7 +1049,6 @@
           const priorFold = (targetType === 'parcel' && this.parcelTagFoldMaps[tagId])
             ? this.parcelTagFoldMaps[tagId][targetId]
             : undefined;
-          // Optimistic update — patch both the per-parcel display state and the filter fold map
           this.tagPending = {...this.tagPending, [tagId]: true};
           const next = {...this[stateMap]};
           if (state === null) { delete next[tagId]; } else { next[tagId] = state; }
@@ -1516,7 +1066,6 @@
             });
             if (!r.ok) throw new Error(r.status);
           } catch(e) {
-            // revert both
             const reverted = {...this[stateMap]};
             if (prior == null) { delete reverted[tagId]; } else { reverted[tagId] = prior; }
             this[stateMap] = reverted;
@@ -1674,7 +1223,6 @@
           if (!this.selectedTag) return;
           this.tagEditForm.deleting = true; this.tagEditForm.err = '';
           try {
-            // Dry-run: confirm:false to get n_affected from server
             const r = await fetch('/api/admin/tags/' + this.selectedTag.tag_id, {
               method: 'DELETE', headers: {'Content-Type':'application/json'},
               body: JSON.stringify({confirm: false}),
@@ -1691,7 +1239,6 @@
               };
               return;
             }
-            // n_affected was 0 — server deleted immediately
             if (!r.ok) { this.tagEditForm.err = d.error || 'Error'; return; }
             this._afterTagDeleted();
           } catch(e) { this.tagEditForm.err = 'Network error'; }
@@ -1844,7 +1391,7 @@
           } catch(e) { alert('Network error'); }
         },
 
-        // ── Display helpers ──────────────────────────────────────────────────
+        // ── Display helpers (delegates to lib/helpers.js) ────────────────────
         parcelAttrs,
         gisGroups,
 

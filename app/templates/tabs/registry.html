@@ -1,3 +1,4 @@
+    {% from 'partials/_tag_picker.html' import tag_picker %}
     <div class="tab-panel three-col" x-show="activeTab==='registry'">
 
       <!-- Left: document list -->
@@ -259,24 +260,7 @@
                         }"
                         @click.stop="toggleTagPicker('doc', tag.tag_id)">
                         <span x-text="docTagState[tag.tag_id] != null ? tag.name + ' : ' + docTagState[tag.tag_id] : tag.name"></span>
-                        <div class="tag-dropdown" x-show="tagPickerOpen === 'doc:'+tag.tag_id" @click.stop>
-                          <template x-for="(s, i) in tag.states_csv.split(',')" :key="s">
-                            <div class="tag-dd-item"
-                              :class="{current: docTagState[tag.tag_id]===s, 'default-state': i===0 && docTagState[tag.tag_id]==null}"
-                              @click="applyTag('document', docSelectedBP.book+'/'+docSelectedBP.page, tag.tag_id, s)">
-                              <span x-text="s"></span>
-                            </div>
-                          </template>
-                          <template x-if="docTagState[tag.tag_id] != null">
-                            <div>
-                              <hr class="tag-dd-divider">
-                              <div class="tag-dd-item tag-dd-remove"
-                                @click="applyTag('document', docSelectedBP.book+'/'+docSelectedBP.page, tag.tag_id, null)">
-                                Remove tag
-                              </div>
-                            </div>
-                          </template>
-                        </div>
+                        {{ tag_picker('doc', "tag.states_csv.split(',')", 'document', "docSelectedBP.book+'/'+docSelectedBP.page", 'docTagState') }}
                       </div>
                     </template>
                     <template x-if="allDocTagOptions.length === 0 && !tagsLoading">

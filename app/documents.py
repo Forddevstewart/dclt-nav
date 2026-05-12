@@ -54,48 +54,65 @@ def _fetch_rod_redirect(viewer_url: str):
     return redirect(viewer_url)
 
 
+# ── SQL builders ──────────────────────────────────────────────────────────────
+
+def _document_list_sql(has_ocr: bool) -> str:
+    """Build the document list SELECT. One row per unique book/page."""
+    if has_ocr:
+        kw_cols = ",\n".join(
+            f"    COALESCE(o.kw_{kw}, 0.0) kw_{kw}" for kw in KW_KEYS
+        )
+        return f"""
+            SELECT
+                d.book, d.page, MIN(d.parcel_id) parcel_id,
+                d.instrument_type, d.recorded_date,
+                d.grantor, d.grantee, d.address, d.scan_cached, d.doc_amount,
+                {kw_cols},
+                CASE WHEN o.book IS NOT NULL THEN 1 ELSE 0 END has_ocr
+            FROM registry_documents d
+            LEFT JOIN registry_ocr o ON d.book = o.book AND d.page = o.page
+            GROUP BY d.book, d.page
+            ORDER BY d.recorded_date DESC
+        """
+    zero_cols = ",\n".join(f"    0.0 kw_{kw}" for kw in KW_KEYS)
+    return f"""
+        SELECT
+            book, page, MIN(parcel_id) parcel_id,
+            instrument_type, recorded_date,
+            grantor, grantee, address, scan_cached, doc_amount,
+            {zero_cols},
+            0 has_ocr
+        FROM registry_documents
+        GROUP BY book, page
+        ORDER BY recorded_date DESC
+    """
+
+
+def _fetch_document_row(db, book, page):
+    """Fetch a single registry_documents row, or None."""
+    return db.execute(
+        "SELECT * FROM registry_documents WHERE book = ? AND page = ? LIMIT 1",
+        (book, page),
+    ).fetchone()
+
+
+def _fetch_ocr_row(db, book, page):
+    """Fetch OCR row for a document, or None if table absent."""
+    if not table_exists(db, "registry_ocr"):
+        return None
+    return db.execute(
+        "SELECT * FROM registry_ocr WHERE book = ? AND page = ? LIMIT 1",
+        (book, page),
+    ).fetchone()
+
+
 # ── Document list ─────────────────────────────────────────────────────────────
 
 @bp.route("/documents")
 def documents_list():
     db = get_reference_db()
     has_ocr = table_exists(db, "registry_ocr")
-
-    kw_cols = ",\n".join(
-        f"    COALESCE(o.kw_{kw}, 0.0) kw_{kw}" for kw in KW_KEYS
-    )
-    has_ocr_col = "CASE WHEN o.book IS NOT NULL THEN 1 ELSE 0 END has_ocr"
-
-    # One row per unique document (book/page). registry_documents has multiple
-    # rows per deed when the same doc is associated with multiple parcels;
-    # duplicate keys in that payload break Alpine's x-for rendering.
-    if has_ocr:
-        sql = f"""
-            SELECT
-                d.book, d.page, MIN(d.parcel_id) parcel_id,
-                d.instrument_type, d.recorded_date,
-                d.grantor, d.grantee, d.address, d.scan_cached, d.doc_amount,
-                {kw_cols},
-                {has_ocr_col}
-            FROM registry_documents d
-            LEFT JOIN registry_ocr o ON d.book = o.book AND d.page = o.page
-            GROUP BY d.book, d.page
-            ORDER BY d.recorded_date DESC
-        """
-    else:
-        zero_cols = ",\n".join(f"    0.0 kw_{kw}" for kw in KW_KEYS)
-        sql = f"""
-            SELECT
-                book, page, MIN(parcel_id) parcel_id,
-                instrument_type, recorded_date,
-                grantor, grantee, address, scan_cached, doc_amount,
-                {zero_cols},
-                0 has_ocr
-            FROM registry_documents
-            GROUP BY book, page
-            ORDER BY recorded_date DESC
-        """
-
+    sql = _document_list_sql(has_ocr)
     rows = db.execute(sql).fetchall()
     db.close()
     return jsonify([dict(r) for r in rows])
@@ -107,21 +124,12 @@ def documents_list():
 def document_detail(book, page):
     db = get_reference_db()
 
-    doc = db.execute(
-        "SELECT * FROM registry_documents WHERE book = ? AND page = ? LIMIT 1",
-        (book, page),
-    ).fetchone()
+    doc = _fetch_document_row(db, book, page)
     if not doc:
         db.close()
         abort(404)
 
-    ocr = None
-    if table_exists(db, "registry_ocr"):
-        ocr = db.execute(
-            "SELECT * FROM registry_ocr WHERE book = ? AND page = ? LIMIT 1",
-            (book, page),
-        ).fetchone()
-
+    ocr = _fetch_ocr_row(db, book, page)
     db.close()
 
     doc_dict = {k: v for k, v in dict(doc).items() if k not in _DOC_SKIP}
@@ -147,10 +155,7 @@ def document_detail(book, page):
 def document_rod(book, page):
     """Redirect to the raw PDF on the Registry of Deeds server."""
     db = get_reference_db()
-    doc = db.execute(
-        "SELECT * FROM registry_documents WHERE book = ? AND page = ? LIMIT 1",
-        (book, page),
-    ).fetchone()
+    doc = _fetch_document_row(db, book, page)
     db.close()
 
     if not doc:
@@ -168,10 +173,7 @@ def document_rod(book, page):
 @bp.route("/documents/<book>/<page>/pdf")
 def document_pdf(book, page):
     db = get_reference_db()
-    doc = db.execute(
-        "SELECT * FROM registry_documents WHERE book = ? AND page = ? LIMIT 1",
-        (book, page),
-    ).fetchone()
+    doc = _fetch_document_row(db, book, page)
     db.close()
 
     if not doc:

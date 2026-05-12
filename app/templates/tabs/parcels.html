@@ -1,3 +1,4 @@
+    {% from 'partials/_tag_picker.html' import tag_picker %}
     <div class="tab-panel" x-show="activeTab==='parcels'" style="overflow:hidden;">
     <div class="pn-nav" :class="{'pn-exp-map': pnExpandMode==='map', 'pn-exp-doc': pnExpandMode==='doc'}">
 
@@ -239,25 +240,7 @@
                         :class="{'not-applicable': parcelDetail?.tags?.[tag.name]?.applicable === false}"
                         x-text="parcelTagState[tag.tag_id] ?? tag.states_csv.split(',')[0]">
                       </div>
-                      <!-- Inline tag picker -->
-                      <div x-show="tagPickerOpen === 'parcel:'+tag.tag_id" @click.stop
-                        style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #cbd5e1;box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:30;padding:3px 0;min-width:140px;">
-                        <template x-for="(s, i) in parcelTagStates(tag, parcelDetail?.parcel)" :key="s">
-                          <div class="tag-dd-item"
-                            :class="{current: parcelTagState[tag.tag_id]===s, 'default-state': i===0 && parcelTagState[tag.tag_id]==null}"
-                            @click="applyTag('parcel', selectedParcelId, tag.tag_id, s)"
-                            x-text="s"></div>
-                        </template>
-                        <template x-if="parcelTagState[tag.tag_id] != null">
-                          <div>
-                            <hr class="tag-dd-divider">
-                            <div class="tag-dd-item tag-dd-remove"
-                              @click="applyTag('parcel', selectedParcelId, tag.tag_id, null)">
-                              Remove tag
-                            </div>
-                          </div>
-                        </template>
-                      </div>
+                      {{ tag_picker('parcel', 'parcelTagStates(tag, parcelDetail?.parcel)', 'parcel', 'selectedParcelId', 'parcelTagState') }}
                       <div class="pn-dcard-foot">
                         <span class="pn-dcard-scope" x-text="campaignMeta(tag)?.scope || tag.target_entity"></span>
                         <span style="color:var(--pn-ink-5);font-size:10px;">→</span>

@@ -1,0 +1,31 @@
+{#
+  tag_picker(ns, states_expr, target_type, target_id_expr, state_map)
+
+  ns             — picker namespace prefix, e.g. 'parcel' or 'doc'
+  states_expr    — Alpine expression producing the states array, e.g. "tag.states_csv.split(',')"
+  target_type    — string literal passed to applyTag, e.g. 'parcel' or 'document'
+  target_id_expr — Alpine expression for the target ID
+  state_map      — name of the Alpine state map object, e.g. 'parcelTagState'
+#}
+{% macro tag_picker(ns, states_expr, target_type, target_id_expr, state_map) %}
+<div class="tag-dropdown"
+     x-show="tagPickerOpen === '{{ ns }}:'+tag.tag_id"
+     @click.stop>
+  <template x-for="(s, i) in {{ states_expr }}" :key="s">
+    <div class="tag-dd-item"
+      :class="{current: {{ state_map }}[tag.tag_id]===s, 'default-state': i===0 && {{ state_map }}[tag.tag_id]==null}"
+      @click="applyTag('{{ target_type }}', {{ target_id_expr }}, tag.tag_id, s)"
+      x-text="s">
+    </div>
+  </template>
+  <template x-if="{{ state_map }}[tag.tag_id] != null">
+    <div>
+      <hr class="tag-dd-divider">
+      <div class="tag-dd-item tag-dd-remove"
+        @click="applyTag('{{ target_type }}', {{ target_id_expr }}, tag.tag_id, null)">
+        Remove tag
+      </div>
+    </div>
+  </template>
+</div>
+{% endmacro %}

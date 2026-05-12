@@ -33,6 +33,134 @@ def _clean(row: dict, skip: set) -> dict:
     return {k: v for k, v in row.items() if k not in skip}
 
 
+# ── SQL fragment builders ─────────────────────────────────────────────────────
+
+def _gis_fragments(db):
+    """Return (SELECT fragment, JOIN fragment) for GIS presence columns."""
+    if not table_exists(db, "parcels_gis"):
+        return (
+            ", 0 has_wetlands, 0 has_zone1, 0 has_zone2, 0 has_prihab"
+            ", 0 has_esthab, 0 has_natcomm, 0 has_bm3, 0 has_openspace",
+            "",
+        )
+    select = """,
+        CASE WHEN g.wetlands_code IS NOT NULL AND g.wetlands_code !='' THEN 1 ELSE 0 END has_wetlands,
+        CASE WHEN g.zone1_type    IS NOT NULL AND g.zone1_type    !='' THEN 1 ELSE 0 END has_zone1,
+        CASE WHEN g.zone2_id      IS NOT NULL AND g.zone2_id      !='' THEN 1 ELSE 0 END has_zone2,
+        CASE WHEN g.prihab_id     IS NOT NULL AND g.prihab_id     !='' THEN 1 ELSE 0 END has_prihab,
+        CASE WHEN g.esthab_id     IS NOT NULL AND g.esthab_id     !='' THEN 1 ELSE 0 END has_esthab,
+        CASE WHEN g.natcomm_id    IS NOT NULL AND g.natcomm_id    !='' THEN 1 ELSE 0 END has_natcomm,
+        CASE WHEN (g.bm3_vp_id  IS NOT NULL AND g.bm3_vp_id !='')
+               OR (g.bm3_wc_id  IS NOT NULL AND g.bm3_wc_id !='')
+               OR (g.bm3_ch_id  IS NOT NULL AND g.bm3_ch_id !='')
+               OR (g.bm3_cnl_id IS NOT NULL AND g.bm3_cnl_id!='') THEN 1 ELSE 0 END has_bm3,
+        CASE WHEN g.os_site_name  IS NOT NULL AND g.os_site_name  !='' THEN 1 ELSE 0 END has_openspace"""
+    join = "LEFT JOIN parcels_gis g ON g.parcel_id = p.parcel_id"
+    return select, join
+
+
+def _kw_fragments(db):
+    """Return (SELECT fragment, JOIN fragment) for keyword score columns."""
+    if not (table_exists(db, "registry_ocr") and table_exists(db, "registry_documents")):
+        return "".join(f", 0 kw_{k}" for k in KW_KEYS), ""
+    kw_select = "".join(
+        f",\n        COALESCE(kw.kw_{k}, 0) kw_{k}" for k in KW_KEYS
+    )
+    kw_agg = ",\n               ".join(
+        f"MAX(CASE WHEN ro.kw_{k} > 0.4 THEN 1 ELSE 0 END) kw_{k}" for k in KW_KEYS
+    )
+    kw_join = f"""LEFT JOIN (
+        SELECT rd.parcel_id,
+               {kw_agg}
+        FROM registry_documents rd
+        JOIN registry_ocr ro ON ro.book = rd.book AND ro.page = rd.page
+        GROUP BY rd.parcel_id
+    ) kw ON kw.parcel_id = p.parcel_id"""
+    return kw_select, kw_join
+
+
+def _for_sale_fragment(db):
+    """Return SELECT fragment for the for_sale boolean column."""
+    if not table_exists(db, "layer_for_sale"):
+        return ", 0 for_sale"
+    return (
+        ", CASE WHEN p.locno IS NOT NULL AND p.locno != ''"
+        " AND p.locst IS NOT NULL AND p.locst != ''"
+        " AND EXISTS (SELECT 1 FROM layer_for_sale"
+        "  WHERE UPPER(norm_address) LIKE printf('%d', CAST(p.locno AS REAL))||' '||UPPER(p.locst)||'%')"
+        " THEN 1 ELSE 0 END for_sale"
+    )
+
+
+def _derived_column_fragments(db):
+    """Return SELECT fragments for optional derived columns on parcels."""
+    return {
+        "coverage":     ", p.coverage_ratio, p.coverage_status"   if column_exists(db, "parcels", "coverage_ratio")           else ", NULL coverage_ratio, NULL coverage_status",
+        "usc":          ", p.is_undeveloped_state_code"            if column_exists(db, "parcels", "is_undeveloped_state_code") else ", 0 is_undeveloped_state_code",
+        "farming":      ", p.farming_suitability"                  if column_exists(db, "parcels", "farming_suitability")      else ", NULL farming_suitability",
+        "acquisition":  ", p.acquisition_suitability"              if column_exists(db, "parcels", "acquisition_suitability")  else ", NULL acquisition_suitability",
+    }
+
+
+def _parcel_list_sql(db) -> str:
+    """Build the full parcel list SELECT statement for the current DB schema."""
+    gis_select, gis_join     = _gis_fragments(db)
+    kw_select,  kw_join      = _kw_fragments(db)
+    fs_select                = _for_sale_fragment(db)
+    derived                  = _derived_column_fragments(db)
+    return f"""
+        SELECT p.parcel_id, p.site_addr, p.owner_name, p.owner_category,
+               p.property_class, p.use_code_norm, p.use_code_desc,
+               p.totalapprvalue, p.billingacres, p.village, p.is_public, p.condo_units,
+               p.centroid_lat,
+               p.parcel_class, p.parcel_gisid_status, p.parcel_massgis_status,
+               p.parcel_adb_gisid,
+               CASE
+                 WHEN p.parcel_class = 'special-feature' THEN 'OK'
+                 WHEN p.join_status = 'BOTH'             THEN 'OK'
+                 WHEN p.join_status = 'ASSESSOR_ONLY'    THEN 'ADB-only'
+                 WHEN p.join_status = 'MASSGIS_ONLY'     THEN 'GIS-only'
+                 ELSE 'OK'
+               END AS identity_state
+               {derived['coverage']}{derived['usc']}{derived['farming']}{derived['acquisition']}
+               {gis_select}{kw_select}{fs_select}
+        FROM parcels p
+        {gis_join}
+        {kw_join}
+        ORDER BY p.locst NULLS LAST, p.locno NULLS LAST
+    """
+
+
+def _parcel_tag_block(tx, ref, parcel_id, parcel_row):
+    """Return the tags dict for a parcel detail response."""
+    tag_rows = tx.execute(
+        "SELECT tag_id, name FROM tags"
+        " WHERE deprecated_at IS NULL AND target_entity IN ('parcel','any')"
+        " ORDER BY display_order",
+    ).fetchall()
+    fold_rows = tx.execute(
+        f"SELECT t1.tag_id, t1.state FROM taggings t1"
+        f" WHERE t1.target_type = 'parcel' AND t1.target_id = ? AND {_FOLD}",
+        (parcel_id,),
+    ).fetchall()
+    fold_map = {r["tag_id"]: r["state"] for r in fold_rows}
+
+    tags_block = {}
+    for tr in tag_rows:
+        dim_name = tr["name"]
+        dim = DIMENSIONS.get(dim_name)
+        if dim is None or dim.node_type != "parcel":
+            continue
+        applicable, reason = dim.is_applicable("parcel", parcel_id, ref)
+        tags_block[dim_name] = {
+            "tag_id":     tr["tag_id"],
+            "state":      fold_map.get(tr["tag_id"]),
+            "applicable": applicable,
+            "reason":     reason if not applicable else "",
+        }
+    return tags_block
+
+
 # ── Items (legacy) ────────────────────────────────────────────────────────────
 
 @bp.route("/items")
@@ -46,86 +174,7 @@ def items():
 @bp.route("/parcels")
 def parcels_list():
     db = get_reference_db()
-    has_gis      = table_exists(db, "parcels_gis")
-    has_ocr      = table_exists(db, "registry_ocr") and table_exists(db, "registry_documents")
-    has_for_sale = table_exists(db, "layer_for_sale")
-    has_coverage  = column_exists(db, "parcels", "coverage_ratio")
-    has_usc       = column_exists(db, "parcels", "is_undeveloped_state_code")
-    has_farming   = column_exists(db, "parcels", "farming_suitability")
-    has_acq_suit  = column_exists(db, "parcels", "acquisition_suitability")
-
-    if has_gis:
-        gis_select = """,
-            CASE WHEN g.wetlands_code IS NOT NULL AND g.wetlands_code !='' THEN 1 ELSE 0 END has_wetlands,
-            CASE WHEN g.zone1_type    IS NOT NULL AND g.zone1_type    !='' THEN 1 ELSE 0 END has_zone1,
-            CASE WHEN g.zone2_id      IS NOT NULL AND g.zone2_id      !='' THEN 1 ELSE 0 END has_zone2,
-            CASE WHEN g.prihab_id     IS NOT NULL AND g.prihab_id     !='' THEN 1 ELSE 0 END has_prihab,
-            CASE WHEN g.esthab_id     IS NOT NULL AND g.esthab_id     !='' THEN 1 ELSE 0 END has_esthab,
-            CASE WHEN g.natcomm_id    IS NOT NULL AND g.natcomm_id    !='' THEN 1 ELSE 0 END has_natcomm,
-            CASE WHEN (g.bm3_vp_id  IS NOT NULL AND g.bm3_vp_id !='')
-                   OR (g.bm3_wc_id  IS NOT NULL AND g.bm3_wc_id !='')
-                   OR (g.bm3_ch_id  IS NOT NULL AND g.bm3_ch_id !='')
-                   OR (g.bm3_cnl_id IS NOT NULL AND g.bm3_cnl_id!='') THEN 1 ELSE 0 END has_bm3,
-            CASE WHEN g.os_site_name  IS NOT NULL AND g.os_site_name  !='' THEN 1 ELSE 0 END has_openspace"""
-        gis_join = "LEFT JOIN parcels_gis g ON g.parcel_id = p.parcel_id"
-    else:
-        gis_select = ", 0 has_wetlands, 0 has_zone1, 0 has_zone2, 0 has_prihab, 0 has_esthab, 0 has_natcomm, 0 has_bm3, 0 has_openspace"
-        gis_join = ""
-
-    if has_ocr:
-        kw_select = "".join(
-            f",\n            COALESCE(kw.kw_{k}, 0) kw_{k}" for k in KW_KEYS
-        )
-        kw_agg = ",\n                   ".join(
-            f"MAX(CASE WHEN ro.kw_{k} > 0.4 THEN 1 ELSE 0 END) kw_{k}" for k in KW_KEYS
-        )
-        kw_join = f"""LEFT JOIN (
-            SELECT rd.parcel_id,
-                   {kw_agg}
-            FROM registry_documents rd
-            JOIN registry_ocr ro ON ro.book = rd.book AND ro.page = rd.page
-            GROUP BY rd.parcel_id
-        ) kw ON kw.parcel_id = p.parcel_id"""
-    else:
-        kw_select = "".join(f", 0 kw_{k}" for k in KW_KEYS)
-        kw_join = ""
-
-    if has_for_sale:
-        fs_select = (
-            ", CASE WHEN p.locno IS NOT NULL AND p.locno != ''"
-            " AND p.locst IS NOT NULL AND p.locst != ''"
-            " AND EXISTS (SELECT 1 FROM layer_for_sale"
-            "  WHERE UPPER(norm_address) LIKE printf('%d', CAST(p.locno AS REAL))||' '||UPPER(p.locst)||'%')"
-            " THEN 1 ELSE 0 END for_sale"
-        )
-    else:
-        fs_select = ", 0 for_sale"
-
-    cov_select      = ", p.coverage_ratio, p.coverage_status" if has_coverage else ", NULL coverage_ratio, NULL coverage_status"
-    usc_select      = ", p.is_undeveloped_state_code" if has_usc else ", 0 is_undeveloped_state_code"
-    farming_select  = ", p.farming_suitability" if has_farming else ", NULL farming_suitability"
-    acq_suit_select = ", p.acquisition_suitability" if has_acq_suit else ", NULL acquisition_suitability"
-
-    sql = f"""
-        SELECT p.parcel_id, p.site_addr, p.owner_name, p.owner_category,
-               p.property_class, p.use_code_norm, p.use_code_desc,
-               p.totalapprvalue, p.billingacres, p.village, p.is_public, p.condo_units,
-               p.centroid_lat,
-               p.parcel_class, p.parcel_gisid_status, p.parcel_massgis_status,
-               p.parcel_adb_gisid,
-               CASE
-                 WHEN p.parcel_class = 'special-feature' THEN 'OK'
-                 WHEN p.join_status = 'BOTH'             THEN 'OK'
-                 WHEN p.join_status = 'ASSESSOR_ONLY'    THEN 'ADB-only'
-                 WHEN p.join_status = 'MASSGIS_ONLY'     THEN 'GIS-only'
-                 ELSE 'OK'
-               END AS identity_state{cov_select}{usc_select}{farming_select}{acq_suit_select}
-               {gis_select}{kw_select}{fs_select}
-        FROM parcels p
-        {gis_join}
-        {kw_join}
-        ORDER BY p.locst NULLS LAST, p.locno NULLS LAST
-    """
+    sql = _parcel_list_sql(db)
     rows = db.execute(sql).fetchall()
     db.close()
     return jsonify([dict(r) for r in rows])
@@ -158,32 +207,7 @@ def parcel_detail(parcel_id):
         "SELECT * FROM layer_soils WHERE parcel_id = ? LIMIT 1", (parcel_id,)
     ).fetchone()
 
-    # Tags: current fold state + applicability for all parcel dimensions.
-    tag_rows = tx.execute(
-        "SELECT tag_id, name FROM tags"
-        " WHERE deprecated_at IS NULL AND target_entity IN ('parcel','any')"
-        " ORDER BY display_order",
-    ).fetchall()
-    fold_rows = tx.execute(
-        f"SELECT t1.tag_id, t1.state FROM taggings t1"
-        f" WHERE t1.target_type = 'parcel' AND t1.target_id = ? AND {_FOLD}",
-        (parcel_id,),
-    ).fetchall()
-    fold_map = {r["tag_id"]: r["state"] for r in fold_rows}
-
-    tags_block = {}
-    for tr in tag_rows:
-        dim_name = tr["name"]
-        dim = DIMENSIONS.get(dim_name)
-        if dim is None or dim.node_type != "parcel":
-            continue
-        applicable, reason = dim.is_applicable("parcel", parcel_id, ref)
-        tags_block[dim_name] = {
-            "tag_id":     tr["tag_id"],
-            "state":      fold_map.get(tr["tag_id"]),
-            "applicable": applicable,
-            "reason":     reason if not applicable else "",
-        }
+    tags_block = _parcel_tag_block(tx, ref, parcel_id, parcel)
 
     ref.close()
     tx.close()
@@ -251,17 +275,11 @@ def parcel_geometry(parcel_id):
 
 # ── Parcel → linked town docs ─────────────────────────────────────────────────
 
-@bp.route("/parcels/<parcel_id>/town-docs")
-def parcel_town_docs(parcel_id):
-    """Confirmed town doc links for a parcel, with doc metadata from reference.db."""
-    dclt = get_db()
-    ref  = get_reference_db()
-
+def _confirmed_town_doc_links(dclt, parcel_id: str) -> list:
+    """Return confirmed/user_manual town doc links for a parcel from transactions DB."""
     if not table_exists(dclt, "parcel_link_adjudications"):
-        dclt.close(); ref.close()
-        return jsonify([])
-
-    links = dclt.execute(
+        return []
+    return dclt.execute(
         "SELECT doc_id, source_type, match_type, confidence, reviewed_at"
         " FROM parcel_link_adjudications"
         " WHERE parcel_id = ?"
@@ -273,6 +291,15 @@ def parcel_town_docs(parcel_id):
         " ORDER BY reviewed_at DESC",
         (parcel_id, parcel_id),
     ).fetchall()
+
+
+@bp.route("/parcels/<parcel_id>/town-docs")
+def parcel_town_docs(parcel_id):
+    """Confirmed town doc links for a parcel, with doc metadata from reference.db."""
+    dclt = get_db()
+    ref  = get_reference_db()
+
+    links = _confirmed_town_doc_links(dclt, parcel_id)
 
     result = []
     seen = {}  # (committee, meeting_date) -> index in result; prefer 'Updated' doc_type
