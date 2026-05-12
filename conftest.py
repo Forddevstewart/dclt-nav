@@ -1,5 +1,7 @@
 import sqlite3
+import threading
 import pytest
+from werkzeug.serving import make_server
 from app import create_app
 
 SEED_PARCEL_ID = "P001"
@@ -103,3 +105,42 @@ def auth_client(app):
     with c:
         c.post("/login", data={"username": "ford", "password": "ford"})
     return c
+
+
+# ── Playwright fixtures ───────────────────────────────────────────────────────
+
+@pytest.fixture(scope="session")
+def session_app(ref_db_path, tmp_path_factory):
+    """Session-scoped Flask app for Playwright live-server tests."""
+    tx = tmp_path_factory.mktemp("tx_ui") / "transactions.db"
+    uploads = tmp_path_factory.mktemp("uploads_ui")
+    flask_app = create_app({
+        "TESTING": True,
+        "DATABASE": str(tx),
+        "REFERENCE_DATABASE": ref_db_path,
+        "UPLOAD_DIR": str(uploads),
+    })
+    yield flask_app
+
+
+@pytest.fixture(scope="session")
+def live_server_url(session_app):
+    """Boot Flask on a random port; yield base URL; shut down after session."""
+    server = make_server("127.0.0.1", 0, session_app)
+    port = server.server_address[1]
+    t = threading.Thread(target=server.serve_forever)
+    t.daemon = True
+    t.start()
+    yield f"http://127.0.0.1:{port}"
+    server.shutdown()
+
+
+@pytest.fixture
+def logged_in_page(page, live_server_url):
+    """Playwright page already authenticated as ford."""
+    page.goto(f"{live_server_url}/login")
+    page.fill("#username", "ford")
+    page.fill("#password", "ford")
+    page.click("button[type='submit']")
+    page.wait_for_url(f"{live_server_url}/")
+    return page

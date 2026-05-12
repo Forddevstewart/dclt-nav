@@ -20,7 +20,13 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -r requirements.txt pytest
+        run: pip install -r requirements.txt pytest pytest-playwright
 
-      - name: Run tests
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
+
+      - name: Run unit + route tests
         run: pytest app/test_adjudications.py app/test_routes.py -v
+
+      - name: Run UI tests
+        run: pytest app/test_ui.py -v
