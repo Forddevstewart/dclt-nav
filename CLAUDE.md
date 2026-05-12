@@ -5,8 +5,8 @@
 Three-stage design: **Discovery** (local scraping) → **Processing** (pipeline builds `reference.db`) → **Presentation** (Flask app on VPS).
 
 **Two databases — never confuse them:**
-- `reference.db` — pipeline-written, read-only from the app. Contains parcels, GIS layers, registry documents, OCR scores.
-- `transactions.db` — app-written. Contains user tags, taggings, notes, adjudications. Never overwritten by deploy. WORM triggers enforce append-only on taggings and notes.
+- `reference.db` — only flows **up** (local pipeline builds it → `sync.sh` deploys it to VPS). Read-only from the app. Contains parcels, GIS layers, registry documents, OCR scores.
+- `transactions.db` — only flows **down** (lives on VPS → `sync.sh` pulls it to local backup). Written by the app, never overwritten by deploy. WORM triggers enforce append-only on taggings and notes.
 
 **Tags vs Layers:**
 - Tag = user-authored decision, written to `transactions.db`. Defined in `app/dimensions.py`.
