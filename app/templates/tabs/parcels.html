@@ -285,13 +285,22 @@
               </template>
               <template x-for="doc in (parcelDetail?.documents||[]).slice(0,6)" :key="doc.doc_rank">
                 <div class="pn-link-row"
+                  style="align-items:flex-start"
                   :class="{active: parcelSelectedDoc && parcelSelectedDoc.doc_rank===doc.doc_rank}"
                   @click="selectParcelDoc(doc)">
-                  <span style="font-size:14px;">📄</span>
-                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;" x-text="'Bk '+doc.book+'/'+doc.page"></span>
-                  <span style="color:var(--pn-ink-3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" x-text="doc.instrument_type||'—'"></span>
-                  <span style="color:var(--pn-ink-5);font-size:10px;font-family:'IBM Plex Mono',monospace;" x-text="doc.recorded_date?doc.recorded_date.slice(0,4):''"></span>
-                  <template x-if="doc.scan_cached"><span class="pn-chip pn-chip-decided" style="font-size:8px;padding:0 4px;">●</span></template>
+                  <span style="font-size:14px;flex-shrink:0;padding-top:1px;">📄</span>
+                  <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;gap:5px;">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;flex-shrink:0;" x-text="'Bk '+doc.book+'/'+doc.page"></span>
+                      <span style="color:var(--pn-ink-3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" x-text="doc.instrument_type||'—'"></span>
+                      <span style="color:var(--pn-ink-5);font-size:10px;font-family:'IBM Plex Mono',monospace;flex-shrink:0;" x-text="doc.recorded_date?doc.recorded_date.slice(0,4):''"></span>
+                      <template x-if="doc.scan_cached"><span class="pn-chip pn-chip-decided" style="font-size:8px;padding:0 4px;">●</span></template>
+                      <template x-if="doc.relevance && doc.relevance !== 'SCAN'"><span class="pn-chip pn-chip-plain" style="font-size:8px;padding:0 3px;flex-shrink:0;" x-text="doc.relevance"></span></template>
+                    </div>
+                    <template x-if="pnDocPartyLine(doc)">
+                      <div style="font-size:10px;color:var(--pn-ink-4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px;" x-text="pnDocPartyLine(doc)"></div>
+                    </template>
+                  </div>
                 </div>
               </template>
               <template x-if="(parcelDetail?.documents||[]).length > 6">

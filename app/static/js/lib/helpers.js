@@ -220,3 +220,16 @@ function gisGroups(gis, soil) {
 function gisGroupsSorted(gis, soil) {
   return gisGroups(gis, soil).slice().sort((a, b) => a.label.localeCompare(b.label));
 }
+
+function pnDocPartyLine(doc) {
+  const clean = s => (s || '').replace(/\s*\((Gtor|Gtee)\)\s*/gi, '').trim();
+  const grantor = clean(doc.grantor);
+  const grantee = clean(doc.grantee);
+  const reverse = (doc.reverse_party || '').trim();
+  if (grantor && grantee) return grantor + ' → ' + grantee;
+  if (grantor)            return grantor;
+  if (grantee && reverse) return reverse + ' → ' + grantee;
+  if (grantee)            return grantee;
+  if (reverse)            return reverse;
+  return null;
+}

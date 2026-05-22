@@ -48,6 +48,11 @@ def ref_db_path(tmp_path_factory):
             recorded_date     TEXT,
             grantor           TEXT,
             grantee           TEXT,
+            reverse_party     TEXT,
+            relevance         TEXT,
+            description       TEXT,
+            lookup_method     TEXT,
+            search_name       TEXT,
             address           TEXT,
             scan_cached       INTEGER DEFAULT 0,
             doc_amount        REAL,
@@ -58,8 +63,8 @@ def ref_db_path(tmp_path_factory):
             doc_type_code     TEXT
         );
         INSERT INTO registry_documents
-            (book, page, parcel_id, instrument_type, recorded_date)
-        VALUES ('{SEED_BOOK}', '{SEED_PAGE}', '{SEED_PARCEL_ID}', 'DEED', '2020-01-01');
+            (book, page, parcel_id, instrument_type, recorded_date, grantor, grantee, relevance)
+        VALUES ('{SEED_BOOK}', '{SEED_PAGE}', '{SEED_PARCEL_ID}', 'DEED', '2020-01-01', 'SELLER, JOHN', 'BUYER, JANE', 'CCR');
 
         CREATE TABLE parcels_gis (
             parcel_id     TEXT PRIMARY KEY,

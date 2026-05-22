@@ -63,6 +63,19 @@ def test_parcel_detail_not_found(client):
     assert r.status_code == 404
 
 
+def test_parcel_detail_documents_have_party_fields(client):
+    r = client.get(f"/api/parcels/{SEED_PARCEL_ID}")
+    docs = r.get_json()["documents"]
+    assert len(docs) > 0
+    doc = docs[0]
+    assert "grantor" in doc
+    assert "grantee" in doc
+    assert "relevance" in doc
+    assert doc["grantor"] == "SELLER, JOHN"
+    assert doc["grantee"] == "BUYER, JANE"
+    assert doc["relevance"] == "CCR"
+
+
 # ── /api/documents ────────────────────────────────────────────────────────────
 
 def test_documents_list_ok(client):
