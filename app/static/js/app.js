@@ -25,23 +25,18 @@
         campaignMetaByDim:     {},   // dimension → {campaign_id, label, scope, color}
         campaignMetaLoaded:    false,
 
-        // campaign work queue (identity)
+        // campaign work queue
         cwQueue:          [],
         cwQueueLoading:   false,
         cwIdx:            0,
-        cwDecisions:      {},     // parcelId → state string
-        cwFilter:         'all',  // 'all' | 'adb_only' | 'gis_only'
+        cwDecisions:      {},     // entity_id → state string
+        cwFilter:         'all',
         cwFilterQuery:    '',
         cwParcelDetail:   null,
+        cwDocDetail:      null,
         cwDetailLoading:  false,
         cwDetailError:    null,
         cwChipOpen:       false,
-        cwIdentityDecisions: [
-          { key: 'ADB Add',    hint: 'Add owner record to assessor database' },
-          { key: 'ADB Remove', hint: 'Retire stale assessor record' },
-          { key: 'GIS Add',    hint: 'Add parcel polygon to GIS layer' },
-          { key: 'GIS Remove', hint: 'Retire spurious GIS polygon' },
-        ],
 
         // overview
         overviewData:    null,
@@ -247,18 +242,32 @@
 
         // ── Computed — campaign work queue ──────────────────────────────────
         get cwFilteredQueue() {
+          const dim = this.selectedCampaignTag?.name;
           let list = this.cwQueue;
-          if (this.cwFilter === 'adb_only')  list = list.filter(p => p.identity_state === 'ADB-only');
-          if (this.cwFilter === 'gis_only')  list = list.filter(p => p.identity_state === 'GIS-only');
+          if (dim === 'IdentityResolution') {
+            if (this.cwFilter === 'adb_only') list = list.filter(p => p.identity_state === 'ADB-only');
+            if (this.cwFilter === 'gis_only') list = list.filter(p => p.identity_state === 'GIS-only');
+          } else if (dim === 'AcquisitionDetermination') {
+            if (this.cwFilter === 'possible') list = list.filter(p => p.acquisition_suitability === 'Possible');
+            if (this.cwFilter === 'likely')   list = list.filter(p => p.acquisition_suitability === 'Likely');
+          }
           const q = this.cwFilterQuery.trim().toLowerCase();
           if (q) list = list.filter(p =>
-            (p.parcel_id  ||'').toLowerCase().includes(q) ||
-            (p.owner_name ||'').toLowerCase().includes(q) ||
-            (p.site_addr  ||'').toLowerCase().includes(q)
+            (p.parcel_id       || '').toLowerCase().includes(q) ||
+            (p.doc_id          || '').toLowerCase().includes(q) ||
+            (p.owner_name      || '').toLowerCase().includes(q) ||
+            (p.site_addr       || '').toLowerCase().includes(q) ||
+            (p.instrument_type || '').toLowerCase().includes(q)
           );
           return list;
         },
         get cwCurrentParcel() { return this.cwFilteredQueue[this.cwIdx] || null; },
+        get cwCurrentEntityId() {
+          const item = this.cwCurrentParcel;
+          if (!item) return null;
+          return this.selectedCampaignTag?.name === 'Article97Determination'
+            ? item.doc_id : item.parcel_id;
+        },
 
         // ── Computed — registry ─────────────────────────────────────────────
         get docTypes() {
@@ -403,12 +412,13 @@
               if (this.cwIdx > 0) this.cwSelectIdx(this.cwIdx - 1);
               return;
             }
-            if (['1','2','3','4'].includes(e.key) && this.cwParcelDetail) {
+            if (['1','2','3','4'].includes(e.key) && (this.cwParcelDetail || this.cwDocDetail)) {
               e.preventDefault();
-              const d = this.cwIdentityDecisions[parseInt(e.key) - 1];
-              if (d) {
-                const pid = this.cwParcelDetail.parcel.parcel_id;
-                this.cwDecisions = {...this.cwDecisions, [pid]: d.key};
+              const opts = this.cwDecisionOptions();
+              const d    = opts[parseInt(e.key) - 1];
+              const eid  = this.cwCurrentEntityId;
+              if (d && eid) {
+                this.cwDecisions = {...this.cwDecisions, [eid]: d.key};
                 this.cwChipOpen = false;
               }
             }
@@ -417,8 +427,8 @@
             if (this.campaignView !== 'work') return;
             this.cwIdx = 0;
             const q = this.cwFilteredQueue;
-            if (q.length > 0) this.loadCwParcelDetail(q[0]);
-            else this.cwParcelDetail = null;
+            if (q.length > 0) this.loadCwDetail(q[0]);
+            else { this.cwParcelDetail = null; this.cwDocDetail = null; }
           });
           this.$nextTick(() => {
             this.updateParcelPageSize();
@@ -540,53 +550,89 @@
 
         async loadCwQueue() {
           this.cwQueueLoading = true;
+          const dim = this.selectedCampaignTag?.name;
+          const tag = this.selectedCampaignTag;
           try {
             if (this.allTags.length === 0) await this.loadTags();
-            if (this.allParcels.length === 0) {
-              const r = await fetch('/api/parcels');
-              if (r.ok) this.allParcels = (await r.json()).map(p => ({...p, coverage_estimate: coverageEstimate(p)}));
+            if (dim === 'Article97Determination') {
+              const r = await fetch('/api/documents');
+              if (r.ok) {
+                const docs = await r.json();
+                this.cwQueue = docs
+                  .filter(d => (d.kw_article_97 || 0) > 0.4)
+                  .map(d => ({...d, doc_id: d.book + '/' + d.page}));
+              }
+            } else {
+              if (this.allParcels.length === 0) {
+                const r = await fetch('/api/parcels');
+                if (r.ok) this.allParcels = (await r.json()).map(p => ({...p, coverage_estimate: coverageEstimate(p)}));
+              }
+              if (dim === 'IdentityResolution') {
+                this.cwQueue = this.allParcels.filter(p => p.identity_state !== 'OK');
+              } else if (dim === 'AcquisitionDetermination') {
+                this.cwQueue = this.allParcels.filter(p => ['Possible','Likely'].includes(p.acquisition_suitability));
+              } else {
+                this.cwQueue = [...this.allParcels];
+              }
             }
-            this.cwQueue = this.allParcels.filter(p => p.identity_state !== 'OK');
-            const idTag = this.allTags.find(t => t.name === 'IdentityResolution');
-            if (idTag) {
+            if (tag) {
+              const entityType = dim === 'Article97Determination' ? 'document' : 'parcel';
               try {
-                const r = await fetch('/api/folds/parcel?tag_id=' + idTag.tag_id);
-                if (r.ok) {
-                  const foldMap = await r.json();
+                const fr = await fetch('/api/folds/' + entityType + '?tag_id=' + tag.tag_id);
+                if (fr.ok) {
+                  const foldMap = await fr.json();
                   const dec = {};
-                  for (const [pid, state] of Object.entries(foldMap)) {
-                    if (state && state !== 'Unconfirmed') dec[pid] = state;
+                  for (const [id, state] of Object.entries(foldMap)) {
+                    if (state && state !== 'Unconfirmed') dec[id] = state;
                   }
                   this.cwDecisions = dec;
                 }
               } catch(_) {}
             }
             if (this.cwFilteredQueue.length > 0) {
-              await this.loadCwParcelDetail(this.cwFilteredQueue[0]);
+              await this.loadCwDetail(this.cwFilteredQueue[0]);
             }
           } finally { this.cwQueueLoading = false; }
         },
 
-        async loadCwParcelDetail(parcel) {
-          if (!parcel) return;
+        async loadCwDetail(item) {
+          if (!item) return;
           this.cwParcelDetail  = null;
+          this.cwDocDetail     = null;
           this.cwDetailLoading = true;
           this.cwDetailError   = null;
           this.cwChipOpen      = false;
+          const dim = this.selectedCampaignTag?.name;
           try {
-            const r = await fetch('/api/parcels/' + encodeURIComponent(parcel.parcel_id));
-            if (!r.ok) throw new Error(r.status);
-            this.cwParcelDetail = await r.json();
-            const tagInfo = this.cwParcelDetail.tags?.['IdentityResolution'];
-            if (tagInfo?.state && tagInfo.state !== 'Unconfirmed' && !this.cwDecisions[parcel.parcel_id]) {
-              this.cwDecisions = {...this.cwDecisions, [parcel.parcel_id]: tagInfo.state};
+            if (dim === 'Article97Determination') {
+              const r = await fetch('/api/documents/' + item.book + '/' + item.page);
+              if (!r.ok) throw new Error(r.status);
+              this.cwDocDetail = await r.json();
+              const parcelId = this.cwDocDetail.document?.parcel_id;
+              if (parcelId) {
+                try {
+                  const pr = await fetch('/api/parcels/' + encodeURIComponent(parcelId));
+                  if (pr.ok) {
+                    const pd = await pr.json();
+                    this.$nextTick(() => _updateCampaignMap(parcelId, pd.parcel.centroid_lat, pd.parcel.centroid_lon, pd.gis));
+                  }
+                } catch(_) {}
+              }
+            } else {
+              const r = await fetch('/api/parcels/' + encodeURIComponent(item.parcel_id));
+              if (!r.ok) throw new Error(r.status);
+              this.cwParcelDetail = await r.json();
+              const tagInfo = this.cwParcelDetail.tags?.[dim];
+              if (tagInfo?.state && tagInfo.state !== 'Unconfirmed' && !this.cwDecisions[item.parcel_id]) {
+                this.cwDecisions = {...this.cwDecisions, [item.parcel_id]: tagInfo.state};
+              }
+              this.$nextTick(() => _updateCampaignMap(
+                item.parcel_id,
+                this.cwParcelDetail.parcel.centroid_lat,
+                this.cwParcelDetail.parcel.centroid_lon,
+                this.cwParcelDetail.gis,
+              ));
             }
-            this.$nextTick(() => _updateCampaignMap(
-              parcel.parcel_id,
-              this.cwParcelDetail.parcel.centroid_lat,
-              this.cwParcelDetail.parcel.centroid_lon,
-              this.cwParcelDetail.gis,
-            ));
           } catch(e) { this.cwDetailError = e.message; }
           finally    { this.cwDetailLoading = false; }
         },
@@ -594,16 +640,17 @@
         async cwSelectIdx(i) {
           if (i < 0 || i >= this.cwFilteredQueue.length) return;
           this.cwIdx = i;
-          await this.loadCwParcelDetail(this.cwFilteredQueue[i]);
+          await this.loadCwDetail(this.cwFilteredQueue[i]);
         },
 
         async cwSaveAndNext() {
-          const parcel   = this.cwCurrentParcel;
-          const decision = parcel ? this.cwDecisions[parcel.parcel_id] : null;
-          if (!parcel || !decision) return;
-          const idTag = this.allTags.find(t => t.name === 'IdentityResolution');
-          if (!idTag) return;
-          await this.applyTag('parcel', parcel.parcel_id, idTag.tag_id, decision);
+          const item     = this.cwCurrentParcel;
+          const tag      = this.selectedCampaignTag;
+          const entityId = this.cwCurrentEntityId;
+          const decision = entityId ? this.cwDecisions[entityId] : null;
+          if (!item || !decision || !tag) return;
+          const entityType = tag.name === 'Article97Determination' ? 'document' : 'parcel';
+          await this.applyTag(entityType, entityId, tag.tag_id, decision);
           this.loadCampaignProgress();
           await this.cwAdvance();
         },
@@ -620,14 +667,31 @@
           this.cwFilter = filter;
           this.cwIdx = 0;
           const q = this.cwFilteredQueue;
-          if (q.length > 0) await this.loadCwParcelDetail(q[0]);
-          else this.cwParcelDetail = null;
+          if (q.length > 0) await this.loadCwDetail(q[0]);
+          else { this.cwParcelDetail = null; this.cwDocDetail = null; }
         },
 
-        cwSuggestion(parcel) {
-          if (!parcel) return null;
-          if (parcel.identity_state === 'ADB-only') return 'GIS Add';
-          if (parcel.identity_state === 'GIS-only') return 'ADB Add';
+        cwSuggestion(item) {
+          if (!item) return null;
+          const dim = this.selectedCampaignTag?.name;
+          if (dim === 'IdentityResolution') {
+            if (item.identity_state === 'ADB-only') return 'GIS Add';
+            if (item.identity_state === 'GIS-only') return 'ADB Add';
+          } else if (dim === 'CoverageDetermination') {
+            const est = item.coverage_estimate;
+            if (est === 'Underdeveloped') return 'Underdeveloped';
+            if (est === 'Developed' || est === 'Out of range') return 'Developed';
+          } else if (dim === 'FarmingDetermination') {
+            const fs = (item.farming_suitability || '').toLowerCase();
+            if (fs === 'not suitable') return 'Not Suitable';
+            if (fs === 'possible') return 'Possible';
+            if (fs === 'suitable') return 'Suitable';
+          } else if (dim === 'AcquisitionDetermination') {
+            if (item.acquisition_suitability === 'Likely')   return 'Pursue';
+            if (item.acquisition_suitability === 'Possible') return 'Watch';
+          } else if (dim === 'Article97Determination') {
+            if ((item.kw_article_97 || 0) > 0.4) return 'Confirmed';
+          }
           return null;
         },
 
@@ -640,6 +704,52 @@
             { k: 'Public',   v: parcel.is_public ? 'Yes' : 'No' },
             { k: 'Class',    v: parcel.property_class || '—' },
           ];
+        },
+
+        cwDecisionOptions() {
+          const dim = this.selectedCampaignTag?.name;
+          const allHints = {
+            IdentityResolution: {
+              'ADB Add':    'Add owner record to assessor database',
+              'ADB Remove': 'Retire stale assessor record',
+              'GIS Add':    'Add parcel polygon to GIS layer',
+              'GIS Remove': 'Retire spurious GIS polygon',
+            },
+            CoverageDetermination: {
+              'Undeveloped':    'No significant structures; land is open or forested',
+              'Underdeveloped': 'Some development but substantial open space remains',
+              'Developed':      'Land is substantially developed',
+            },
+            FarmingDetermination: {
+              'Not Suitable': 'Site characteristics do not support agricultural use',
+              'Possible':     'Some agricultural potential; further review warranted',
+              'Suitable':     'Site is well-suited for agricultural use',
+            },
+            AcquisitionDetermination: {
+              'Pursue': 'Priority acquisition — initiate contact or process',
+              'Watch':  'Monitor for future opportunity',
+              'Pass':   'Not a conservation priority at this time',
+            },
+            Article97Determination: {
+              'Confirmed': 'Document relates to Article 97 protected land',
+              'Denied':    'Document does not establish Article 97 protection',
+            },
+          };
+          const hints  = allHints[dim] || {};
+          const states = (this.selectedCampaignTag?.states_csv || '').split(',')
+            .map(s => s.trim()).filter(s => s && s !== 'Unconfirmed');
+          return states.map(s => ({ key: s, hint: hints[s] || '' }));
+        },
+
+        cwDimLabel() {
+          const labels = {
+            IdentityResolution:      'IDENTITY',
+            CoverageDetermination:   'COVERAGE',
+            FarmingDetermination:    'FARMING',
+            AcquisitionDetermination:'ACQUISITION',
+            Article97Determination:  'ARTICLE 97',
+          };
+          return labels[this.selectedCampaignTag?.name] || 'DETERMINATION';
         },
 
         cwOpenFullParcel(parcelId) {

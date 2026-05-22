@@ -167,21 +167,34 @@
                   :style="cwFilter==='all' ? 'background:#0f172a;color:#fff;border-color:#0f172a;' : 'background:#fff;color:#475569;border-color:#e2e8f0;'">
                   All
                 </button>
-                <button @click="cwSetFilter('adb_only')"
-                  style="font-size:10px;padding:3px 7px;border-radius:999px;font-family:inherit;cursor:pointer;border:1px solid;"
-                  :style="cwFilter==='adb_only' ? 'background:#0f172a;color:#fff;border-color:#0f172a;' : 'background:#fff;color:#475569;border-color:#e2e8f0;'">
-                  ADB only
-                </button>
-                <button @click="cwSetFilter('gis_only')"
-                  style="font-size:10px;padding:3px 7px;border-radius:999px;font-family:inherit;cursor:pointer;border:1px solid;"
-                  :style="cwFilter==='gis_only' ? 'background:#0f172a;color:#fff;border-color:#0f172a;' : 'background:#fff;color:#475569;border-color:#e2e8f0;'">
-                  GIS only
-                </button>
-                <button @click="cwSetFilter('mismatch')"
-                  style="font-size:10px;padding:3px 7px;border-radius:999px;font-family:inherit;cursor:pointer;border:1px solid;"
-                  :style="cwFilter==='mismatch' ? 'background:#0f172a;color:#fff;border-color:#0f172a;' : 'background:#fff;color:#475569;border-color:#e2e8f0;'">
-                  Mismatch
-                </button>
+                <template x-if="selectedCampaignTag?.name === 'IdentityResolution'">
+                  <span style="display:contents;">
+                    <button @click="cwSetFilter('adb_only')"
+                      style="font-size:10px;padding:3px 7px;border-radius:999px;font-family:inherit;cursor:pointer;border:1px solid;"
+                      :style="cwFilter==='adb_only' ? 'background:#0f172a;color:#fff;border-color:#0f172a;' : 'background:#fff;color:#475569;border-color:#e2e8f0;'">
+                      ADB only
+                    </button>
+                    <button @click="cwSetFilter('gis_only')"
+                      style="font-size:10px;padding:3px 7px;border-radius:999px;font-family:inherit;cursor:pointer;border:1px solid;"
+                      :style="cwFilter==='gis_only' ? 'background:#0f172a;color:#fff;border-color:#0f172a;' : 'background:#fff;color:#475569;border-color:#e2e8f0;'">
+                      GIS only
+                    </button>
+                  </span>
+                </template>
+                <template x-if="selectedCampaignTag?.name === 'AcquisitionDetermination'">
+                  <span style="display:contents;">
+                    <button @click="cwSetFilter('possible')"
+                      style="font-size:10px;padding:3px 7px;border-radius:999px;font-family:inherit;cursor:pointer;border:1px solid;"
+                      :style="cwFilter==='possible' ? 'background:#0f172a;color:#fff;border-color:#0f172a;' : 'background:#fff;color:#475569;border-color:#e2e8f0;'">
+                      Possible
+                    </button>
+                    <button @click="cwSetFilter('likely')"
+                      style="font-size:10px;padding:3px 7px;border-radius:999px;font-family:inherit;cursor:pointer;border:1px solid;"
+                      :style="cwFilter==='likely' ? 'background:#0f172a;color:#fff;border-color:#0f172a;' : 'background:#fff;color:#475569;border-color:#e2e8f0;'">
+                      Likely
+                    </button>
+                  </span>
+                </template>
               </div>
             </div>
             <!-- List -->
@@ -202,17 +215,30 @@
                       : (cwDecisions[p.parcel_id] ? '#10b981' : 'transparent'),
                   }">
                   <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <span style="font-size:13px;font-weight:600;color:#0f172a;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;" x-text="p.parcel_id"></span>
+                    <span style="font-size:13px;font-weight:600;color:#0f172a;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"
+                          x-text="selectedCampaignTag?.name === 'Article97Determination' ? ('Bk ' + p.book + '/' + p.page) : p.parcel_id"></span>
                     <span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;letter-spacing:0.4px;"
-                          :style="cwDecisions[p.parcel_id] ? 'color:#047857;background:#d1fae5;' : 'color:#92400e;background:#fef3c7;'"
-                          x-text="cwDecisions[p.parcel_id] || 'NA'"></span>
+                          :style="cwDecisions[p.parcel_id||p.doc_id] ? 'color:#047857;background:#d1fae5;' : 'color:#92400e;background:#fef3c7;'"
+                          x-text="cwDecisions[p.parcel_id||p.doc_id] || 'NA'"></span>
                   </div>
                   <div style="font-size:11px;color:#334155;margin-top:2px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
-                       x-text="p.owner_name || '(no owner)'"></div>
+                       x-text="selectedCampaignTag?.name === 'Article97Determination' ? (p.instrument_type || '—') : (p.owner_name || '(no owner)')"></div>
                   <div style="font-size:10px;color:#94a3b8;margin-top:3px;">
-                    <span x-text="p.identity_state === 'ADB-only' ? 'ADB only' : 'GIS only'"></span>
-                    <span> · </span>
-                    <span x-text="(+(p.billingacres||0)).toFixed(2) + ' ac'"></span>
+                    <template x-if="selectedCampaignTag?.name === 'IdentityResolution'">
+                      <span><span x-text="p.identity_state === 'ADB-only' ? 'ADB only' : 'GIS only'"></span> · <span x-text="(+(p.billingacres||0)).toFixed(2) + ' ac'"></span></span>
+                    </template>
+                    <template x-if="selectedCampaignTag?.name === 'CoverageDetermination'">
+                      <span><span x-text="p.coverage_estimate || '—'"></span> · <span x-text="(+(p.billingacres||0)).toFixed(2) + ' ac'"></span></span>
+                    </template>
+                    <template x-if="selectedCampaignTag?.name === 'FarmingDetermination'">
+                      <span><span x-text="p.farming_suitability || '—'"></span> · <span x-text="(+(p.billingacres||0)).toFixed(2) + ' ac'"></span></span>
+                    </template>
+                    <template x-if="selectedCampaignTag?.name === 'AcquisitionDetermination'">
+                      <span><span x-text="p.acquisition_suitability || '—'"></span> · <span x-text="(+(p.billingacres||0)).toFixed(2) + ' ac'"></span></span>
+                    </template>
+                    <template x-if="selectedCampaignTag?.name === 'Article97Determination'">
+                      <span x-text="((p.kw_article_97||0)*100).toFixed(0) + '% score'"></span>
+                    </template>
                   </div>
                 </button>
               </template>
@@ -235,38 +261,67 @@
               </div>
             </template>
 
-            <template x-if="cwParcelDetail && !cwDetailLoading">
+            <template x-if="(cwParcelDetail || cwDocDetail) && !cwDetailLoading">
 
-              <!-- Parcel strip -->
-              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
-                <div>
-                  <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;margin-bottom:4px;">PARCEL</div>
-                  <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;">
-                    <span style="font-size:22px;font-weight:700;letter-spacing:-0.4px;" x-text="cwParcelDetail.parcel.parcel_id"></span>
-                    <span style="font-size:13px;color:#334155;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;"
-                          x-text="cwParcelDetail.parcel.site_addr || '(no address)'"></span>
+              <!-- Parcel strip (all parcel campaigns) -->
+              <template x-if="cwParcelDetail">
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+                  <div>
+                    <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;margin-bottom:4px;">PARCEL</div>
+                    <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;">
+                      <span style="font-size:22px;font-weight:700;letter-spacing:-0.4px;" x-text="cwParcelDetail.parcel.parcel_id"></span>
+                      <span style="font-size:13px;color:#334155;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;"
+                            x-text="cwParcelDetail.parcel.site_addr || '(no address)'"></span>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+                      <template x-if="cwParcelDetail.parcel.owner_category">
+                        <span style="font-size:10px;font-weight:700;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:3px;letter-spacing:0.6px;"
+                              x-text="cwParcelDetail.parcel.owner_category.toUpperCase()"></span>
+                      </template>
+                      <template x-if="cwParcelDetail.parcel.is_public">
+                        <span style="font-size:10px;font-weight:700;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:3px;letter-spacing:0.6px;">PUBLIC</span>
+                      </template>
+                      <template x-if="cwParcelDetail.parcel.use_code_norm">
+                        <span style="font-size:10px;font-weight:700;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:3px;letter-spacing:0.6px;"
+                              x-text="cwParcelDetail.parcel.use_code_norm.toUpperCase()"></span>
+                      </template>
+                      <span style="font-size:11px;color:#64748b;"
+                            x-text="(+(cwParcelDetail.parcel.billingacres||0)).toFixed(2) + ' ac · ' + (cwParcelDetail.parcel.village||'')"></span>
+                    </div>
                   </div>
-                  <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
-                    <template x-if="cwParcelDetail.parcel.owner_category">
-                      <span style="font-size:10px;font-weight:700;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:3px;letter-spacing:0.6px;"
-                            x-text="cwParcelDetail.parcel.owner_category.toUpperCase()"></span>
-                    </template>
-                    <template x-if="cwParcelDetail.parcel.is_public">
-                      <span style="font-size:10px;font-weight:700;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:3px;letter-spacing:0.6px;">PUBLIC</span>
-                    </template>
-                    <template x-if="cwParcelDetail.parcel.use_code_norm">
-                      <span style="font-size:10px;font-weight:700;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 6px;border-radius:3px;letter-spacing:0.6px;"
-                            x-text="cwParcelDetail.parcel.use_code_norm.toUpperCase()"></span>
-                    </template>
-                    <span style="font-size:11px;color:#64748b;"
-                          x-text="(+(cwParcelDetail.parcel.billingacres||0)).toFixed(2) + ' ac · ' + (cwParcelDetail.parcel.village||'')"></span>
-                  </div>
+                  <button @click="cwOpenFullParcel(cwParcelDetail.parcel.parcel_id)"
+                    style="font-size:12px;color:#1d4ed8;background:none;border:none;cursor:pointer;font-weight:500;margin-top:4px;white-space:nowrap;flex-shrink:0;font-family:inherit;padding:0;">
+                    Open full parcel →
+                  </button>
                 </div>
-                <button @click="cwOpenFullParcel(cwParcelDetail.parcel.parcel_id)"
-                  style="font-size:12px;color:#1d4ed8;background:none;border:none;cursor:pointer;font-weight:500;margin-top:4px;white-space:nowrap;flex-shrink:0;font-family:inherit;padding:0;">
-                  Open full parcel →
-                </button>
-              </div>
+              </template>
+
+              <!-- Document strip (Article 97) -->
+              <template x-if="cwDocDetail">
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+                  <div>
+                    <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;margin-bottom:4px;">DOCUMENT</div>
+                    <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;">
+                      <span style="font-size:20px;font-weight:700;letter-spacing:-0.4px;font-family:'IBM Plex Mono',monospace;"
+                            x-text="'Bk ' + cwDocDetail.document.book + '/' + cwDocDetail.document.page"></span>
+                      <span style="font-size:13px;color:#334155;text-transform:uppercase;"
+                            x-text="cwDocDetail.document.instrument_type || '—'"></span>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:6px;align-items:center;flex-wrap:wrap;font-size:11px;color:#64748b;">
+                      <span x-text="cwDocDetail.document.recorded_date?.slice(0,10) || '—'"></span>
+                      <template x-if="pnDocPartyLine(cwDocDetail.document)">
+                        <span x-text="pnDocPartyLine(cwDocDetail.document)"></span>
+                      </template>
+                    </div>
+                  </div>
+                  <template x-if="cwDocDetail.document.parcel_id">
+                    <button @click="cwOpenFullParcel(cwDocDetail.document.parcel_id)"
+                      style="font-size:12px;color:#1d4ed8;background:none;border:none;cursor:pointer;font-weight:500;margin-top:4px;white-space:nowrap;flex-shrink:0;font-family:inherit;padding:0;">
+                      Open parcel →
+                    </button>
+                  </template>
+                </div>
+              </template>
 
               <!-- Decision -->
               <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px 16px;">
@@ -276,36 +331,38 @@
                   <button @click="cwChipOpen=!cwChipOpen"
                     style="border:1px solid;border-radius:8px;min-width:240px;cursor:pointer;text-align:left;font-family:inherit;padding:10px 12px;"
                     :style="{
-                      borderColor: cwDecisions[cwParcelDetail.parcel.parcel_id] ? (campaignMeta(selectedCampaignTag)?.color||'#d97706') : '#e2e8f0',
-                      background:  cwDecisions[cwParcelDetail.parcel.parcel_id] ? '#fef3c7' : '#fff',
+                      borderColor: cwDecisions[cwCurrentEntityId] ? (campaignMeta(selectedCampaignTag)?.color||'#d97706') : '#e2e8f0',
+                      background:  cwDecisions[cwCurrentEntityId] ? '#fef3c7' : '#fff',
                     }">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                      <span style="font-size:10px;font-weight:700;letter-spacing:1.4px;color:#475569;">IDENTITY</span>
+                      <span style="font-size:10px;font-weight:700;letter-spacing:1.4px;color:#475569;" x-text="cwDimLabel()"></span>
                       <span style="font-size:10px;font-weight:700;letter-spacing:0.8px;padding:2px 8px;border-radius:4px;"
-                            :style="cwDecisions[cwParcelDetail.parcel.parcel_id]
+                            :style="cwDecisions[cwCurrentEntityId]
                               ? 'background:' + (campaignMeta(selectedCampaignTag)?.color||'#d97706') + ';color:#fff;'
                               : 'background:#fef3c7;color:#92400e;'"
-                            x-text="cwDecisions[cwParcelDetail.parcel.parcel_id] || 'NA'"></span>
+                            x-text="cwDecisions[cwCurrentEntityId] || 'NA'"></span>
                     </div>
                     <div style="font-size:15px;font-weight:600;color:#0f172a;font-style:italic;margin-bottom:4px;"
-                         x-text="cwDecisions[cwParcelDetail.parcel.parcel_id] || 'Unconfirmed'"></div>
+                         x-text="cwDecisions[cwCurrentEntityId] || 'Unconfirmed'"></div>
                     <div style="font-size:11px;color:#64748b;display:flex;justify-content:space-between;align-items:center;">
-                      <span>Resolve mismatch</span>
+                      <span x-text="campaignMeta(selectedCampaignTag)?.scope || 'Set determination'"></span>
                       <span x-text="cwChipOpen ? '▴' : '▾'" style="color:#94a3b8;"></span>
                     </div>
                   </button>
                   <!-- Popover -->
                   <div x-show="cwChipOpen" @click.stop
                     style="position:absolute;top:calc(100% + 6px);left:0;width:340px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 12px 32px -8px rgba(15,23,42,.18);padding:12px;z-index:50;">
-                    <div style="font-size:13px;font-weight:600;color:#0f172a;">Set Identity determination</div>
-                    <div style="font-size:11px;color:#64748b;margin-top:2px;margin-bottom:10px;">Pick the action that resolves the ADB ↔ GIS mismatch.</div>
+                    <div style="font-size:13px;font-weight:600;color:#0f172a;"
+                         x-text="'Set ' + (campaignMeta(selectedCampaignTag)?.label || cwDimLabel()) + ' determination'"></div>
+                    <div style="font-size:11px;color:#64748b;margin-top:2px;margin-bottom:10px;"
+                         x-text="campaignMeta(selectedCampaignTag)?.scope || 'Choose the determination for this item.'"></div>
                     <div style="display:flex;flex-direction:column;gap:6px;">
-                      <template x-for="d in cwIdentityDecisions" :key="d.key">
-                        <button @click="cwDecisions = {...cwDecisions, [cwParcelDetail.parcel.parcel_id]: d.key}; cwChipOpen=false"
+                      <template x-for="d in cwDecisionOptions()" :key="d.key">
+                        <button @click="cwDecisions = {...cwDecisions, [cwCurrentEntityId]: d.key}; cwChipOpen=false"
                           style="text-align:left;border:1px solid;border-radius:6px;padding:8px 10px;cursor:pointer;font-family:inherit;"
                           :style="{
-                            background:  cwDecisions[cwParcelDetail.parcel.parcel_id]===d.key ? '#fef3c7' : '#fff',
-                            borderColor: cwDecisions[cwParcelDetail.parcel.parcel_id]===d.key ? '#fcd34d' : '#e2e8f0',
+                            background:  cwDecisions[cwCurrentEntityId]===d.key ? '#fef3c7' : '#fff',
+                            borderColor: cwDecisions[cwCurrentEntityId]===d.key ? '#fcd34d' : '#e2e8f0',
                           }">
                           <div style="display:flex;justify-content:space-between;align-items:center;">
                             <span style="font-size:13px;font-weight:600;color:#0f172a;" x-text="d.key"></span>
@@ -319,7 +376,7 @@
                       </template>
                     </div>
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid #f1f5f9;">
-                      <button @click="cwClearDecision(cwParcelDetail.parcel.parcel_id); cwChipOpen=false"
+                      <button @click="cwClearDecision(cwCurrentEntityId); cwChipOpen=false"
                         style="background:transparent;border:none;color:#64748b;font-size:12px;cursor:pointer;padding:0;font-family:inherit;">
                         Clear determination
                       </button>
@@ -335,80 +392,220 @@
                 </div>
               </div>
 
-              <!-- Identity evidence -->
-              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px 16px;">
-                <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;margin-bottom:10px;">IDENTITY EVIDENCE</div>
-                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;">
-                  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;">
-                    <span style="font-size:13px;font-weight:600;color:#0f172a;">Owner mismatch</span>
-                    <span style="font-size:11px;font-weight:600;letter-spacing:0.4px;"
-                          :style="'color:' + (campaignMeta(selectedCampaignTag)?.color||'#d97706')"
-                          x-text="cwParcelDetail.parcel.identity_state === 'ADB-only' ? 'ADB only — missing in GIS' : 'GIS only — missing in ADB'"></span>
-                  </div>
-                  <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:stretch;">
-                    <!-- ADB -->
-                    <div style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;padding:10px 12px;">
-                      <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.8px;display:flex;align-items:center;gap:6px;margin-bottom:6px;text-transform:uppercase;">
-                        <span style="width:8px;height:8px;border-radius:999px;background:#d97706;display:inline-block;flex-shrink:0;"></span>
-                        ADB · assessor
-                      </div>
-                      <div style="font-size:15px;font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-bottom:4px;word-break:break-word;"
-                           :style="cwParcelDetail.parcel.identity_state !== 'GIS-only' && cwParcelDetail.parcel.owner_name ? 'color:#0f172a;' : 'color:#94a3b8;font-style:italic;'"
-                           x-text="cwParcelDetail.parcel.identity_state === 'GIS-only' ? '— no record —' : (cwParcelDetail.parcel.owner_name || '— no record —')"></div>
-                      <div style="font-size:11px;color:#64748b;"
-                           x-text="cwParcelDetail.parcel.identity_state !== 'GIS-only' ? ('Parcel ' + cwParcelDetail.parcel.parcel_id) : 'Not in assessor database'"></div>
+              <!-- ── Identity evidence ─────────────────────────────────── -->
+              <template x-if="selectedCampaignTag?.name === 'IdentityResolution'">
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px 16px;">
+                  <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;margin-bottom:10px;">IDENTITY EVIDENCE</div>
+                  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;">
+                      <span style="font-size:13px;font-weight:600;color:#0f172a;">Owner mismatch</span>
+                      <span style="font-size:11px;font-weight:600;letter-spacing:0.4px;"
+                            :style="'color:' + (campaignMeta(selectedCampaignTag)?.color||'#d97706')"
+                            x-text="cwParcelDetail.parcel.identity_state === 'ADB-only' ? 'ADB only — missing in GIS' : 'GIS only — missing in ADB'"></span>
                     </div>
-                    <!-- Arrow -->
-                    <div style="align-self:center;font-size:18px;color:#cbd5e1;font-weight:600;">↔</div>
-                    <!-- GIS -->
-                    <div style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;padding:10px 12px;">
-                      <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.8px;display:flex;align-items:center;gap:6px;margin-bottom:6px;text-transform:uppercase;">
-                        <span style="width:8px;height:8px;border-radius:999px;background:#1d4ed8;display:inline-block;flex-shrink:0;"></span>
-                        GIS · parcel layer
+                    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:stretch;">
+                      <div style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;padding:10px 12px;">
+                        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.8px;display:flex;align-items:center;gap:6px;margin-bottom:6px;text-transform:uppercase;">
+                          <span style="width:8px;height:8px;border-radius:999px;background:#d97706;display:inline-block;flex-shrink:0;"></span>
+                          ADB · assessor
+                        </div>
+                        <div style="font-size:15px;font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-bottom:4px;word-break:break-word;"
+                             :style="cwParcelDetail.parcel.identity_state !== 'GIS-only' && cwParcelDetail.parcel.owner_name ? 'color:#0f172a;' : 'color:#94a3b8;font-style:italic;'"
+                             x-text="cwParcelDetail.parcel.identity_state === 'GIS-only' ? '— no record —' : (cwParcelDetail.parcel.owner_name || '— no record —')"></div>
+                        <div style="font-size:11px;color:#64748b;"
+                             x-text="cwParcelDetail.parcel.identity_state !== 'GIS-only' ? ('Parcel ' + cwParcelDetail.parcel.parcel_id) : 'Not in assessor database'"></div>
                       </div>
-                      <div style="font-size:15px;font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-bottom:4px;word-break:break-word;"
-                           :style="cwParcelDetail.parcel.identity_state !== 'ADB-only' ? 'color:#0f172a;' : 'color:#94a3b8;font-style:italic;'"
-                           x-text="cwParcelDetail.parcel.identity_state === 'ADB-only' ? '— no record —' : (cwParcelDetail.parcel.owner_name || '— no record —')"></div>
-                      <div style="font-size:11px;color:#64748b;"
-                           x-text="cwParcelDetail.parcel.identity_state === 'ADB-only' ? 'No polygon in GIS layer' : ((+(cwParcelDetail.parcel.billingacres||0)).toFixed(2) + ' ac')"></div>
+                      <div style="align-self:center;font-size:18px;color:#cbd5e1;font-weight:600;">↔</div>
+                      <div style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;padding:10px 12px;">
+                        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.8px;display:flex;align-items:center;gap:6px;margin-bottom:6px;text-transform:uppercase;">
+                          <span style="width:8px;height:8px;border-radius:999px;background:#1d4ed8;display:inline-block;flex-shrink:0;"></span>
+                          GIS · parcel layer
+                        </div>
+                        <div style="font-size:15px;font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-bottom:4px;word-break:break-word;"
+                             :style="cwParcelDetail.parcel.identity_state !== 'ADB-only' ? 'color:#0f172a;' : 'color:#94a3b8;font-style:italic;'"
+                             x-text="cwParcelDetail.parcel.identity_state === 'ADB-only' ? '— no record —' : (cwParcelDetail.parcel.owner_name || '— no record —')"></div>
+                        <div style="font-size:11px;color:#64748b;"
+                             x-text="cwParcelDetail.parcel.identity_state === 'ADB-only' ? 'No polygon in GIS layer' : ((+(cwParcelDetail.parcel.billingacres||0)).toFixed(2) + ' ac')"></div>
+                      </div>
                     </div>
-                  </div>
-                  <!-- Suggestion -->
-                  <div style="margin-top:12px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#78350f;line-height:1.5;">
-                    <span style="color:#d97706;font-weight:600;">✦ Suggestion:</span>
-                    <strong x-text="' ' + (cwSuggestion(cwCurrentParcel) || '—')"></strong>
-                    <span x-text="cwParcelDetail.parcel.identity_state === 'ADB-only'
-                      ? ' — Owner on ADB but no matching polygon in GIS layer.'
-                      : ' — Parcel polygon in GIS but no matching assessor record.'"></span>
+                    <div style="margin-top:12px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#78350f;line-height:1.5;">
+                      <span style="color:#d97706;font-weight:600;">✦ Suggestion:</span>
+                      <strong x-text="' ' + (cwSuggestion(cwCurrentParcel) || '—')"></strong>
+                      <span x-text="cwParcelDetail.parcel.identity_state === 'ADB-only'
+                        ? ' — Owner on ADB but no matching polygon in GIS layer.'
+                        : ' — Parcel polygon in GIS but no matching assessor record.'"></span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </template>
 
-              <!-- Basic info -->
-              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px 16px;">
-                <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;margin-bottom:10px;">BASIC INFO</div>
-                <template x-for="row in cwBasicInfoRows(cwParcelDetail.parcel)" :key="row.k">
-                  <div style="display:grid;grid-template-columns:120px 1fr 90px;gap:12px;border-bottom:1px solid #f1f5f9;align-items:center;padding:8px 0;">
-                    <div style="font-size:12px;color:#64748b;" x-text="row.k"></div>
-                    <div style="font-size:13px;color:#0f172a;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;" x-text="row.v"></div>
-                    <div style="font-size:10px;color:#94a3b8;text-align:right;letter-spacing:0.3px;">↑ Assessor</div>
+              <!-- ── Coverage evidence ──────────────────────────────────── -->
+              <template x-if="selectedCampaignTag?.name === 'CoverageDetermination'">
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px 16px;">
+                  <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;margin-bottom:10px;">COVERAGE EVIDENCE</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+                    <div style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;padding:10px 12px;">
+                      <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.8px;margin-bottom:4px;">ESTIMATE</div>
+                      <div style="font-size:15px;font-weight:700;"
+                           :style="'color:' + (campaignMeta(selectedCampaignTag)?.color||'#10b981')"
+                           x-text="cwCurrentParcel?.coverage_estimate || '—'"></div>
+                    </div>
+                    <div style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;padding:10px 12px;">
+                      <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.8px;margin-bottom:4px;">COVERAGE RATIO</div>
+                      <div style="font-size:15px;font-weight:700;color:#0f172a;"
+                           x-text="cwParcelDetail.parcel.coverage_ratio != null ? (cwParcelDetail.parcel.coverage_ratio * 100).toFixed(1) + '%' : '—'"></div>
+                    </div>
                   </div>
-                </template>
-              </div>
+                  <div x-show="cwParcelDetail.parcel.coverage_ratio != null" style="height:6px;border-radius:3px;background:#f1f5f9;overflow:hidden;margin-bottom:12px;">
+                    <div :style="'height:100%;width:' + Math.min((cwParcelDetail.parcel.coverage_ratio||0)*100, 100).toFixed(1) + '%;background:' + (campaignMeta(selectedCampaignTag)?.color||'#10b981')"></div>
+                  </div>
+                  <template x-if="cwSuggestion(cwCurrentParcel)">
+                    <div style="padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:12px;color:#14532d;line-height:1.5;">
+                      <span style="font-weight:600;" :style="'color:' + (campaignMeta(selectedCampaignTag)?.color||'#10b981')">✦ Suggestion:</span>
+                      <strong x-text="' ' + cwSuggestion(cwCurrentParcel)"></strong>
+                      <span x-text="' — based on coverage ratio of ' + ((cwParcelDetail.parcel.coverage_ratio||0)*100).toFixed(1) + '%'"></span>
+                    </div>
+                  </template>
+                </div>
+              </template>
 
-            </template><!-- /cwParcelDetail -->
+              <!-- ── Farming evidence ──────────────────────────────────── -->
+              <template x-if="selectedCampaignTag?.name === 'FarmingDetermination'">
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px 16px;">
+                  <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;margin-bottom:10px;">FARMING EVIDENCE</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+                    <div style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;padding:10px 12px;">
+                      <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.8px;margin-bottom:4px;">FARMING SUITABILITY</div>
+                      <div style="font-size:15px;font-weight:700;"
+                           :style="'color:' + (cwParcelDetail.parcel.farming_suitability && cwParcelDetail.parcel.farming_suitability !== 'Not suitable' ? (campaignMeta(selectedCampaignTag)?.color||'#84cc16') : '#94a3b8')"
+                           x-text="cwParcelDetail.parcel.farming_suitability || '—'"></div>
+                    </div>
+                    <div style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;padding:10px 12px;">
+                      <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.8px;margin-bottom:4px;">USE CODE</div>
+                      <div style="font-size:13px;font-weight:600;color:#0f172a;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"
+                           x-text="cwParcelDetail.parcel.use_code_norm || '—'"></div>
+                      <div style="font-size:11px;color:#64748b;margin-top:2px;"
+                           x-text="cwParcelDetail.parcel.use_code_desc || ''"></div>
+                    </div>
+                  </div>
+                  <template x-if="cwParcelDetail.soil">
+                    <div style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;padding:10px 12px;margin-bottom:12px;">
+                      <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.8px;margin-bottom:6px;">SOIL</div>
+                      <template x-for="[k,v] in Object.entries(cwParcelDetail.soil).filter(([k])=>!['_loaded_at','parcel_id'].includes(k) && cwParcelDetail.soil[k] != null)" :key="k">
+                        <div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;">
+                          <span style="color:#64748b;" x-text="k.replace(/_/g,' ')"></span>
+                          <span style="color:#0f172a;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;" x-text="v"></span>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                  <template x-if="cwSuggestion(cwCurrentParcel)">
+                    <div style="padding:10px 12px;background:#f7fee7;border:1px solid #d9f99d;border-radius:6px;font-size:12px;color:#365314;line-height:1.5;">
+                      <span style="font-weight:600;" :style="'color:' + (campaignMeta(selectedCampaignTag)?.color||'#84cc16')">✦ Suggestion:</span>
+                      <strong x-text="' ' + cwSuggestion(cwCurrentParcel)"></strong>
+                      <span x-text="' — based on farming suitability layer value \'' + (cwParcelDetail.parcel.farming_suitability||'—') + '\''"></span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+
+              <!-- ── Acquisition evidence ──────────────────────────────── -->
+              <template x-if="selectedCampaignTag?.name === 'AcquisitionDetermination'">
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px 16px;">
+                  <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;margin-bottom:10px;">ACQUISITION EVIDENCE</div>
+                  <div style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;padding:10px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                      <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.8px;margin-bottom:4px;">ACQUISITION SUITABILITY</div>
+                      <div style="font-size:17px;font-weight:700;"
+                           :style="'color:' + (campaignMeta(selectedCampaignTag)?.color||'#3b82f6')"
+                           x-text="cwParcelDetail.parcel.acquisition_suitability || '—'"></div>
+                    </div>
+                    <div style="text-align:right;">
+                      <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.8px;margin-bottom:4px;">APPRAISED VALUE</div>
+                      <div style="font-size:15px;font-weight:600;color:#0f172a;"
+                           x-text="cwParcelDetail.parcel.totalapprvalue ? '$' + Number(cwParcelDetail.parcel.totalapprvalue).toLocaleString() : '—'"></div>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;">
+                    <template x-for="[label, val] in [
+                      ['Protected Open Space', cwParcelDetail.parcel.os_acres != null ? Number(cwParcelDetail.parcel.os_acres).toFixed(2) + ' ac' : null],
+                      ['BioMap Core Habitat',  cwParcelDetail.parcel.bm3_core_acres != null ? Number(cwParcelDetail.parcel.bm3_core_acres).toFixed(2) + ' ac' : null],
+                      ['BioMap CNL',           cwParcelDetail.parcel.bm3_cnl_acres != null ? Number(cwParcelDetail.parcel.bm3_cnl_acres).toFixed(2) + ' ac' : null],
+                      ['BioMap Local',         cwParcelDetail.parcel.bm3_local_acres != null ? Number(cwParcelDetail.parcel.bm3_local_acres).toFixed(2) + ' ac' : null],
+                      ['Priority Habitat',     cwParcelDetail.parcel.phrs_present != null ? (cwParcelDetail.parcel.phrs_present ? 'Present' : 'Not detected') : null],
+                    ].filter(([,v]) => v !== null)" :key="label">
+                      <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid #f1f5f9;">
+                        <span style="color:#64748b;" x-text="label"></span>
+                        <span style="font-weight:600;color:#0f172a;" x-text="val"></span>
+                      </div>
+                    </template>
+                  </div>
+                  <template x-if="cwSuggestion(cwCurrentParcel)">
+                    <div style="padding:10px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;color:#1e3a5f;line-height:1.5;">
+                      <span style="font-weight:600;" :style="'color:' + (campaignMeta(selectedCampaignTag)?.color||'#3b82f6')">✦ Suggestion:</span>
+                      <strong x-text="' ' + cwSuggestion(cwCurrentParcel)"></strong>
+                      <span x-text="' — suitability is ' + cwParcelDetail.parcel.acquisition_suitability"></span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+
+              <!-- ── Article 97 evidence ────────────────────────────────── -->
+              <template x-if="selectedCampaignTag?.name === 'Article97Determination' && cwDocDetail">
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px 16px;">
+                  <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;margin-bottom:10px;">ARTICLE 97 EVIDENCE</div>
+                  <div style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;padding:10px 12px;margin-bottom:12px;">
+                    <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:0.8px;margin-bottom:8px;">KEYWORD SCORE</div>
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                      <div style="flex:1;height:8px;border-radius:4px;background:#f1f5f9;overflow:hidden;">
+                        <div :style="'height:100%;width:' + Math.min(((cwDocDetail.ocr?.kw_article_97||cwCurrentParcel?.kw_article_97||0)*100), 100).toFixed(1) + '%;background:' + (campaignMeta(selectedCampaignTag)?.color||'#8b5cf6')"></div>
+                      </div>
+                      <span style="font-size:15px;font-weight:700;"
+                            :style="'color:' + (campaignMeta(selectedCampaignTag)?.color||'#8b5cf6')"
+                            x-text="(((cwDocDetail.ocr?.kw_article_97||cwCurrentParcel?.kw_article_97||0))*100).toFixed(0) + '%'"></span>
+                    </div>
+                    <div style="font-size:11px;color:#64748b;">Score above 40% triggers Article 97 review applicability.</div>
+                  </div>
+                  <template x-if="cwDocDetail.document.parcel_id">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;color:#64748b;">
+                      <span>Related parcel:</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:#0f172a;" x-text="cwDocDetail.document.parcel_id"></span>
+                    </div>
+                  </template>
+                  <div style="padding:10px 12px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;font-size:12px;color:#3b0764;line-height:1.5;">
+                    <span style="font-weight:600;" :style="'color:' + (campaignMeta(selectedCampaignTag)?.color||'#8b5cf6')">✦ Suggestion: Confirmed</span>
+                    <span> — keyword score exceeds threshold. Review document for Article 97 references before deciding.</span>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Basic info (parcel campaigns only) -->
+              <template x-if="cwParcelDetail">
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px 16px;">
+                  <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;margin-bottom:10px;">BASIC INFO</div>
+                  <template x-for="row in cwBasicInfoRows(cwParcelDetail.parcel)" :key="row.k">
+                    <div style="display:grid;grid-template-columns:120px 1fr 90px;gap:12px;border-bottom:1px solid #f1f5f9;align-items:center;padding:8px 0;">
+                      <div style="font-size:12px;color:#64748b;" x-text="row.k"></div>
+                      <div style="font-size:13px;color:#0f172a;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;" x-text="row.v"></div>
+                      <div style="font-size:10px;color:#94a3b8;text-align:right;letter-spacing:0.3px;">↑ Assessor</div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+
+            </template><!-- /(cwParcelDetail||cwDocDetail) -->
           </main><!-- /center col -->
 
           <!-- Right: map + actions -->
           <aside style="background:#fff;border-left:1px solid #e2e8f0;padding:14px 16px;display:flex;flex-direction:column;gap:12px;overflow:auto;">
             <div style="display:flex;justify-content:space-between;align-items:baseline;">
               <span style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;"
-                    x-text="cwParcelDetail ? 'MAP · ' + cwParcelDetail.parcel.parcel_id : 'MAP'"></span>
+                    x-text="cwParcelDetail ? 'MAP · ' + cwParcelDetail.parcel.parcel_id : (cwDocDetail?.document?.parcel_id ? 'MAP · ' + cwDocDetail.document.parcel_id : 'MAP')"></span>
             </div>
             <!-- Map -->
             <div style="position:relative;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;height:360px;flex-shrink:0;">
               <div id="campaign-map" style="position:absolute;inset:0;"></div>
-              <template x-if="!cwParcelDetail">
+              <template x-if="!cwParcelDetail && !cwDocDetail">
                 <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#f8fafc;font-size:11px;color:#94a3b8;font-family:'IBM Plex Mono',monospace;">
                   Select a parcel
                 </div>
@@ -421,9 +618,9 @@
                 Skip
               </button>
               <button @click="cwSaveAndNext()"
-                :disabled="!cwDecisions[cwParcelDetail?.parcel?.parcel_id]"
+                :disabled="!cwDecisions[cwCurrentEntityId]"
                 style="border:none;padding:9px 16px;border-radius:6px;font-size:13px;font-weight:600;font-family:inherit;flex:2;color:#fff;"
-                :style="cwDecisions[cwParcelDetail?.parcel?.parcel_id]
+                :style="cwDecisions[cwCurrentEntityId]
                   ? 'background:' + (campaignMeta(selectedCampaignTag)?.color||'#d97706') + ';cursor:pointer;'
                   : 'background:#cbd5e1;cursor:not-allowed;'">
                 Save &amp; Next →
