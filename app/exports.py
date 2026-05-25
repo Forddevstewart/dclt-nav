@@ -4,7 +4,7 @@ from flask import Blueprint, Response, request
 from flask_login import login_required
 from .models import get_db, get_reference_db
 from .db_utils import table_exists as _table_exists
-from discovery.keywords import KW_KEYS, KW_LABELS
+from .keywords import KW_KEYS, KW_LABELS
 
 bp = Blueprint("exports", __name__, url_prefix="/exports")
 

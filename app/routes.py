@@ -3,8 +3,6 @@ from flask import Blueprint, render_template, send_file
 
 bp = Blueprint("routes", __name__)
 
-_PROCESSING_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "processing")
-
 
 @bp.route("/")
 def index():

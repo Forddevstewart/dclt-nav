@@ -5,7 +5,8 @@ from flask_login import login_required
 from .models import get_reference_db, get_db
 from .db_utils import table_exists, column_exists, FOLD as _FOLD
 from .dimensions import JOIN_STATUS_TO_IDENTITY_STATE, DIMENSIONS
-from discovery.keywords import KW_KEYS
+from .keywords import KW_KEYS
+from .civictwin_paths import parcel_geojson_path
 
 bp = Blueprint("parcels", __name__, url_prefix="/api")
 
@@ -248,14 +249,15 @@ def _get_geojson_index() -> dict:
     global _geojson_index
     if _geojson_index is not None:
         return _geojson_index
-    from discovery.config import get_config
-    cfg = get_config()
-    gis_files = cfg.collection_files("gis")
-    path = Path(gis_files[0]["abs_path"]) if gis_files else cfg.root / "gis" / "dennis_parcels.geojson"
+    path = Path(parcel_geojson_path())
     if not path.exists():
         _geojson_index = {}
         return _geojson_index
-    data = json.loads(path.read_text())
+    try:
+        data = json.loads(path.read_text())
+    except Exception:
+        _geojson_index = {}
+        return _geojson_index
     _geojson_index = {
         f["properties"].get("MAP_PAR_ID"): f
         for f in data.get("features", [])

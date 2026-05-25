@@ -5,13 +5,18 @@ from datetime import datetime
 from flask import Blueprint, jsonify, send_file, redirect, abort
 from .models import get_reference_db
 from .db_utils import table_exists
-from discovery.keywords import KW_KEYS
+from .keywords import KW_KEYS
+from .civictwin_paths import registry_scan_path
 
 bp = Blueprint("documents", __name__, url_prefix="/api")
 
 REGISTRY_BASE = "https://search.barnstabledeeds.org"
 
 _DOC_SKIP = {"_loaded_at"}
+
+# In-process cache: viewer_url → resolved /WwwImg/ PDF URL.
+# Avoids repeated outbound fetches to barnstabledeeds.org for the same document.
+_rod_cache: dict[str, str] = {}
 
 
 def _registry_viewer_url(doc) -> str | None:
@@ -38,7 +43,13 @@ def _fetch_rod_redirect(viewer_url: str):
     to that path serves a bare PDF that browsers (and iframes) can display
     without hitting X-Frame-Options restrictions on the viewer wrapper page.
     Falls back to the viewer URL itself if extraction fails.
+
+    Results are cached in _rod_cache so repeated requests for the same document
+    (e.g. iframe reload, expand/collapse) resolve instantly without a second
+    outbound fetch.
     """
+    if viewer_url in _rod_cache:
+        return redirect(_rod_cache[viewer_url])
     try:
         req = _urlreq.Request(viewer_url, headers={"User-Agent": "Mozilla/5.0"})
         with _urlreq.urlopen(req, timeout=10) as resp:
@@ -48,9 +59,12 @@ def _fetch_rod_redirect(viewer_url: str):
             page_suffix = _re.compile(r'\d{4}\.PDF$', _re.IGNORECASE)
             base_paths = [p for p in paths if not page_suffix.search(p)]
             chosen = base_paths[0] if base_paths else paths[0]
-            return redirect(REGISTRY_BASE + chosen)
+            pdf_url = REGISTRY_BASE + chosen
+            _rod_cache[viewer_url] = pdf_url
+            return redirect(pdf_url)
     except Exception:
         pass
+    _rod_cache[viewer_url] = viewer_url  # cache fallback too
     return redirect(viewer_url)
 
 
@@ -182,8 +196,7 @@ def document_pdf(book, page):
     doc = dict(doc)
 
     if doc.get("scan_cached"):
-        from discovery.registry.cache import scan_path
-        path = scan_path(book, page)
+        path = registry_scan_path(book, page)
         if path.exists():
             return send_file(path, mimetype="application/pdf")
 

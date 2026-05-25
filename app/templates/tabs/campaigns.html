@@ -148,8 +148,11 @@
           </template>
         </div>
 
-        <!-- 3-col body -->
-        <div style="flex:1;display:grid;grid-template-columns:260px 1fr 360px;overflow:hidden;border-top:1px solid #e2e8f0;">
+        <!-- 3-col body: grid-template-rows:1fr makes the single implicit row fill the
+             container's definite height (from flex:1), giving grid items a definite
+             height so nested flex:1 children resolve correctly. -->
+        <div style="flex:1;display:grid;grid-template-rows:1fr;overflow:hidden;border-top:1px solid #e2e8f0;"
+             :style="{gridTemplateColumns: '260px ' + (cwExpandedPanel ? '1fr' : '1fr 360px')}">
 
           <!-- Left: queue list -->
           <aside style="background:#fff;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden;">
@@ -246,7 +249,8 @@
           </aside>
 
           <!-- Center: parcel detail -->
-          <main style="overflow:auto;padding:16px 22px;display:flex;flex-direction:column;gap:18px;background:#f3f4f3;">
+          <main style="overflow:auto;padding:16px 22px;display:flex;flex-direction:column;gap:18px;background:#f3f4f3;"
+                :style="{display: cwExpandedPanel ? 'none' : 'flex'}">
 
             <template x-if="cwDetailLoading">
               <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:32px;text-align:center;font-size:12px;color:#94a3b8;">
@@ -646,22 +650,77 @@
           </main><!-- /center col -->
 
           <!-- Right: map + actions -->
-          <aside style="background:#fff;border-left:1px solid #e2e8f0;padding:14px 16px;display:flex;flex-direction:column;gap:12px;overflow:auto;">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;">
-              <span style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;"
-                    x-text="cwParcelDetail ? 'MAP · ' + cwParcelDetail.parcel.parcel_id : (cwDocDetail?.document?.parcel_id ? 'MAP · ' + cwDocDetail.document.parcel_id : 'MAP')"></span>
+          <!-- position:relative lets the PDF section use position:absolute;inset:0 when expanded. -->
+          <aside style="position:relative;background:#fff;border-left:1px solid #e2e8f0;padding:14px 16px;display:flex;flex-direction:column;gap:12px;"
+                 :style="{overflow: cwExpandedPanel ? 'hidden' : 'auto'}">
+
+            <!-- Map section (hidden when PDF is expanded) -->
+            <!-- Use static style for display:flex so x-show can safely override it with display:none.
+                 Object-form :style only patches flex/minHeight, never touches display. -->
+            <div x-show="!cwExpandedPanel || cwExpandedPanel === 'map'"
+                 style="display:flex;flex-direction:column;gap:8px;"
+                 :style="{flex: cwExpandedPanel === 'map' ? '1' : '', minHeight: cwExpandedPanel === 'map' ? '0' : ''}">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;"
+                      x-text="cwParcelDetail ? 'MAP · ' + cwParcelDetail.parcel.parcel_id : (cwDocDetail?.document?.parcel_id ? 'MAP · ' + cwDocDetail.document.parcel_id : 'MAP')"></span>
+                <template x-if="cwParcelDetail || cwDocDetail?.document?.parcel_id">
+                  <button @click="cwExpandedPanel = cwExpandedPanel === 'map' ? null : 'map'"
+                    style="font-size:10px;color:#64748b;background:none;border:1px solid #e2e8f0;border-radius:4px;padding:2px 7px;cursor:pointer;font-family:inherit;line-height:1.6;">
+                    <span x-text="cwExpandedPanel === 'map' ? '⤡ Collapse' : '⤢ Expand'"></span>
+                  </button>
+                </template>
+              </div>
+              <!-- position:relative must stay in static style — the campaign-map child is
+                   position:absolute;inset:0 and depends on this as its containing block. -->
+              <div style="position:relative;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;"
+                   :style="{flex: cwExpandedPanel === 'map' ? '1' : '', minHeight: cwExpandedPanel === 'map' ? '0' : '', height: cwExpandedPanel === 'map' ? '' : '360px', flexShrink: cwExpandedPanel === 'map' ? '' : '0'}">
+                <div id="campaign-map" style="position:absolute;inset:0;"></div>
+                <template x-if="!cwParcelDetail && !cwDocDetail">
+                  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#f8fafc;font-size:11px;color:#94a3b8;font-family:'IBM Plex Mono',monospace;">
+                    Select a parcel
+                  </div>
+                </template>
+              </div>
             </div>
-            <!-- Map -->
-            <div style="position:relative;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;height:360px;flex-shrink:0;">
-              <div id="campaign-map" style="position:absolute;inset:0;"></div>
-              <template x-if="!cwParcelDetail && !cwDocDetail">
-                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#f8fafc;font-size:11px;color:#94a3b8;font-family:'IBM Plex Mono',monospace;">
-                  Select a parcel
+
+            <!-- PDF section (Article 97 only, hidden when map is expanded) -->
+            <!-- PDF section (Article 97 only, hidden when map is expanded) -->
+            <template x-if="selectedCampaignTag?.name === 'Article97Determination' && cwDocDetail && cwDocDetail.document.alis_url">
+              <!-- When expanded: position:absolute;inset:0 pins the section to the aside's
+                   bounding box (aside is position:relative), giving a concrete size for
+                   the flex children inside rather than relying on a 3-level flex:1 chain. -->
+              <div x-show="!cwExpandedPanel || cwExpandedPanel === 'pdf'"
+                   style="display:flex;flex-direction:column;gap:8px;"
+                   :style="{
+                     position: cwExpandedPanel === 'pdf' ? 'absolute' : '',
+                     inset:    cwExpandedPanel === 'pdf' ? '0'        : '',
+                     zIndex:   cwExpandedPanel === 'pdf' ? '1'        : '',
+                     background: cwExpandedPanel === 'pdf' ? '#fff'   : '',
+                     padding:  cwExpandedPanel === 'pdf' ? '14px 16px': ''
+                   }">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:1.2px;"
+                        x-text="'DOCUMENT · Bk ' + cwDocDetail.document.book + '/' + cwDocDetail.document.page"></span>
+                  <button @click="cwExpandedPanel = cwExpandedPanel === 'pdf' ? null : 'pdf'"
+                    style="font-size:10px;color:#64748b;background:none;border:1px solid #e2e8f0;border-radius:4px;padding:2px 7px;cursor:pointer;font-family:inherit;line-height:1.6;">
+                    <span x-text="cwExpandedPanel === 'pdf' ? '⤡ Collapse' : '⤢ Expand'"></span>
+                  </button>
                 </div>
-              </template>
-            </div>
+                <!-- PDF iframe — compact in sidebar, full-height when expanded.
+                     /rod resolves the PDF URL with an outbound fetch on first load,
+                     then serves from _rod_cache so expand/collapse is instant. -->
+                <div style="position:relative;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#f8fafc;"
+                     :style="{flex: cwExpandedPanel === 'pdf' ? '1' : '', flexShrink: cwExpandedPanel === 'pdf' ? '' : '0', minHeight: cwExpandedPanel === 'pdf' ? '0' : '', height: cwExpandedPanel === 'pdf' ? '' : '200px'}">
+                  <iframe :src="'/api/documents/' + cwDocDetail.document.book + '/' + cwDocDetail.document.page + '/rod'"
+                          style="position:absolute;inset:0;width:100%;height:100%;border:none;display:block;"
+                          title="Registry document PDF">
+                    </iframe>
+                  </div>
+              </div>
+            </template>
+
             <!-- Save & Next -->
-            <div style="display:flex;gap:8px;">
+            <div style="flex-shrink:0;display:flex;gap:8px;">
               <button @click="cwSkip()"
                 style="background:#fff;border:1px solid #e2e8f0;color:#64748b;padding:9px 14px;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit;flex:1;">
                 Skip
@@ -676,7 +735,7 @@
               </button>
             </div>
             <!-- Keyboard hints -->
-            <div style="text-align:center;">
+            <div style="flex-shrink:0;text-align:center;">
               <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#94a3b8;">
                 <kbd style="font-family:ui-monospace,monospace;font-size:10px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:3px;padding:1px 5px;margin:0 2px;">S</kbd> skip ·
                 <kbd style="font-family:ui-monospace,monospace;font-size:10px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:3px;padding:1px 5px;margin:0 2px;">↵</kbd> save ·

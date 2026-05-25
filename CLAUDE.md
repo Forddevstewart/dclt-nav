@@ -2,12 +2,16 @@
 
 ## Architecture
 
-Three-stage design: **Discovery** (local scraping) → **Processing** (pipeline builds `reference.db`) → **Presentation** (Flask app on VPS).
+This repository is the **Presentation** application for DCLT Navigator.
+
+Discovery and processing now live in the sibling project `dennis-discovery`.
+
+Canonical architecture contract for both projects:
+- [CONCEPTUAL_ARCHITECTURE.md](CONCEPTUAL_ARCHITECTURE.md)
 
 **Two databases — never confuse them:**
-- `reference.db` — only flows **up** (local pipeline builds it → `sync.sh` deploys it to VPS). Read-only from the app. Contains parcels, GIS layers, registry documents, OCR scores.
-- `transactions.db` — only flows **down** (lives on VPS → `sync.sh` pulls it to local backup). Written by the app, never overwritten by deploy. WORM triggers enforce append-only on taggings and notes.
-- `raw.db` — pipeline-only intermediate. Never accessed by the UI.
+- `reference.db` — produced and deployed by `dennis-discovery`. Read-only from this app.
+- `transactions.db` — lives with this app and is written by user actions. WORM triggers enforce append-only on taggings and notes.
 
 **Tags vs Layers:**
 - Tag = user-authored decision, written to `transactions.db`. Defined in `app/dimensions.py`.
@@ -18,8 +22,6 @@ Three-stage design: **Discovery** (local scraping) → **Processing** (pipeline 
 ## Testing
 
 Include tests with every code change. New API endpoints go in `app/test_routes.py`, new UI flows in `app/test_ui.py`, DB/schema logic in `app/test_adjudications.py`. Run the relevant test file locally before committing to confirm it passes.
-
-`processing/test_build.py` requires the full data pipeline output and is intentionally excluded from CI.
 
 ## Commits
 

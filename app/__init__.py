@@ -7,13 +7,17 @@ from flask import Flask, request, session
 def create_app(test_config=None):
     app = Flask(__name__, template_folder="templates", static_folder="static")
 
+    civictwin_root = os.environ.get("CIVICTWIN_ROOT", "/Volumes/DigitalTwin/CivicTwin")
+
     app.config["DATABASE"] = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), "data", "transactions.db"
     )
+    app.config["CIVICTWIN_ROOT"] = civictwin_root
+    app.config["REFERENCE_DATABASE"] = os.environ.get(
+        "REFERENCE_DATABASE",
+        os.path.join(civictwin_root, "db", "reference.db"),
+    )
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-in-prod")
-
-    from discovery.config import get_config
-    app.config["REFERENCE_DATABASE"] = str(get_config().db_path("reference"))
     app.config["UPLOAD_DIR"] = os.path.join(
         os.path.dirname(os.path.dirname(__file__)), "data", "uploads"
     )

@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request, abort
 from .models import get_reference_db, get_db
 from .db_utils import table_exists
-from discovery.keywords import KW_KEYS, KW_LABELS
+from .keywords import KW_KEYS, KW_LABELS
 
 bp = Blueprint("meta", __name__, url_prefix="/api")
 

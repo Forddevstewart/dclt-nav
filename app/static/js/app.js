@@ -37,6 +37,7 @@
         cwDetailLoading:  false,
         cwDetailError:    null,
         cwChipOpen:       false,
+        cwExpandedPanel:  null,     // null | 'map' | 'pdf'
 
         // overview
         overviewData:    null,
@@ -601,6 +602,7 @@
           this.cwDocDetail     = null;
           this.cwDetailLoading = true;
           this.cwDetailError   = null;
+          this.cwExpandedPanel = null;
           this.cwChipOpen      = false;
           const dim = this.selectedCampaignTag?.name;
           try {

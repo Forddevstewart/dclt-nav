@@ -2,6 +2,7 @@ from collections import defaultdict
 from flask import Blueprint, jsonify, abort, send_file, redirect, request
 from .models import get_reference_db, get_db
 from .db_utils import table_exists
+from .civictwin_paths import town_doc_pdf_path
 
 bp = Blueprint("town_docs", __name__, url_prefix="/api")
 
@@ -230,8 +231,7 @@ def town_doc_pdf(doc_id):
     ref.close()
     if not row or not row["source_path"]:
         abort(404)
-    from discovery.config import get_config
-    pdf_path = get_config().root / "ma-dennis" / row["source_path"]
+    pdf_path = town_doc_pdf_path(row["source_path"])
     if pdf_path.exists():
         return send_file(pdf_path, mimetype="application/pdf")
     source_url = (dict(row).get("source_url") or "").strip()
