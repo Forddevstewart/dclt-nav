@@ -11,11 +11,10 @@ const _GIS_WMS = {
   natcomm_id:   { label: 'Natural Community',        wmsLayer: 'massgis:GISDATA.NATCOMM_POLY' },
   bm3_vp_id:    { label: 'BioMap3 Vernal Pool',      wmsLayer: 'massgis:GISDATA.BM3_CH_VERNAL_POOLS_CORE' },
   bm3_wc_id:    { label: 'BioMap3 Wetland Corridor', wmsLayer: 'massgis:GISDATA.BM3_LOCAL_WETLANDS' },
-  bm3_ch_id:    { label: 'BioMap3 Core Habitat',     wmsLayer: 'massgis:GISDATA.BM3_CORE_HABITAT' },
-  bm3_cnl_id:   { label: 'BioMap3 CNL',              wmsLayer: 'massgis:GISDATA.BM3_CRITICAL_NATURAL_LANDSCAPE' },
   os_site_name: { label: 'Open Space',               wmsLayer: 'massgis:GISDATA.OPENSPACE_POLY' },
   wetlands_code:{ label: 'Wetlands',                 wmsLayer: 'massgis:GISDATA.WETLANDSDEP_POLY',
                   styles: 'GISDATA.WETLANDSDEP_POLY::General_Categories_Max_24000' },
+  cvp_id:       { label: 'Certified Vernal Pool',    wmsLayer: 'massgis:GISDATA.CVP_PT' },
 };
 
 // ── Parcel detail map ─────────────────────────────────────────────────────────
